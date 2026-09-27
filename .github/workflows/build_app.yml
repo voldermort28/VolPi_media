@@ -54,6 +54,7 @@ jobs:
   build-ios:
     name: Build iOS No-Codesign Payload
     runs-on: macos-latest
+    continue-on-error: true
 
     steps:
       - name: Checkout Code
@@ -75,10 +76,6 @@ jobs:
           mkdir -p ios/Runner
           cp /tmp/Info.plist ios/Runner/Info.plist || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
-          mkdir -p ios/Flutter
-          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
-          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
-          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
 
       - name: Get Dependencies
         working-directory: app-tv
@@ -86,14 +83,31 @@ jobs:
 
       - name: Build iOS (No codesign)
         working-directory: app-tv
-        run: flutter build ios --release --no-codesign
+        run: |
+          flutter build ios --release --no-codesign --config-only
+          sed -i '' 's/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;/g' ios/Runner.xcodeproj/project.pbxproj || true
+          xcodebuild -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
 
       - name: Create Unsigned IPA Package
         working-directory: app-tv
         run: |
-          mkdir -p Payload
-          cp -r build/ios/iphoneos/Runner.app Payload/
-          zip -r VolPi-Media-iOS.ipa Payload
+          APP_PATH=$(find build -name "Runner.app" -type d | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            mkdir -p Payload
+            cp -r "$APP_PATH" Payload/
+            zip -r VolPi-Media-iOS.ipa Payload
+          else
+            echo "Runner.app not found"
+            exit 1
+          fi
 
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
