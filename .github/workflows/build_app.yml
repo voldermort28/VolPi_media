@@ -3,7 +3,12 @@ name: Build VolPi Media APK & IPA
 on:
   push:
     branches: [ main, master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-apk:
@@ -45,11 +50,52 @@ jobs:
         working-directory: app-tv
         run: flutter build apk --release
 
+      - name: Prepare Release APK with Version
+        working-directory: app-tv
+        run: |
+          RAW_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ' | tr -d '\r')
+          CLEAN_VERSION=$(echo $RAW_VERSION | cut -d '+' -f 1)
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+          else
+            RELEASE_TAG="v${CLEAN_VERSION}"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
+          
+          APK_DIR="build/app/outputs/flutter-apk"
+          cp "$APK_DIR/app-release.apk" "$APK_DIR/VolPi-Media-${RELEASE_TAG}.apk"
+          cp "$APK_DIR/app-release.apk" "$APK_DIR/VolPi-Media-AndroidTV.apk"
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VolPi-Media-AndroidTV
-          path: app-tv/build/app/outputs/flutter-apk/app-release.apk
+          name: VolPi-Media-${{ env.RELEASE_TAG }}
+          path: app-tv/build/app/outputs/flutter-apk/VolPi-Media-${{ env.RELEASE_TAG }}.apk
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: "VolPi Media ${{ env.RELEASE_TAG }}"
+          body: |
+            ## 🚀 VolPi Media ${{ env.RELEASE_TAG }} - Ứng dụng xem Trực tiếp Bóng Đá & Phim
+
+            ### 🌟 Tính năng chính:
+            - 📺 **Giao diện Android TV (10-foot UI)**: Điều hướng 100% bằng remote D-pad, hiệu ứng phóng to 1.06x và viền phát quang xanh neon.
+            - ⚽ **Bóng Đá Trực Tiếp (Xôi Lạc)**: Tự động refresh khi vào tab, hỗ trợ chọn BLV trực tiếp trong player.
+            - 🍿 **Anime & Phim lẻ**: Tốc độ phát nhanh, phụ đề và lồng tiếng đầy đủ.
+            - 🔒 **Profile Bí Mật (Zero-Trace)**: Nút Profile góc trên, mã PIN bí mật `3105` mở kho phim riêng tư, tự động xóa sạch dữ liệu khỏi RAM khi thoát.
+
+            ### 📥 Hướng dẫn cài đặt trên Android TV / Google TV / Android Phone:
+            1. Tải file **`VolPi-Media-${{ env.RELEASE_TAG }}.apk`** bên dưới.
+            2. Chép vào USB cắm vào TV hoặc dùng ứng dụng **Send Files to TV** để chuyển file sang TV.
+            3. Cài đặt và mở app từ màn hình chính TV.
+          files: |
+            app-tv/build/app/outputs/flutter-apk/VolPi-Media-${{ env.RELEASE_TAG }}.apk
+            app-tv/build/app/outputs/flutter-apk/VolPi-Media-AndroidTV.apk
+          draft: false
+          prerelease: false
 
   build-ios:
     name: Build iOS No-Codesign Payload
@@ -109,8 +155,27 @@ jobs:
             exit 1
           fi
 
+      - name: Extract Release Tag
+        working-directory: app-tv
+        run: |
+          RAW_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ' | tr -d '\r')
+          CLEAN_VERSION=$(echo $RAW_VERSION | cut -d '+' -f 1)
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+          else
+            RELEASE_TAG="v${CLEAN_VERSION}"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+
       - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
           name: VolPi-Media-iOS
           path: app-tv/VolPi-Media-iOS.ipa
+
+      - name: Attach IPA to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: app-tv/VolPi-Media-iOS.ipa
