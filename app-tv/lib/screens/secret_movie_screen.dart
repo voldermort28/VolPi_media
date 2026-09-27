@@ -182,7 +182,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      color: Colors.redAccent.withValues(alpha: 0.2),
+                      color: Colors.redAccent.withOpacity(0.2),
                       child: const Row(
                         children: [
                           Icon(Icons.lock_outline_rounded, color: Colors.redAccent, size: 16),

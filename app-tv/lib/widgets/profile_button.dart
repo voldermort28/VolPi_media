@@ -27,7 +27,7 @@ class ProfileButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFF1E293B).withValues(alpha: 0.8),
+            color: const Color(0xFF1E293B).withOpacity(0.8),
             borderRadius: BorderRadius.circular(22),
             border: Border.all(color: const Color(0xFF334155), width: 1),
           ),

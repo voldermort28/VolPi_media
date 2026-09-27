@@ -30,9 +30,12 @@ jobs:
       - name: Scaffold Platform Wrapper
         working-directory: app-tv
         run: |
+          cp pubspec.yaml /tmp/pubspec.yaml || true
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
-          flutter create . --platforms=android --org=com.volpi
+          flutter create . --platforms=android --org=com.volpi --project-name=volpi_media
+          mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+          cp /tmp/pubspec.yaml pubspec.yaml || true
 
       - name: Get Dependencies
         working-directory: app-tv
@@ -66,9 +69,12 @@ jobs:
       - name: Scaffold Platform Wrapper
         working-directory: app-tv
         run: |
+          cp pubspec.yaml /tmp/pubspec.yaml || true
           cp ios/Runner/Info.plist /tmp/Info.plist || true
-          flutter create . --platforms=ios --org=com.volpi
+          flutter create . --platforms=ios --org=com.volpi --project-name=volpi_media
+          mkdir -p ios/Runner
           cp /tmp/Info.plist ios/Runner/Info.plist || true
+          cp /tmp/pubspec.yaml pubspec.yaml || true
 
       - name: Get Dependencies
         working-directory: app-tv

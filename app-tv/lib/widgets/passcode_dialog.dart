@@ -148,7 +148,7 @@ class _PasscodeDialogState extends State<PasscodeDialog> {
                       _buildActionKey(
                         icon: Icons.close,
                         onTap: () => Navigator.of(context).pop(),
-                        color: Colors.redAccent.withValues(alpha: 0.2),
+                        color: Colors.redAccent.withOpacity(0.2),
                       ),
                       const SizedBox(width: 12),
                       _buildNumberKey('0'),
@@ -156,7 +156,7 @@ class _PasscodeDialogState extends State<PasscodeDialog> {
                       _buildActionKey(
                         icon: Icons.backspace_outlined,
                         onTap: _onBackspace,
-                        color: Colors.amber.withValues(alpha: 0.2),
+                        color: Colors.amber.withOpacity(0.2),
                       ),
                     ],
                   ),

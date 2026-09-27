@@ -90,7 +90,7 @@ class _TvFocusableCardState extends State<TvFocusableCard> {
               boxShadow: _isFocused
                   ? [
                       BoxShadow(
-                        color: widget.focusBorderColor.withValues(alpha: 0.5),
+                        color: widget.focusBorderColor.withOpacity(0.5),
                         blurRadius: 16,
                         spreadRadius: 2,
                       ),

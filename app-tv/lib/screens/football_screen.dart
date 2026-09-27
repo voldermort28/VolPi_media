@@ -195,7 +195,7 @@ class _FootballScreenState extends State<FootballScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7).withValues(alpha: 0.3),
+                        color: const Color(0xFF0284C7).withOpacity(0.3),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
                       ),
@@ -306,11 +306,11 @@ class _FootballScreenState extends State<FootballScreen> {
     Color focusBorder = const Color(0xFF38BDF8);
 
     if (match.isMuFavorite) {
-      cardBg = const Color(0xFF450A0A).withValues(alpha: 0.6);
+      cardBg = const Color(0xFF450A0A).withOpacity(0.6);
       borderColor = const Color(0xFF991B1B);
       focusBorder = const Color(0xFFEF4444);
     } else if (match.isHot) {
-      cardBg = const Color(0xFF451A03).withValues(alpha: 0.6);
+      cardBg = const Color(0xFF451A03).withOpacity(0.6);
       borderColor = const Color(0xFF9A3412);
       focusBorder = const Color(0xFFF97316);
     }
