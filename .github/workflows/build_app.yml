@@ -75,6 +75,10 @@ jobs:
           mkdir -p ios/Runner
           cp /tmp/Info.plist ios/Runner/Info.plist || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
+          mkdir -p ios/Flutter
+          echo "CODE_SIGNING_ALLOWED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> ios/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY=" >> ios/Flutter/Release.xcconfig
 
       - name: Get Dependencies
         working-directory: app-tv
