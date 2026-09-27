@@ -1,0 +1,24 @@
+{
+  "name": "stremio-vlxx-addon",
+  "version": "1.0.0",
+  "description": "VLXX Stremio Stream & Catalog Addon",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "test": "node test.js"
+  },
+  "keywords": [
+    "stremio",
+    "stremio-addon",
+    "vlxx",
+    "stream"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "cheerio": "1.0.0-rc.12",
+    "stremio-addon-sdk": "^1.6.10"
+  }
+}

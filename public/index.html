@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stremio Addon Manager | Laboon Stream</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 60%, #030712 100%);
+      min-height: 100vh;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glow-effect {
+      box-shadow: 0 0 40px -10px rgba(14, 165, 233, 0.3);
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-sans antialiased selection:bg-sky-500 selection:text-white pb-16">
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toast-content" class="px-5 py-4 rounded-xl shadow-2xl flex items-center gap-3 glass-panel border border-slate-700">
+      <div id="toast-icon"></div>
+      <div>
+        <h4 id="toast-title" class="font-bold text-sm"></h4>
+        <p id="toast-message" class="text-xs text-slate-300 mt-0.5"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 sticky top-0 z-40 bg-slate-950/80 backdrop-blur-lg">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 font-black text-xl text-white">
+          ⚡
+        </div>
+        <div>
+          <span class="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-sky-400 bg-clip-text text-transparent">
+            Stremio Addon Manager
+          </span>
+          <span class="hidden sm:inline-block ml-2 text-xs text-slate-400 px-2 py-0.5 rounded bg-slate-800 border border-slate-700">v1.3.0</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>Server Online</span>
+        </div>
+        <button onclick="fetchStatus(true)" class="p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition border border-slate-700 cursor-pointer" title="Làm mới trạng thái">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 pt-8 space-y-8">
+    
+    <!-- Hero Banner -->
+    <div class="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8 glow-effect border-sky-500/20">
+      <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 text-xs font-bold mb-3">
+            <span>🌸 Yumei Anime • ⚽ Xôi Lạc TV • 🎬 VLFilm Hub</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-black tracking-tight text-white">
+            Trung Tâm Điều Khiển & Cập Nhật Domain
+          </h1>
+          <p class="text-slate-400 text-sm sm:text-base mt-2 max-w-2xl leading-relaxed">
+            Quản lý và cập nhật tên miền nguồn phát trực tuyến nhanh chóng khi các trang bị chặn hoặc đổi domain. Tự động áp dụng ngay tức thì cho mọi ứng dụng Stremio.
+          </p>
+        </div>
+        <div class="flex flex-col gap-2 min-w-[200px]">
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-xs">
+            <span class="text-slate-400 block">Trận bóng đá trực tiếp:</span>
+            <span id="stat-matches" class="text-lg font-black text-sky-400">Đang tải...</span>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-xs">
+            <span class="text-slate-400 block">Thời gian máy chủ:</span>
+            <span id="stat-uptime" class="text-sm font-semibold text-slate-300">Online</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 1: Domain Configuration & Quick Switcher -->
+    <div class="glass-panel rounded-2xl p-6 sm:p-8 space-y-6">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-white">
+            <i data-lucide="globe" class="w-5 h-5 text-sky-400"></i>
+            Cấu Hình Domain Nguồn Phát
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Khi website đổi tên miền, bạn chỉ cần dán domain mới vào đây và bấm Lưu.</p>
+        </div>
+        <span class="text-xs font-semibold px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+          ⚡ Hot-Reload (Không cần reset)
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        
+        <!-- Yumei Anime Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-purple-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">🌸</span>
+              <span>Yumei Anime</span>
+            </div>
+            <span id="yumei-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-yumei-domain" placeholder="https://yumei-anime.com" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setYumeiDomain('https://yumei-anime.com')" class="text-[11px] bg-slate-800 hover:bg-purple-600/30 hover:border-purple-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                yumei-anime.com ⭐
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('yumei')" id="btn-test-yumei" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Xoilac TV Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-sky-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">⚽</span>
+              <span>Xôi Lạc TV</span>
+            </div>
+            <span id="xoilac-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-xoilac-domain" placeholder="https://xoilaczzw.cc" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setXoilacDomain('https://xoilaczzw.cc')" class="text-[11px] bg-slate-800 hover:bg-sky-600/30 hover:border-sky-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                xoilaczzw.cc ⭐
+              </button>
+              <button type="button" onclick="setXoilacDomain('https://xoilaczbn.tv')" class="text-[11px] bg-slate-800 hover:bg-sky-600/30 hover:border-sky-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                xoilaczbn.tv
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('xoilac')" id="btn-test-xoilac" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VLXX Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-rose-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">🎬</span>
+              <span>VLFilm Stream</span>
+            </div>
+            <span id="vlxx-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-vlxx-domain" placeholder="https://vlxx.phd" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setVlxxDomain('https://vlxx.phd')" class="text-[11px] bg-slate-800 hover:bg-rose-600/30 hover:border-rose-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                vlxx.phd ⭐
+              </button>
+              <button type="button" onclick="setVlxxDomain('https://vlxx.sex')" class="text-[11px] bg-slate-800 hover:bg-rose-600/30 hover:border-rose-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                vlxx.sex
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('vlxx')" id="btn-test-vlxx" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Save Button -->
+      <div class="pt-4 flex items-center justify-end gap-3 border-t border-slate-800">
+        <span class="text-xs text-slate-400">Tự động xóa cache và cập nhật tức thì cho toàn bộ người dùng Stremio.</span>
+        <button type="button" onclick="saveAllConfig()" id="btn-save-config" class="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm shadow-lg shadow-sky-500/25 flex items-center gap-2 transition transform active:scale-95 cursor-pointer">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          <span>Lưu Cấu Hình & Áp Dụng Ngay</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Section 2: Quick Stremio Addon Links -->
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-xl font-bold flex items-center gap-2 text-white">
+          <i data-lucide="tv" class="w-5 h-5 text-indigo-400"></i>
+          Danh Sách Addon Cài Vào Stremio
+        </h2>
+        <span class="text-xs text-slate-400">Hỗ trợ 1-Click mở trên Stremio Mobile, Android TV, Desktop</span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Yumei Anime Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-purple-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">🌸</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-400 font-bold">Mới ⭐</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">Yumei Anime Vietsub</h3>
+            <p class="text-xs text-slate-400 mt-1">Trọn bộ Pokemon (Season 1-29), Pokemon Movies, Sakura, Ghibli, Super Sentai & Power Rangers.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-yumei-install" href="/yumei/manifest.json" class="w-full bg-purple-600 hover:bg-purple-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('yumei')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Xoilac Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-sky-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">⚽</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-400 font-bold">Bóng Đá</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">Xôi Lạc TV (Bóng Đá)</h3>
+            <p class="text-xs text-slate-400 mt-1">Trực tiếp bóng đá C1, Ngoại Hạng Anh, La Liga... BLV tiếng Việt, không quảng cáo.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-xoilac-install" href="/xoilac/manifest.json" class="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('xoilac')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- VLFilm Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-rose-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">🎬</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold">VLFilm</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">VLFilm Stream</h3>
+            <p class="text-xs text-slate-400 mt-1">Kho phim Vietsub Full HD, thumbnail kèm tiêu đề rõ nét, server riêng tốc độ cao.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-vlxx-install" href="/vlxx/manifest.json" class="w-full bg-rose-600 hover:bg-rose-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('vlxx')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Combo Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">📦</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 font-bold">Combo All</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">VolPi Media (Combo)</h3>
+            <p class="text-xs text-slate-400 mt-1">Tích hợp đầy đủ Anime, Bóng Đá và VLFilm trong 1 addon duy nhất.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-combo-install" href="/manifest.json" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('combo')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Section 3: Live Scraped Football Match Preview -->
+    <div class="glass-panel rounded-2xl p-6 sm:p-8 space-y-4">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div>
+          <h2 class="text-xl font-bold flex items-center gap-2 text-white">
+            <i data-lucide="activity" class="w-5 h-5 text-emerald-400"></i>
+            Danh Sách Trận Bóng Đá Đang Lấy Từ Domain Hiện Tại
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">Dữ liệu thực tế được bóc tách trực tiếp từ nguồn Xôi Lạc để bạn kiểm tra.</p>
+        </div>
+        <button type="button" onclick="loadLiveMatches()" class="text-xs font-semibold px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Làm mới</span>
+        </button>
+      </div>
+
+      <div id="matches-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+        <div class="col-span-full py-8 text-center text-slate-400 text-sm">
+          Đang tải danh sách trận đấu...
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    // Initialize Lucide Icons
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    // Setup Dynamic Install Links
+    const hostWithPort = window.location.host;
+    document.getElementById('link-yumei-install').href = 'stremio://' + hostWithPort + '/yumei/manifest.json';
+    document.getElementById('link-xoilac-install').href = 'stremio://' + hostWithPort + '/xoilac/manifest.json';
+    document.getElementById('link-vlxx-install').href = 'stremio://' + hostWithPort + '/vlxx/manifest.json';
+    document.getElementById('link-combo-install').href = 'stremio://' + hostWithPort + '/manifest.json';
+
+    function showToast(title, message, isSuccess) {
+      const toast = document.getElementById('toast');
+      const titleEl = document.getElementById('toast-title');
+      const msgEl = document.getElementById('toast-message');
+      const iconEl = document.getElementById('toast-icon');
+
+      titleEl.textContent = title;
+      msgEl.textContent = message;
+
+      if (isSuccess) {
+        titleEl.className = 'font-bold text-sm text-emerald-400';
+        iconEl.innerHTML = '<div class="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-black">✓</div>';
+      } else {
+        titleEl.className = 'font-bold text-sm text-rose-400';
+        iconEl.innerHTML = '<div class="w-7 h-7 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center font-black">✕</div>';
+      }
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(function() {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3500);
+    }
+
+    function copyManifestUrl(type) {
+      const origin = window.location.origin;
+      let url = origin + '/manifest.json';
+      if (type === 'yumei') url = origin + '/yumei/manifest.json';
+      if (type === 'xoilac') url = origin + '/xoilac/manifest.json';
+      if (type === 'vlxx') url = origin + '/vlxx/manifest.json';
+
+      navigator.clipboard.writeText(url).then(function() {
+        showToast('Đã sao chép!', url, true);
+      }).catch(function() {
+        showToast('Lỗi', 'Không thể copy tự động, vui lòng copy link: ' + url, false);
+      });
+    }
+
+    function setYumeiDomain(url) {
+      document.getElementById('input-yumei-domain').value = url;
+    }
+
+    function setXoilacDomain(url) {
+      document.getElementById('input-xoilac-domain').value = url;
+    }
+
+    function setVlxxDomain(url) {
+      document.getElementById('input-vlxx-domain').value = url;
+    }
+
+    async function fetchStatus(showNotification) {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+
+        if (data.config) {
+          if (document.getElementById('input-yumei-domain')) {
+            document.getElementById('input-yumei-domain').value = data.config.yumeiBaseUrl || '';
+          }
+          document.getElementById('input-xoilac-domain').value = data.config.xoilacBaseUrl || '';
+          document.getElementById('input-vlxx-domain').value = data.config.vlxxBaseUrl || '';
+        }
+
+        if (data.matchesCount !== undefined) {
+          document.getElementById('stat-matches').textContent = data.matchesCount + ' trận đấu';
+        }
+        if (data.uptime) {
+          document.getElementById('stat-uptime').textContent = data.uptime;
+        }
+
+        if (showNotification) {
+          showToast('Đã làm mới', 'Dữ liệu trạng thái mới nhất đã được cập nhật.', true);
+        }
+      } catch (err) {
+        console.error('Status fetch error:', err);
+      }
+    }
+
+    async function testDomain(type) {
+      let inputEl, badgeEl, btnEl;
+      if (type === 'yumei') {
+        inputEl = document.getElementById('input-yumei-domain');
+        badgeEl = document.getElementById('yumei-status-badge');
+        btnEl = document.getElementById('btn-test-yumei');
+      } else if (type === 'xoilac') {
+        inputEl = document.getElementById('input-xoilac-domain');
+        badgeEl = document.getElementById('xoilac-status-badge');
+        btnEl = document.getElementById('btn-test-xoilac');
+      } else {
+        inputEl = document.getElementById('input-vlxx-domain');
+        badgeEl = document.getElementById('vlxx-status-badge');
+        btnEl = document.getElementById('btn-test-vlxx');
+      }
+
+      const url = inputEl.value.trim();
+      if (!url) {
+        showToast('Cảnh báo', 'Vui lòng nhập domain cần kiểm tra!', false);
+        return;
+      }
+
+      badgeEl.className = 'text-xs px-2 py-0.5 rounded font-medium bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      badgeEl.textContent = 'Đang test...';
+      btnEl.disabled = true;
+
+      try {
+        const res = await fetch('/api/test-domain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: type, url: url }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (data.redirectedUrl) {
+            inputEl.value = data.redirectedUrl;
+            badgeEl.className = 'text-xs px-2 py-0.5 rounded font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+            badgeEl.textContent = '✓ Tự chuyển hướng: ' + data.redirectedUrl + ' (' + (data.count || 0) + ' mục)';
+            showToast('Phát hiện chuyển hướng!', 'Đã tự động cập nhật domain mới: ' + data.redirectedUrl, true);
+          } else {
+            badgeEl.className = 'text-xs px-2 py-0.5 rounded font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
+            badgeEl.textContent = '✓ Hoạt động tốt (' + (data.count || 0) + ' items)';
+            showToast('Kết nối thành công!', 'Domain hoạt động tốt, tìm thấy ' + (data.count || 0) + ' mục.', true);
+          }
+        } else {
+          badgeEl.className = 'text-xs px-2 py-0.5 rounded font-medium bg-rose-500/20 text-rose-400 border border-rose-500/40';
+          badgeEl.textContent = '✕ Thất bại: ' + (data.error || 'Không kết nối được');
+          showToast('Kiểm tra thất bại', data.error || 'Không thể kết nối đến domain này.', false);
+        }
+      } catch (err) {
+        badgeEl.className = 'text-xs px-2 py-0.5 rounded font-medium bg-rose-500/20 text-rose-400 border border-rose-500/40';
+        badgeEl.textContent = '✕ Lỗi';
+        showToast('Lỗi', err.message, false);
+      } finally {
+        btnEl.disabled = false;
+      }
+    }
+
+    async function saveAllConfig() {
+      const yumeiBaseUrl = document.getElementById('input-yumei-domain') ? document.getElementById('input-yumei-domain').value.trim() : '';
+      const xoilacBaseUrl = document.getElementById('input-xoilac-domain').value.trim();
+      const vlxxBaseUrl = document.getElementById('input-vlxx-domain').value.trim();
+      const saveBtn = document.getElementById('btn-save-config');
+
+      saveBtn.disabled = true;
+      saveBtn.innerHTML = '<span>Đang lưu...</span>';
+
+      try {
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ yumeiBaseUrl: yumeiBaseUrl, xoilacBaseUrl: xoilacBaseUrl, vlxxBaseUrl: vlxxBaseUrl }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          showToast('Thành công!', 'Đã cập nhật tên miền mới và xóa sạch cache cũ.', true);
+          loadLiveMatches();
+          fetchStatus();
+        } else {
+          showToast('Lỗi', data.message || 'Không thể lưu cấu hình.', false);
+        }
+      } catch (err) {
+        showToast('Lỗi', err.message, false);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i data-lucide="save" class="w-4 h-4"></i><span>Lưu Cấu Hình & Áp Dụng Ngay</span>';
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    async function loadLiveMatches() {
+      const container = document.getElementById('matches-container');
+      container.innerHTML = '<div class="col-span-full py-8 text-center text-slate-400 text-sm">Đang tải danh sách trận đấu...</div>';
+
+      try {
+        const res = await fetch('/api/matches');
+        const matches = await res.json();
+
+        if (!Array.isArray(matches) || matches.length === 0) {
+          container.innerHTML = '<div class="col-span-full py-8 text-center text-slate-400 text-sm">Hiện tại không có trận đấu nào hoặc domain chưa lấy được dữ liệu.</div>';
+          return;
+        }
+
+        document.getElementById('stat-matches').textContent = matches.length + ' trận đấu';
+
+        let html = '';
+        for (let i = 0; i < Math.min(matches.length, 15); i++) {
+          const m = matches[i];
+          const isMu = m.priority && m.priority.level === 1;
+          const isBig = m.priority && m.priority.level === 2;
+          const borderClass = isMu ? 'border-rose-500/60 bg-rose-950/20' : (isBig ? 'border-amber-500/50 bg-amber-950/20' : 'border-slate-800 bg-slate-900/60');
+          
+          let badgeHtml = '';
+          if (isMu) {
+            badgeHtml = '<span class="text-[10px] px-2 py-0.5 rounded bg-rose-600 text-white font-black tracking-wide">⭐ MU FAVORITE</span>';
+          } else if (isBig) {
+            badgeHtml = '<span class="text-[10px] px-2 py-0.5 rounded bg-amber-600 text-white font-black tracking-wide">🔥 TÂM ĐIỂM</span>';
+          }
+
+          html += '<div class="rounded-xl p-4 border ' + borderClass + ' glass-card space-y-3 flex flex-col justify-between">' +
+            '<div class="flex items-center justify-between text-xs">' +
+              '<span class="text-sky-400 font-bold truncate max-w-[170px]">' + (m.league || 'Bóng đá') + '</span>' +
+              '<span class="text-slate-400 font-mono text-[11px] bg-slate-800 px-2 py-0.5 rounded">' + (m.time || '') + '</span>' +
+            '</div>' +
+            '<div class="flex items-center justify-between gap-3 py-1">' +
+              '<div class="flex-1 text-right font-extrabold text-white text-xs truncate">' + (m.homeTeam || '') + '</div>' +
+              '<div class="px-2 py-0.5 rounded bg-rose-600/90 text-white text-[10px] font-black">VS</div>' +
+              '<div class="flex-1 text-left font-extrabold text-white text-xs truncate">' + (m.awayTeam || '') + '</div>' +
+            '</div>' +
+            '<div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[11px]">' +
+              '<div>' + badgeHtml + '</div>' +
+              '<span class="text-emerald-400 flex items-center gap-1 font-semibold text-[10px]">' +
+                '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>' +
+                'Trực tiếp' +
+              '</span>' +
+            '</div>' +
+          '</div>';
+        }
+
+        container.innerHTML = html;
+        if (window.lucide) lucide.createIcons();
+      } catch (err) {
+        container.innerHTML = '<div class="col-span-full py-8 text-center text-rose-400 text-sm">Lỗi khi tải danh sách trận: ' + err.message + '</div>';
+      }
+    }
+
+    // Run on start
+    fetchStatus();
+    loadLiveMatches();
+  </script>
+</body>
+</html>
