@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/match_model.dart';
 import '../widgets/tv_focusable_card.dart';
 
@@ -46,7 +45,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _currentTitle = widget.title;
     _currentHeaders = widget.headers;
 
-    WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _initPlayer();
   }
@@ -140,7 +138,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void dispose() {
     _hideControlsTimer?.cancel();
     _controller.dispose();
-    WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
