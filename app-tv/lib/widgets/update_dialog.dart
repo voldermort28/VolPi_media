@@ -259,7 +259,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   const SizedBox(width: 12),
                   TvFocusableCard(
                     onTap: _isDownloading ? () {} : _startUpdate,
-                    autofocus: true,
+                    autoFocus: true,
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
