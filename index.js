@@ -86,7 +86,7 @@ app.post("/api/update-version-info", (req, res) => {
   return res.json({ success: true, versionInfo: data });
 });
 
-// Endpoint to stream-upload release binary (.apk or .ipa)
+// Endpoint to stream-upload release binary (.apk or .ipa) with auto-cleanup of old versions
 app.post("/api/upload-release", (req, res) => {
   const token = req.query.token || req.headers["x-upload-token"];
   if (token !== OTA_DEPLOY_TOKEN) {
@@ -103,38 +103,110 @@ app.post("/api/upload-release", (req, res) => {
     fs.mkdirSync(downloadDir, { recursive: true });
   }
 
-  const filePath = path.join(downloadDir, filename);
-  const writeStream = fs.createWriteStream(filePath);
+  const isApk = filename.endsWith(".apk");
+  const isIpa = filename.endsWith(".ipa");
+  const targetFilename = isApk ? "VolPi-Media-AndroidTV.apk" : "VolPi-Media-iOS.ipa";
+  const tmpPath = path.join(downloadDir, `${targetFilename}.tmp`);
+  const finalFilePath = path.join(downloadDir, targetFilename);
 
+  const writeStream = fs.createWriteStream(tmpPath);
   req.pipe(writeStream);
 
   writeStream.on("finish", () => {
-    const version = req.query.version;
-    if (version) {
-      const versionFile = path.join(__dirname, "version.json");
-      let data = {};
-      if (fs.existsSync(versionFile)) {
-        try {
-          data = JSON.parse(fs.readFileSync(versionFile, "utf-8"));
-        } catch (e) {}
+    try {
+      if (!fs.existsSync(tmpPath) || fs.statSync(tmpPath).size === 0) {
+        if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+        return res.status(400).json({ error: "Uploaded file is empty" });
       }
-      data.version = version.replace(/^v/i, "");
-      data.tag_name = version.startsWith("v") ? version : `v${version}`;
-      data.apkUrl = "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk";
-      data.ipaUrl = "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa";
-      data.updated_at = new Date().toISOString();
-      fs.writeFileSync(versionFile, JSON.stringify(data, null, 2), "utf-8");
-    }
 
-    const size = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
-    console.log(`[OTA Deploy] Successfully saved ${filename} (${(size / 1024 / 1024).toFixed(2)} MB)`);
-    return res.json({ success: true, filename, size });
+      // STORAGE CLEANUP: Delete old versions and residual files of the same type
+      const files = fs.readdirSync(downloadDir);
+      for (const f of files) {
+        if (f !== `${targetFilename}.tmp`) {
+          if (
+            (isApk && f.toLowerCase().endsWith(".apk")) ||
+            (isIpa && f.toLowerCase().endsWith(".ipa")) ||
+            f.endsWith(".tmp") ||
+            f.endsWith(".part")
+          ) {
+            try {
+              fs.unlinkSync(path.join(downloadDir, f));
+              console.log(`[Storage Cleanup] Deleted old release file: ${f}`);
+            } catch (err) {
+              console.error(`[Storage Cleanup Error] Failed to delete ${f}:`, err.message);
+            }
+          }
+        }
+      }
+
+      // Atomic rename tmp file to active release filename
+      fs.renameSync(tmpPath, finalFilePath);
+
+      // Update version metadata
+      const version = req.query.version;
+      if (version) {
+        const versionFile = path.join(__dirname, "version.json");
+        let data = {};
+        if (fs.existsSync(versionFile)) {
+          try {
+            data = JSON.parse(fs.readFileSync(versionFile, "utf-8"));
+          } catch (e) {}
+        }
+        data.version = version.replace(/^v/i, "");
+        data.tag_name = version.startsWith("v") ? version : `v${version}`;
+        data.apkUrl = "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk";
+        data.ipaUrl = "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa";
+        data.updated_at = new Date().toISOString();
+        fs.writeFileSync(versionFile, JSON.stringify(data, null, 2), "utf-8");
+      }
+
+      const size = fs.existsSync(finalFilePath) ? fs.statSync(finalFilePath).size : 0;
+      console.log(`[OTA Deploy] Successfully updated ${targetFilename} (${(size / 1024 / 1024).toFixed(2)} MB), old versions purged.`);
+      return res.json({ success: true, filename: targetFilename, size, purgedOldVersions: true });
+    } catch (err) {
+      console.error("[OTA Deploy Error]", err);
+      if (fs.existsSync(tmpPath)) {
+        try { fs.unlinkSync(tmpPath); } catch (_) {}
+      }
+      return res.status(500).json({ error: err.message });
+    }
   });
 
   writeStream.on("error", (err) => {
-    console.error("[OTA Deploy Error]", err);
+    console.error("[OTA Deploy Stream Error]", err);
+    if (fs.existsSync(tmpPath)) {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+    }
     return res.status(500).json({ error: err.message });
   });
+});
+
+// Endpoint to manually prune any extraneous files in download folder
+app.post("/api/cleanup-downloads", (req, res) => {
+  const token = req.query.token || req.headers["x-upload-token"] || (req.body && req.body.token);
+  if (token !== OTA_DEPLOY_TOKEN) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const downloadDir = path.join(__dirname, "public", "download");
+  if (!fs.existsSync(downloadDir)) {
+    return res.json({ deleted: [] });
+  }
+
+  const keepFiles = ["VolPi-Media-AndroidTV.apk", "VolPi-Media-iOS.ipa"];
+  const deleted = [];
+  const files = fs.readdirSync(downloadDir);
+
+  for (const f of files) {
+    if (!keepFiles.includes(f) && (f.endsWith(".apk") || f.endsWith(".ipa") || f.endsWith(".tmp") || f.endsWith(".part"))) {
+      try {
+        fs.unlinkSync(path.join(downloadDir, f));
+        deleted.push(f);
+      } catch (e) {}
+    }
+  }
+
+  return res.json({ success: true, deleted, remaining: keepFiles });
 });
 
 
