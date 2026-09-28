@@ -383,23 +383,46 @@ async function getPowerRangersCatalogItems() {
   try {
     const cards = await getFolderCards('/thu-vien/power-rangers');
     for (const c of cards) {
-      const it = {
-        id: encodePathId('s', c.path),
-        name: `${c.title} (${c.count})`,
-        cardTitle: c.title,
-        badge: c.count || 'Power Rangers',
-        subtitle: c.desc || '5 Anh Em Siêu Nhân Power Rangers',
-        categoryName: 'Power Rangers',
-        type: 'series',
-        genre: 'Power Rangers',
-        rawPoster: c.poster || 'https://cdn.yumei-anime.com/assets/content/images/6a1ee410dadf8f2c621e57d0/variants/medium.webp',
-        description: c.desc || `${c.title} (${c.count}). 5 Anh Em Siêu Nhân Power Rangers Vietsub Full HD.`,
-        genres: ['Power Rangers', 'Tokusatsu'],
-      };
-      applyCardUrls(it);
-      list.push(it);
+      const subCards = await getFolderCards(c.path);
+      if (subCards && subCards.length > 0) {
+        for (const sub of subCards) {
+          const it = {
+            id: encodePathId('s', sub.path),
+            name: `${sub.title} (${sub.count})`,
+            cardTitle: sub.title,
+            badge: sub.count || 'Power Rangers',
+            subtitle: `${c.title} - ${sub.title}`,
+            categoryName: 'Power Rangers',
+            type: 'series',
+            genre: 'Power Rangers',
+            rawPoster: sub.poster || c.poster || 'https://cdn.yumei-anime.com/assets/content/images/6a1ee410dadf8f2c621e57d0/variants/medium.webp',
+            description: sub.desc || `${c.title} - ${sub.title} (${sub.count}). 5 Anh Em Siêu Nhân Power Rangers Vietsub Full HD.`,
+            genres: ['Power Rangers', 'Tokusatsu'],
+          };
+          applyCardUrls(it);
+          list.push(it);
+        }
+      } else {
+        const it = {
+          id: encodePathId('s', c.path),
+          name: `${c.title} (${c.count})`,
+          cardTitle: c.title,
+          badge: c.count || 'Power Rangers',
+          subtitle: c.desc || '5 Anh Em Siêu Nhân Power Rangers',
+          categoryName: 'Power Rangers',
+          type: 'series',
+          genre: 'Power Rangers',
+          rawPoster: c.poster || 'https://cdn.yumei-anime.com/assets/content/images/6a1ee410dadf8f2c621e57d2/variants/medium.webp',
+          description: c.desc || `${c.title} (${c.count}). 5 Anh Em Siêu Nhân Power Rangers Vietsub Full HD.`,
+          genres: ['Power Rangers', 'Tokusatsu'],
+        };
+        applyCardUrls(it);
+        list.push(it);
+      }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error getting Power Rangers catalog:', e.message);
+  }
   return list;
 }
 
@@ -657,7 +680,7 @@ async function getCatalog(catalogId, extra = {}, requestedType) {
     }
   } else if (catalogId === 'yumei-sentai' || catalogId === 'yumei-tokusatsu') {
     items = await getSentaiCatalogItems();
-  } else if (catalogId === 'yumei-power-rangers') {
+  } else if (catalogId === 'yumei-power-rangers' || catalogId === 'yumei-powerrangers') {
     items = await getPowerRangersCatalogItems();
   } else if (catalogId === 'yumei-anime' || catalogId === 'yumei-other-anime') {
     items = await getAnimeCatalogItems();
@@ -757,10 +780,34 @@ async function getSeriesMeta(seriesId, requestedType = 'series') {
 
   // Requested as 'series'
   if (subcards.length > 0) {
+    // Check if any subcard has nested subcards (e.g. Mighty Morphin has Season 1 & 2)
+    const flatSeasons = [];
+    for (const sc of subcards) {
+      const deeper = await getFolderCards(sc.path);
+      if (deeper && deeper.length > 0) {
+        for (const dsc of deeper) {
+          const seasonTitle = dsc.title.toLowerCase().includes(sc.title.toLowerCase().slice(0, 10))
+            ? dsc.title
+            : `${sc.title} - ${dsc.title}`;
+          flatSeasons.push({
+            title: seasonTitle,
+            path: dsc.path,
+            poster: dsc.poster || sc.poster || fallbackPoster,
+          });
+        }
+      } else {
+        flatSeasons.push({
+          title: sc.title,
+          path: sc.path,
+          poster: sc.poster || fallbackPoster,
+        });
+      }
+    }
+
     // Fetch seasons in parallel (max 10 at a time to prevent timeout)
     const BATCH_SIZE = 10;
-    for (let i = 0; i < subcards.length; i += BATCH_SIZE) {
-      const chunk = subcards.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < flatSeasons.length; i += BATCH_SIZE) {
+      const chunk = flatSeasons.slice(i, i + BATCH_SIZE);
       const chunkResults = await Promise.all(
         chunk.map(async (sc, cIdx) => {
           const seasonNum = i + cIdx + 1;
