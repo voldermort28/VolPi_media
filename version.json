@@ -1,0 +1,9 @@
+{
+  "version": "1.0.4",
+  "build": 5,
+  "tag_name": "v1.0.4",
+  "changelog": "• Cập nhật tính năng OTA Update: Tự động tải và cập nhật trong app không cần tải lại file.\n• Tối ưu hoá giao diện Android TV (D-pad focus mượt mà).\n• Hỗ trợ cập nhật 1 chạm cho iOS (TrollStore).\n• Nâng cấp tốc độ phát trực tiếp bóng đá và anime.",
+  "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
+  "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
+  "published_at": "2026-09-28T04:00:00Z"
+}

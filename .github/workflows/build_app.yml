@@ -97,6 +97,14 @@ jobs:
           draft: false
           prerelease: false
 
+      - name: Deploy APK to VPS OTA Server
+        continue-on-error: true
+        run: |
+          echo "Deploying APK to VPS OTA server..."
+          curl -f -X POST -H "Content-Type: application/octet-stream" \
+            --data-binary "@app-tv/build/app/outputs/flutter-apk/VolPi-Media-AndroidTV.apk" \
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-AndroidTV.apk&version=${{ env.CLEAN_VERSION }}&token=volpi_ota_deploy_secret_9988" || true
+
   build-ios:
     name: Build iOS No-Codesign Payload
     runs-on: macos-latest
@@ -182,3 +190,11 @@ jobs:
           files: |
             app-tv/VolPi-Media-iOS.ipa
             app-tv/VolPi-Media-${{ env.RELEASE_TAG }}.ipa
+
+      - name: Deploy IPA to VPS OTA Server
+        continue-on-error: true
+        run: |
+          echo "Deploying IPA to VPS OTA server..."
+          curl -f -X POST -H "Content-Type: application/octet-stream" \
+            --data-binary "@app-tv/VolPi-Media-iOS.ipa" \
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.RELEASE_TAG }}&token=volpi_ota_deploy_secret_9988" || true

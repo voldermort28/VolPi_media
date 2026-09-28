@@ -60,5 +60,12 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+
+	<!-- TrollStore URL Schemes for OTA Updates -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>apple-magnifier</string>
+		<string>trollstore</string>
+	</array>
 </dict>
 </plist>

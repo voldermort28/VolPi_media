@@ -2,6 +2,7 @@ const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
 const path = require("path");
+const fs = require("fs");
 const { getRouter } = require("stremio-addon-sdk");
 
 const config = require("./config");
@@ -32,6 +33,110 @@ app.use((req, res, next) => {
 
 // Static assets for Web Frontend
 app.use(express.static(path.join(__dirname, "public")));
+
+// OTA App Version & Update Endpoints
+const OTA_DEPLOY_TOKEN = process.env.OTA_DEPLOY_TOKEN || "volpi_ota_deploy_secret_9988";
+
+app.get("/api/version", (req, res) => {
+  const versionFile = path.join(__dirname, "version.json");
+  if (fs.existsSync(versionFile)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(versionFile, "utf-8"));
+      return res.json(data);
+    } catch (e) {
+      console.error("Error reading version.json:", e);
+    }
+  }
+
+  return res.json({
+    version: "1.0.4",
+    build: 5,
+    tag_name: "v1.0.4",
+    changelog: "• Cập nhật tính năng OTA Update tự động trong ứng dụng.\n• Hỗ trợ cập nhật 1 chạm cho Android TV / Điện thoại và iOS (TrollStore).\n• Tối ưu hóa hiệu năng và kết nối phát trực tiếp.",
+    apkUrl: "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
+    ipaUrl: "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
+    published_at: new Date().toISOString()
+  });
+});
+
+// Endpoint to update version info via JSON
+app.post("/api/update-version-info", (req, res) => {
+  const token = req.query.token || req.headers["x-upload-token"] || (req.body && req.body.token);
+  if (token !== OTA_DEPLOY_TOKEN) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const versionFile = path.join(__dirname, "version.json");
+  let data = {};
+  if (fs.existsSync(versionFile)) {
+    try {
+      data = JSON.parse(fs.readFileSync(versionFile, "utf-8"));
+    } catch (e) {}
+  }
+
+  if (req.body.version) data.version = req.body.version.replace(/^v/i, "");
+  if (req.body.build) data.build = parseInt(req.body.build, 10);
+  if (req.body.tag_name) data.tag_name = req.body.tag_name;
+  if (req.body.changelog) data.changelog = req.body.changelog;
+  if (req.body.apkUrl) data.apkUrl = req.body.apkUrl;
+  if (req.body.ipaUrl) data.ipaUrl = req.body.ipaUrl;
+  data.updated_at = new Date().toISOString();
+
+  fs.writeFileSync(versionFile, JSON.stringify(data, null, 2), "utf-8");
+  return res.json({ success: true, versionInfo: data });
+});
+
+// Endpoint to stream-upload release binary (.apk or .ipa)
+app.post("/api/upload-release", (req, res) => {
+  const token = req.query.token || req.headers["x-upload-token"];
+  if (token !== OTA_DEPLOY_TOKEN) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const filename = req.query.filename;
+  if (!filename || (!filename.endsWith(".apk") && !filename.endsWith(".ipa"))) {
+    return res.status(400).json({ error: "Invalid filename. Must end with .apk or .ipa" });
+  }
+
+  const downloadDir = path.join(__dirname, "public", "download");
+  if (!fs.existsSync(downloadDir)) {
+    fs.mkdirSync(downloadDir, { recursive: true });
+  }
+
+  const filePath = path.join(downloadDir, filename);
+  const writeStream = fs.createWriteStream(filePath);
+
+  req.pipe(writeStream);
+
+  writeStream.on("finish", () => {
+    const version = req.query.version;
+    if (version) {
+      const versionFile = path.join(__dirname, "version.json");
+      let data = {};
+      if (fs.existsSync(versionFile)) {
+        try {
+          data = JSON.parse(fs.readFileSync(versionFile, "utf-8"));
+        } catch (e) {}
+      }
+      data.version = version.replace(/^v/i, "");
+      data.tag_name = version.startsWith("v") ? version : `v${version}`;
+      data.apkUrl = "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk";
+      data.ipaUrl = "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa";
+      data.updated_at = new Date().toISOString();
+      fs.writeFileSync(versionFile, JSON.stringify(data, null, 2), "utf-8");
+    }
+
+    const size = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
+    console.log(`[OTA Deploy] Successfully saved ${filename} (${(size / 1024 / 1024).toFixed(2)} MB)`);
+    return res.json({ success: true, filename, size });
+  });
+
+  writeStream.on("error", (err) => {
+    console.error("[OTA Deploy Error]", err);
+    return res.status(500).json({ error: err.message });
+  });
+});
+
 
 function escapeXml(unsafe) {
   if (!unsafe) return "";

@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import '../api/api_service.dart';
+import '../models/update_model.dart';
 import '../screens/football_screen.dart';
 import '../screens/anime_screen.dart';
 import '../screens/secret_movie_screen.dart';
+import '../services/update_service.dart';
 import '../widgets/profile_button.dart';
 import '../widgets/tv_focusable_card.dart';
+import '../widgets/update_dialog.dart';
 
 class AdaptiveLayout extends StatefulWidget {
   final ApiService apiService;
@@ -17,6 +20,41 @@ class AdaptiveLayout extends StatefulWidget {
 
 class _AdaptiveLayoutState extends State<AdaptiveLayout> {
   int _currentTabIndex = 0; // 0: Football, 1: Anime
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkOtaUpdate(silent: true);
+    });
+  }
+
+  Future<void> _checkOtaUpdate({bool silent = false}) async {
+    try {
+      final updateInfo = await UpdateService.checkForUpdate();
+      if (!mounted) return;
+      if (updateInfo != null && updateInfo.hasUpdate) {
+        UpdateDialog.show(context, updateInfo);
+      } else if (!silent) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ứng dụng đang ở phiên bản mới nhất!'),
+            backgroundColor: Color(0xFF0284C7),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Không thể kiểm tra cập nhật: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
 
   void _onProfileUnlocked() {
     Navigator.of(context).push(
@@ -94,6 +132,32 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   _buildTvNavTab(index: 1, label: 'Anime & Tokusatsu', icon: Icons.auto_awesome_rounded),
 
                   const Spacer(),
+
+                  // OTA Update Check Button
+                  SizedBox(
+                    height: 38,
+                    child: TvFocusableCard(
+                      onTap: () => _checkOtaUpdate(silent: false),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        color: const Color(0xFF1E293B),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'Cập nhật',
+                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 14),
 
                   // Profile Button with Passcode 3105
                   ProfileButton(onUnlocked: _onProfileUnlocked),
@@ -178,6 +242,11 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 20),
+            tooltip: 'Kiểm tra cập nhật',
+            onPressed: () => _checkOtaUpdate(silent: false),
+          ),
           Padding(
             padding: const EdgeInsets.only(right: 14),
             child: ProfileButton(onUnlocked: _onProfileUnlocked),
