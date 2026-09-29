@@ -3,6 +3,7 @@ import '../api/api_service.dart';
 import '../models/update_model.dart';
 import '../screens/football_screen.dart';
 import '../screens/anime_screen.dart';
+import '../screens/iptv_screen.dart';
 import '../screens/secret_movie_screen.dart';
 import '../services/update_service.dart';
 import '../widgets/profile_button.dart';
@@ -129,7 +130,9 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   // TV Nav Tabs
                   _buildTvNavTab(index: 0, label: 'Bóng Đá Trực Tiếp', icon: Icons.sports_soccer_rounded),
                   const SizedBox(width: 12),
-                  _buildTvNavTab(index: 1, label: 'Anime & Tokusatsu', icon: Icons.auto_awesome_rounded),
+                  _buildTvNavTab(index: 1, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
+                  const SizedBox(width: 12),
+                  _buildTvNavTab(index: 2, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
 
                   const Spacer(),
 
@@ -172,6 +175,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                 children: [
                   FootballScreen(apiService: widget.apiService),
                   AnimeScreen(apiService: widget.apiService),
+                  IptvScreen(apiService: widget.apiService),
                 ],
               ),
             ),
@@ -258,6 +262,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         children: [
           FootballScreen(apiService: widget.apiService),
           AnimeScreen(apiService: widget.apiService),
+          IptvScreen(apiService: widget.apiService),
         ],
       ),
       bottomNavigationBar: Container(
@@ -283,7 +288,11 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_rounded),
-              label: 'Anime & Phim',
+              label: 'Anime',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.live_tv_rounded),
+              label: 'Truyền Hình',
             ),
           ],
         ),

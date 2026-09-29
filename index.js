@@ -13,6 +13,7 @@ const yumeiAddon = require("./addons/yumeiAddon");
 const vlxxScraper = require("./scrapers/vlxx");
 const xoilacScraper = require("./scrapers/xoilac");
 const yumeiScraper = require("./scrapers/yumei");
+const iptvService = require("./services/iptvService");
 
 const app = express();
 const PORT = process.env.PORT || 7000;
@@ -355,6 +356,69 @@ app.get("/api/matches", async (req, res) => {
     res.json(matches || []);
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// -------------------------------------------------------------
+// IPTV API ENDPOINTS
+// -------------------------------------------------------------
+
+app.get("/api/iptv/channels", async (req, res) => {
+  try {
+    const forAdmin = req.query.admin === "true";
+    const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
+    const data = await iptvService.getChannels({ forceRefresh, forAdmin });
+    res.json(data);
+  } catch (err) {
+    console.error("Error fetching IPTV channels:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/iptv/config", (req, res) => {
+  res.json(iptvService.loadConfig());
+});
+
+app.post("/api/iptv/set-source", (req, res) => {
+  try {
+    const { type, url } = req.body;
+    const cfg = iptvService.setSource(type, url);
+    res.json({ success: true, config: cfg });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/iptv/upload-content", (req, res) => {
+  try {
+    const { content, filename } = req.body;
+    if (!content) return res.status(400).json({ success: false, error: "Nội dung file trống" });
+    const result = iptvService.uploadM3uFile(filename || "playlist.m3u", Buffer.from(content, "utf-8"));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/iptv/settings", (req, res) => {
+  try {
+    const { hiddenChannelIds, pinnedChannelIds } = req.body;
+    const cfg = iptvService.updateChannelSettings({ hiddenChannelIds, pinnedChannelIds });
+    res.json({ success: true, config: cfg });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/iptv/refresh", async (req, res) => {
+  try {
+    iptvService.clearCache();
+    const forAdmin = req.query.admin === "true";
+    const data = await iptvService.getChannels({ forceRefresh: true, forAdmin });
+    const count = Array.isArray(data) ? data.length : (data.totalCount || 0);
+    res.json({ success: true, count, data });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

@@ -1,9 +1,9 @@
 {
-  "version": "1.0.9",
-  "build": 10,
-  "tag_name": "v1.0.9",
-  "changelog": "• Trình phát video: Bổ sung tính năng tua nhanh dần đều khi giữ nút điều khiển remote trên Android TV (giữ càng lâu tua càng nhanh với các mốc tốc độ 1x, 2x, 4x, 8x, 16x).\n• Trình phát video: Hiển thị HUD thời gian thực với mốc tốc độ và xem trước thanh tiến trình mượt mà không bị giật lag bộ giải mã.\n• Tối ưu hóa phản hồi nút bấm remote và hỗ trợ tự động nhảy video khi nhả nút tua.",
+  "version": "1.0.10",
+  "build": 11,
+  "tag_name": "v1.0.10",
+  "changelog": "• Tính năng mới: Xem và quản lý Truyền Hình Trực Tuyến (IPTV) toàn diện trên Android TV, iPhone và iPad.\n• Đồng bộ hóa tập trung từ Web: Thêm link M3U hoặc upload file, ẩn kênh không cần thiết, ghim kênh yêu thích (⭐) trực tiếp tại stremio.laboon.vn.\n• Nút Làm mới (Refresh) 1 chạm: Cập nhật ngay tức thì các luồng bóng đá trực tiếp theo ngày giờ.\n• Trình phát tivi: Bấm nút Lên / Xuống trên remote để chuyển kênh truyền hình nhanh chóng kèm hiển thị thông tin HUD.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-29T06:45:00Z"
+  "published_at": "2026-09-29T07:10:00Z"
 }

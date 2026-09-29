@@ -124,6 +124,42 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
   }
 
+  void _switchChannelDelta(int delta) {
+    final channels = widget.availableChannels;
+    if (channels == null || channels.isEmpty) return;
+    int currentIndex = channels.indexWhere((c) => c.url == _currentStreamUrl);
+    if (currentIndex == -1) currentIndex = 0;
+
+    int newIndex = currentIndex + delta;
+    if (newIndex < 0) {
+      newIndex = channels.length - 1;
+    } else if (newIndex >= channels.length) {
+      newIndex = 0;
+    }
+
+    final targetChannel = channels[newIndex];
+    _switchChannel(targetChannel);
+
+    _hudFadeTimer?.cancel();
+    setState(() {
+      _hudIcon = 'CHANNEL';
+      _hudText = targetChannel.title;
+      _hudSpeedBadge = '${newIndex + 1}/${channels.length}';
+    });
+
+    _hudFadeTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+          _hudSpeedBadge = null;
+        });
+      }
+    });
+
+    _showControlsBriefly();
+  }
+
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 4), () {
@@ -433,8 +469,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
             return KeyEventResult.handled;
           }
-          if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
-            _showControlsBriefly();
+          final bool isUp = key == LogicalKeyboardKey.arrowUp ||
+              key == LogicalKeyboardKey.channelUp ||
+              key == LogicalKeyboardKey.pageUp;
+          final bool isDown = key == LogicalKeyboardKey.arrowDown ||
+              key == LogicalKeyboardKey.channelDown ||
+              key == LogicalKeyboardKey.pageDown;
+
+          if (isUp) {
+            if (widget.isLive && widget.availableChannels != null && widget.availableChannels!.length > 1) {
+              _switchChannelDelta(-1);
+            } else {
+              _showControlsBriefly();
+            }
+            return KeyEventResult.handled;
+          }
+          if (isDown) {
+            if (widget.isLive && widget.availableChannels != null && widget.availableChannels!.length > 1) {
+              _switchChannelDelta(1);
+            } else {
+              _showControlsBriefly();
+            }
             return KeyEventResult.handled;
           }
           if (key == LogicalKeyboardKey.escape) {
@@ -621,7 +676,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+                              _hudIcon == 'CHANNEL'
+                                  ? Icons.live_tv_rounded
+                                  : (_hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded),
                               color: const Color(0xFF38BDF8),
                               size: 44,
                             ),
@@ -645,13 +702,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         const SizedBox(height: 6),
                         Text(
                           _hudText ?? '',
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
+                        if (_hudIcon != 'CHANNEL') ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
+                            style: const TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ],
                       ],
                     ),
                   ),

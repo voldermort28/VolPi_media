@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import '../models/match_model.dart';
 import '../models/anime_model.dart';
 import '../models/movie_model.dart';
+import '../models/iptv_channel_model.dart';
 
 class ApiService {
   static const String defaultHost = 'https://stremio.laboon.vn';
@@ -223,4 +224,41 @@ class ApiService {
       ),
     ];
   }
+
+  // =========================================================================
+  // 4. IPTV / TRUYỀN HÌNH TRỰC TUYẾN
+  // =========================================================================
+
+  Future<List<IptvChannelModel>> getIptvChannels({bool forceRefresh = false}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final url = forceRefresh
+        ? '$baseUrl/api/iptv/channels?_t=$timestamp'
+        : '$baseUrl/api/iptv/channels';
+
+    try {
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is List) {
+          return data
+              .where((item) => item is Map<String, dynamic> || item is Map)
+              .map<IptvChannelModel>((item) => IptvChannelModel.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  Future<bool> refreshIptvSourceOnServer() async {
+    try {
+      final res = await http.post(Uri.parse('$baseUrl/api/iptv/refresh')).timeout(const Duration(seconds: 15));
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 }
+
