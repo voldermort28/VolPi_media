@@ -52,6 +52,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _showDoubleTapRight = false;
   Timer? _doubleTapTimer;
 
+  // Remote Progressive Seeking (Giữ nút tua nhanh dần trên Android TV)
+  bool _isHoldingSeek = false;
+  int _holdSeekDirection = 0; // 1: forward, -1: rewind
+  DateTime? _holdStartTime;
+  int _holdRepeatCount = 0;
+  Duration _pendingSeekPosition = Duration.zero;
+  Duration _seekAccumulatedDelta = Duration.zero;
+  Timer? _commitSeekTimer;
+  String? _hudSpeedBadge;
+
   @override
   void initState() {
     super.initState();
@@ -167,39 +177,138 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  void _seekRelative(int seconds) {
-    if (!_isInitialized || widget.isLive) return;
-    final current = _controller.value.position;
-    final duration = _controller.value.duration;
-    final target = current + Duration(seconds: seconds);
-    final clamped = target < Duration.zero
-        ? Duration.zero
-        : (target > duration ? duration : target);
-
-    _controller.seekTo(clamped);
-    _triggerHud(
-      isForward: seconds > 0,
-      text: '${seconds > 0 ? '+' : ''}${seconds}s',
-      target: clamped,
-    );
-    _showControlsBriefly();
+  String _formatDelta(Duration d, int direction) {
+    final int totalSec = d.inSeconds.abs();
+    final String sign = direction >= 0 ? '+' : '-';
+    if (totalSec < 60) {
+      return '$sign${totalSec}s';
+    }
+    final int minutes = totalSec ~/ 60;
+    final int seconds = totalSec % 60;
+    if (seconds == 0) {
+      return '$sign${minutes}m';
+    }
+    return '$sign${minutes}m ${seconds}s';
   }
 
-  void _triggerHud({required bool isForward, required String text, required Duration target}) {
+  void _seekRelative(int seconds) {
+    if (!_isInitialized || widget.isLive) return;
+    final dir = seconds >= 0 ? 1 : -1;
+    _handleRemoteSeekStart(dir);
+  }
+
+  void _handleRemoteSeekStart(int direction) {
+    if (!_isInitialized || widget.isLive) return;
+
+    final now = DateTime.now();
+
+    if (!_isHoldingSeek || _holdSeekDirection != direction) {
+      _isHoldingSeek = true;
+      _holdSeekDirection = direction;
+      _holdStartTime = now;
+      _holdRepeatCount = 0;
+      _pendingSeekPosition = _controller.value.position;
+      _seekAccumulatedDelta = Duration.zero;
+    }
+
+    _applySeekStep(direction, 10, '1x');
+  }
+
+  void _handleRemoteSeekRepeat(int direction) {
+    if (!_isInitialized || widget.isLive) return;
+
+    if (!_isHoldingSeek || _holdSeekDirection != direction) {
+      _handleRemoteSeekStart(direction);
+      return;
+    }
+
+    _holdRepeatCount++;
+    final elapsedMs = _holdStartTime != null
+        ? DateTime.now().difference(_holdStartTime!).inMilliseconds
+        : 0;
+
+    int stepSeconds;
+    String speedBadge;
+
+    if (elapsedMs > 5500 || _holdRepeatCount > 40) {
+      stepSeconds = 180; // 3m per tick
+      speedBadge = '16x';
+    } else if (elapsedMs > 3500 || _holdRepeatCount > 25) {
+      stepSeconds = 90; // 1.5m per tick
+      speedBadge = '8x';
+    } else if (elapsedMs > 2000 || _holdRepeatCount > 15) {
+      stepSeconds = 45; // 45s per tick
+      speedBadge = '4x';
+    } else if (elapsedMs > 800 || _holdRepeatCount > 6) {
+      stepSeconds = 20; // 20s per tick
+      speedBadge = '2x';
+    } else {
+      stepSeconds = 10; // 10s per tick
+      speedBadge = '1x';
+    }
+
+    _applySeekStep(direction, stepSeconds, speedBadge);
+  }
+
+  void _applySeekStep(int direction, int stepSeconds, String speedBadge) {
+    final duration = _controller.value.duration;
+    final step = Duration(seconds: stepSeconds * direction);
+
+    _seekAccumulatedDelta += step;
+    final newPos = _pendingSeekPosition + step;
+    _pendingSeekPosition = newPos < Duration.zero
+        ? Duration.zero
+        : (newPos > duration ? duration : newPos);
+
     _hudFadeTimer?.cancel();
     setState(() {
-      _hudIcon = isForward ? 'FORWARD' : 'REWIND';
-      _hudText = text;
-      _dragTargetPosition = target;
+      _hudIcon = direction > 0 ? 'FORWARD' : 'REWIND';
+      _hudText = _formatDelta(_seekAccumulatedDelta, direction);
+      _hudSpeedBadge = speedBadge;
+      _dragTargetPosition = _pendingSeekPosition;
     });
-    _hudFadeTimer = Timer(const Duration(milliseconds: 1200), () {
-      if (mounted) {
+
+    _showControlsBriefly();
+
+    // Auto-commit if no key events arrive within 400ms
+    _commitSeekTimer?.cancel();
+    _commitSeekTimer = Timer(const Duration(milliseconds: 400), () {
+      _commitPendingSeek();
+    });
+  }
+
+  void _handleRemoteSeekEnd(int direction) {
+    if (_isHoldingSeek && _holdSeekDirection == direction) {
+      _commitPendingSeek();
+    }
+  }
+
+  void _commitPendingSeek() {
+    _commitSeekTimer?.cancel();
+    if (!_isHoldingSeek || !_isInitialized || widget.isLive) {
+      _isHoldingSeek = false;
+      return;
+    }
+
+    final target = _pendingSeekPosition;
+    _isHoldingSeek = false;
+    _holdRepeatCount = 0;
+    _holdStartTime = null;
+
+    _controller.seekTo(target);
+
+    _hudFadeTimer?.cancel();
+    _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted && !_isHoldingSeek) {
         setState(() {
           _hudIcon = null;
           _hudText = null;
+          _hudSpeedBadge = null;
         });
       }
     });
+
+    _showControlsBriefly();
   }
 
   // --- Touch Gestures Handling ---
@@ -278,6 +387,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _hideControlsTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
+    _commitSeekTimer?.cancel();
     _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -291,8 +401,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return Focus(
       autofocus: true,
       onKeyEvent: (node, event) {
+        final key = event.logicalKey;
+        final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.mediaRewind ||
+            key == LogicalKeyboardKey.mediaTrackPrevious;
+        final bool isRight = key == LogicalKeyboardKey.arrowRight ||
+            key == LogicalKeyboardKey.mediaFastForward ||
+            key == LogicalKeyboardKey.mediaTrackNext;
+
         if (event is KeyDownEvent) {
-          final key = event.logicalKey;
           if (key == LogicalKeyboardKey.select ||
               key == LogicalKeyboardKey.enter ||
               key == LogicalKeyboardKey.space ||
@@ -300,12 +417,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             _togglePlayPause();
             return KeyEventResult.handled;
           }
-          if (key == LogicalKeyboardKey.arrowLeft || key == LogicalKeyboardKey.mediaRewind) {
-            _seekRelative(-10);
+          if (isLeft) {
+            if (_isHoldingSeek && _holdSeekDirection == -1) {
+              _handleRemoteSeekRepeat(-1);
+            } else {
+              _handleRemoteSeekStart(-1);
+            }
             return KeyEventResult.handled;
           }
-          if (key == LogicalKeyboardKey.arrowRight || key == LogicalKeyboardKey.mediaFastForward) {
-            _seekRelative(10);
+          if (isRight) {
+            if (_isHoldingSeek && _holdSeekDirection == 1) {
+              _handleRemoteSeekRepeat(1);
+            } else {
+              _handleRemoteSeekStart(1);
+            }
             return KeyEventResult.handled;
           }
           if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
@@ -314,6 +439,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           }
           if (key == LogicalKeyboardKey.escape) {
             Navigator.of(context).pop();
+            return KeyEventResult.handled;
+          }
+        } else if (event is KeyRepeatEvent) {
+          if (isLeft) {
+            _handleRemoteSeekRepeat(-1);
+            return KeyEventResult.handled;
+          }
+          if (isRight) {
+            _handleRemoteSeekRepeat(1);
+            return KeyEventResult.handled;
+          }
+        } else if (event is KeyUpEvent) {
+          if (isLeft) {
+            _handleRemoteSeekEnd(-1);
+            return KeyEventResult.handled;
+          }
+          if (isRight) {
+            _handleRemoteSeekEnd(1);
             return KeyEventResult.handled;
           }
         }
@@ -474,15 +617,35 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                          _hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
-                          color: const Color(0xFF38BDF8),
-                          size: 44,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+                              color: const Color(0xFF38BDF8),
+                              size: 44,
+                            ),
+                            if (_hudSpeedBadge != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0284C7),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
+                                ),
+                                child: Text(
+                                  _hudSpeedBadge!,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Text(
                           _hudText ?? '',
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -654,7 +817,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   Row(
                                     children: [
                                       Text(
-                                        _formatDuration(_controller.value.position),
+                                        _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
                                         style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                       ),
                                       const SizedBox(width: 8),
@@ -669,7 +832,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             trackHeight: 4.0,
                                           ),
                                           child: Slider(
-                                            value: _controller.value.position.inSeconds.toDouble().clamp(
+                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
                                                   0.0,
                                                   _controller.value.duration.inSeconds.toDouble(),
                                                 ),
