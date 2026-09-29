@@ -122,15 +122,8 @@ class ApiService {
         if (data['streams'] != null && (data['streams'] as List).isNotEmpty) {
           final List list = data['streams'];
           return list
-              .where((s) => s['url'] != null && s['url'].toString().startsWith('http'))
-              .map((s) => StreamChannel(
-                    title: s['title'] ?? s['name'] ?? 'Server',
-                    url: s['url'],
-                    headers: (s['behaviorHints']?['proxyHeaders']?['request'] as Map<String, dynamic>?)?.map(
-                          (k, v) => MapEntry(k, v.toString()),
-                        ) ??
-                        {'Referer': 'https://yumei-anime.com/'},
-                  ))
+              .where((s) => s is Map && s['url'] != null && s['url'].toString().startsWith('http'))
+              .map<StreamChannel>((s) => StreamChannel.fromJson(Map<String, dynamic>.from(s as Map)))
               .toList();
         }
       }
