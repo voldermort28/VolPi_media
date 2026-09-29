@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tải VolPi Media | Android TV, Mobile & iOS</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              900: '#0c4a6e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background: radial-gradient(circle at 50% 0%, #172554 0%, #090d16 60%, #030712 100%);
+      min-height: 100vh;
+    }
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 30px -5px rgba(14, 165, 233, 0.25);
+    }
+    .glow-purple {
+      box-shadow: 0 0 30px -5px rgba(168, 85, 247, 0.25);
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-sans antialiased selection:bg-sky-500 selection:text-white pb-20">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 glass-panel sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <i data-lucide="tv" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-sky-400 to-indigo-300 bg-clip-text text-transparent">VolPi Media</span>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 ml-2 font-semibold">Tải ứng dụng</span>
+        </div>
+      </a>
+      <div class="flex items-center gap-3">
+        <a href="/" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Trang Quản Trị</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <main class="max-w-5xl mx-auto px-4 pt-10">
+    <div class="text-center max-w-2xl mx-auto mb-10">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-semibold mb-4">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Phiên Bản Mới Nhất: <span id="hero-version">v1.0.6</span></span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-3">
+        Tải Ứng Dụng <span class="bg-gradient-to-r from-sky-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">VolPi Media</span>
+      </h1>
+      <p class="text-slate-400 text-sm sm:text-base">
+        Thưởng thức trực tiếp bóng đá Xôi Lạc HD, phim lẻ VLFilm và trọn bộ Anime tuổi thơ (Pokemon, Super Sentai, Power Rangers) trên mọi thiết bị.
+      </p>
+    </div>
+
+    <!-- Download Cards Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+
+      <!-- Card 1: Android TV / Phone -->
+      <div class="glass-card rounded-2xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between glow-cyan">
+        <div class="absolute -top-16 -right-16 w-36 h-36 bg-sky-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <i data-lucide="bot" class="w-7 h-7"></i>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">Android TV / Phone</span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-1">Android APK</h3>
+          <p class="text-slate-400 text-xs mb-4">Tương thích với Smart TV Android, Google TV, Android Box và Điện thoại Android (Android 5.0 trở lên).</p>
+
+          <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 mb-6 flex items-center justify-between text-xs">
+            <div>
+              <span class="text-slate-500 block">Tên tệp</span>
+              <span class="text-slate-200 font-medium">VolPi-Media-AndroidTV.apk</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-500 block">Dung lượng</span>
+              <span class="text-sky-400 font-semibold">~22 MB</span>
+            </div>
+          </div>
+
+          <!-- QR Code Preview -->
+          <div class="flex items-center gap-4 mb-6 bg-slate-800/30 p-3 rounded-xl border border-slate-700/50">
+            <img id="apk-qr" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk" alt="QR APK" class="w-20 h-20 rounded-lg bg-white p-1 shadow-md">
+            <div class="text-xs">
+              <div class="font-semibold text-slate-200 mb-1 flex items-center gap-1">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5 text-sky-400"></i>
+                <span>Quét mã QR tải nhanh</span>
+              </div>
+              <p class="text-slate-400 leading-relaxed">Dùng camera điện thoại hoặc ứng dụng Downloader trên Android TV quét mã để tải về trực tiếp.</p>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <a id="apk-btn" href="/download/VolPi-Media-AndroidTV.apk" download class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-sky-500 to-sky-600 hover:from-sky-400 hover:to-sky-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Tải File APK (Android)</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Card 2: iOS (TrollStore / Sideload) -->
+      <div class="glass-card rounded-2xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between glow-purple">
+        <div class="absolute -top-16 -right-16 w-36 h-36 bg-purple-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+              <i data-lucide="apple" class="w-7 h-7"></i>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">iOS / iPadOS</span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-1">iOS IPA (TrollStore / Sideload)</h3>
+          <p class="text-slate-400 text-xs mb-4">Hỗ trợ cài trực tiếp qua TrollStore (không bị thu hồi chứng chỉ) hoặc Sideloadly, AltStore, ESign.</p>
+
+          <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 mb-6 flex items-center justify-between text-xs">
+            <div>
+              <span class="text-slate-500 block">Tên tệp</span>
+              <span class="text-slate-200 font-medium">VolPi-Media-iOS.ipa</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-500 block">Dung lượng</span>
+              <span class="text-purple-400 font-semibold">~23 MB</span>
+            </div>
+          </div>
+
+          <!-- QR Code Preview -->
+          <div class="flex items-center gap-4 mb-6 bg-slate-800/30 p-3 rounded-xl border border-slate-700/50">
+            <img id="ipa-qr" src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa" alt="QR IPA" class="w-20 h-20 rounded-lg bg-white p-1 shadow-md">
+            <div class="text-xs">
+              <div class="font-semibold text-slate-200 mb-1 flex items-center gap-1">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5 text-purple-400"></i>
+                <span>Quét mã tải trên iPhone</span>
+              </div>
+              <p class="text-slate-400 leading-relaxed">Mở Camera trên iPhone/iPad quét mã để tải IPA hoặc cài trực tiếp vào TrollStore.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="space-y-2.5">
+          <a id="trollstore-btn" href="trollstore://install?url=https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-500/25 transition-all">
+            <i data-lucide="zap" class="w-4 h-4"></i>
+            <span>Cài Nhanh qua TrollStore</span>
+          </a>
+          <a id="ipa-btn" href="/download/VolPi-Media-iOS.ipa" download class="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition-colors">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Tải File IPA (.ipa thô)</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Changelog Section -->
+    <div class="glass-card rounded-2xl p-6 sm:p-7 mb-10 border border-slate-800">
+      <div class="flex items-center gap-2.5 mb-4">
+        <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white">Điểm mới trong bản cập nhật <span id="changelog-version" class="text-sky-400 font-extrabold">v1.0.6</span></h3>
+      </div>
+      <div id="changelog-content" class="text-slate-300 text-sm leading-relaxed space-y-2 whitespace-pre-line bg-slate-900/40 p-4 rounded-xl border border-slate-800/60 font-mono text-xs">
+        Đang tải thông tin...
+      </div>
+    </div>
+
+    <!-- Installation Guides -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs text-slate-400">
+      <div class="glass-panel p-4 rounded-xl">
+        <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
+          <i data-lucide="tv" class="w-4 h-4 text-sky-400"></i>
+          <span>Cài trên Android TV</span>
+        </div>
+        <p class="leading-relaxed">Mở ứng dụng <strong>Downloader</strong> trên TV, nhập link rút gọn hoặc quét mã QR phía trên để tải và cài đặt trực tiếp file APK.</p>
+      </div>
+      <div class="glass-panel p-4 rounded-xl">
+        <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
+          <i data-lucide="smartphone" class="w-4 h-4 text-purple-400"></i>
+          <span>Cài trên iOS (TrollStore)</span>
+        </div>
+        <p class="leading-relaxed">Mở trình duyệt Safari trên iPhone, bấm nút <strong>"Cài Nhanh qua TrollStore"</strong> để ứng dụng tự động nạp và cài đặt vĩnh viễn.</p>
+      </div>
+      <div class="glass-panel p-4 rounded-xl">
+        <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-400"></i>
+          <span>Cập nhật OTA tự động</span>
+        </div>
+        <p class="leading-relaxed">Sau khi cài đặt lần đầu, mỗi khi có bản mới, ứng dụng sẽ <strong>tự động thông báo và cập nhật 1 chạm ngay trong app</strong> mà không cần tải lại thủ công.</p>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="mt-16 text-center text-xs text-slate-500 border-t border-slate-800/80 pt-6 max-w-5xl mx-auto px-4">
+    <p>VolPi Media © 2026. Nền tảng giải trí đa phương tiện tích hợp.</p>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    // Fetch dynamic version data from /api/version
+    fetch('/api/version')
+      .then(res => res.json())
+      .then(data => {
+        if (data.version) {
+          document.getElementById('hero-version').textContent = 'v' + data.version;
+          document.getElementById('changelog-version').textContent = 'v' + data.version;
+        }
+        if (data.changelog) {
+          document.getElementById('changelog-content').textContent = data.changelog;
+        }
+        if (data.apkUrl) {
+          document.getElementById('apk-btn').href = data.apkUrl;
+          document.getElementById('apk-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=' + encodeURIComponent(data.apkUrl);
+        }
+        if (data.ipaUrl) {
+          document.getElementById('ipa-btn').href = data.ipaUrl;
+          document.getElementById('trollstore-btn').href = 'trollstore://install?url=' + encodeURIComponent(data.ipaUrl);
+          document.getElementById('ipa-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=' + encodeURIComponent(data.ipaUrl);
+        }
+      })
+      .catch(err => console.error('Error fetching version:', err));
+  </script>
+</body>
+</html>

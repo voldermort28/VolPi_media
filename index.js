@@ -59,6 +59,11 @@ app.get("/api/version", (req, res) => {
   });
 });
 
+// Serve Download Landing Page
+app.get(["/download", "/download/"], (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "download", "index.html"));
+});
+
 // Endpoint to update version info via JSON
 app.post("/api/update-version-info", (req, res) => {
   const token = req.query.token || req.headers["x-upload-token"] || (req.body && req.body.token);
