@@ -116,9 +116,18 @@ function ensureUploadDir() {
 function loadConfig() {
   ensureUploadDir();
   const defaultConfig = {
-    sourceType: 'default', // 'default' | 'url' | 'file'
+    sourceType: 'default',
     sourceUrl: DEFAULT_SOURCE_URL,
     uploadedFile: '',
+    playlists: [
+      {
+        id: 'pl-default',
+        name: 'Kênh Quốc Gia (iptv-org)',
+        type: 'url',
+        url: DEFAULT_SOURCE_URL,
+        enabled: true,
+      }
+    ],
     hiddenChannelIds: [],
     pinnedChannelIds: ['vtv1-hd', 'vtv3-hd', 'htv-the-thao', 'vtc3-hd'],
     lastUpdated: new Date().toISOString(),
@@ -132,7 +141,41 @@ function loadConfig() {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    return { ...defaultConfig, ...parsed };
+    const cfg = { ...defaultConfig, ...parsed };
+
+    // Migration: populate playlists if empty or not array
+    if (!Array.isArray(cfg.playlists) || cfg.playlists.length === 0) {
+      cfg.playlists = [];
+      if (cfg.sourceType === 'file' && cfg.uploadedFile) {
+        cfg.playlists.push({
+          id: 'pl-file-1',
+          name: 'File Playlist M3U',
+          type: 'file',
+          file: cfg.uploadedFile,
+          enabled: true,
+        });
+      } else if (cfg.sourceType === 'url' && cfg.sourceUrl && cfg.sourceUrl !== DEFAULT_SOURCE_URL) {
+        cfg.playlists.push({
+          id: 'pl-url-1',
+          name: 'Playlist URL Tùy Chỉnh',
+          type: 'url',
+          url: cfg.sourceUrl,
+          enabled: true,
+        });
+      }
+
+      if (cfg.playlists.length === 0) {
+        cfg.playlists.push({
+          id: 'pl-default',
+          name: 'Kênh Quốc Gia (iptv-org)',
+          type: 'url',
+          url: DEFAULT_SOURCE_URL,
+          enabled: true,
+        });
+      }
+    }
+
+    return cfg;
   } catch (err) {
     console.error('[IPTV Service] Error reading iptv_config.json:', err.message);
     return defaultConfig;
@@ -261,40 +304,76 @@ function normalizeGroupName(group, name) {
 }
 
 /**
- * Fetch and parse raw M3U from active source
+ * Fetch and parse raw M3U from active sources
  */
 async function fetchRawChannels(config) {
-  let m3uText = '';
+  let allChannels = [];
+  const playlists = Array.isArray(config.playlists) && config.playlists.length > 0
+    ? config.playlists.filter(p => p.enabled !== false)
+    : [
+        {
+          id: 'pl-default',
+          name: 'Kênh Quốc Gia (iptv-org)',
+          type: config.sourceType === 'file' ? 'file' : 'url',
+          url: config.sourceUrl || DEFAULT_SOURCE_URL,
+          file: config.uploadedFile,
+          enabled: true,
+        }
+      ];
 
-  if (config.sourceType === 'file' && config.uploadedFile) {
-    const filePath = path.join(UPLOAD_DIR, config.uploadedFile);
-    if (fs.existsSync(filePath)) {
-      m3uText = fs.readFileSync(filePath, 'utf-8');
+  for (const pl of playlists) {
+    let m3uText = '';
+    const plName = pl.name || 'Playlist';
+    const plId = pl.id || ('pl-' + Date.now());
+
+    if (pl.type === 'file' && pl.file) {
+      const filePath = path.join(UPLOAD_DIR, pl.file);
+      if (fs.existsSync(filePath)) {
+        try {
+          m3uText = fs.readFileSync(filePath, 'utf-8');
+        } catch (e) {
+          console.error(`[IPTV Service] Error reading file ${pl.file}:`, e.message);
+        }
+      }
+    } else if (pl.url) {
+      try {
+        console.log(`[IPTV Service] Fetching playlist "${plName}" from ${pl.url}...`);
+        const res = await axios.get(pl.url, {
+          timeout: 12000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (SmartTV; VolPiMedia/1.0.10)',
+            'Accept': '*/*',
+          },
+        });
+        m3uText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+      } catch (err) {
+        console.error(`[IPTV Service] Failed to fetch M3U from ${pl.url}:`, err.message);
+      }
     }
-  } else {
-    const url = config.sourceType === 'url' && config.sourceUrl ? config.sourceUrl : DEFAULT_SOURCE_URL;
-    try {
-      console.log(`[IPTV Service] Fetching playlist from ${url}...`);
-      const res = await axios.get(url, {
-        timeout: 12000,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (SmartTV; VolPiMedia/1.0.9)',
-          'Accept': '*/*',
-        },
+
+    const channels = parseM3U(m3uText);
+    for (const c of channels) {
+      // Ensure unique channel id while keeping clean legacy matching
+      const uniqueId = plId === 'pl-default' ? c.id : `${plId}_${c.id}`;
+      allChannels.push({
+        ...c,
+        id: uniqueId,
+        sourceId: plId,
+        sourceName: plName,
       });
-      m3uText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
-    } catch (err) {
-      console.error(`[IPTV Service] Failed to fetch M3U from ${url}:`, err.message);
     }
   }
 
-  let channels = parseM3U(m3uText);
-  if (channels.length === 0) {
+  if (allChannels.length === 0) {
     console.log('[IPTV Service] Using fallback verified channels.');
-    channels = [...BUILTIN_FALLBACK_CHANNELS];
+    allChannels = BUILTIN_FALLBACK_CHANNELS.map(c => ({
+      ...c,
+      sourceId: 'pl-default',
+      sourceName: 'Kênh Mặc Định',
+    }));
   }
 
-  return channels;
+  return allChannels;
 }
 
 /**
@@ -302,7 +381,7 @@ async function fetchRawChannels(config) {
  * forAdmin: true returns all channels with isHidden & isPinned attributes.
  * forAdmin: false (client apps) filters out hidden channels and sorts pinned to the top.
  */
-async function getChannels({ forceRefresh = false, forAdmin = false } = {}) {
+async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = '' } = {}) {
   const config = loadConfig();
   const now = Date.now();
 
@@ -315,25 +394,55 @@ async function getChannels({ forceRefresh = false, forAdmin = false } = {}) {
   const hiddenSet = new Set(config.hiddenChannelIds || []);
   const pinnedSet = new Set(config.pinnedChannelIds || []);
 
-  const enriched = cachedChannels.map((c) => ({
-    ...c,
-    isPinned: pinnedSet.has(c.id) || pinnedSet.has(c.url) || pinnedSet.has(c.name),
-    isHidden: hiddenSet.has(c.id) || hiddenSet.has(c.url) || hiddenSet.has(c.name),
-  }));
+  const enriched = cachedChannels.map((c) => {
+    const rawSuffix = c.id.includes('_') ? c.id.split('_').slice(1).join('_') : c.id;
+    const isPinned = pinnedSet.has(c.id) || pinnedSet.has(rawSuffix) || pinnedSet.has(c.url) || pinnedSet.has(c.name);
+    const isHidden = hiddenSet.has(c.id) || hiddenSet.has(rawSuffix) || hiddenSet.has(c.url) || hiddenSet.has(c.name);
+    return {
+      ...c,
+      sourceId: c.sourceId || 'pl-default',
+      sourceName: c.sourceName || 'Chung',
+      isPinned,
+      isHidden,
+    };
+  });
+
+  // Calculate dynamic source statistics
+  const sourceStats = new Map();
+  sourceStats.set('ALL', { id: 'ALL', name: 'Tất Cả Các Nguồn', count: 0 });
+  if (Array.isArray(config.playlists)) {
+    config.playlists.forEach((p) => {
+      sourceStats.set(p.id, { id: p.id, name: p.name, count: 0, enabled: p.enabled !== false, type: p.type });
+    });
+  }
+
+  enriched.forEach((c) => {
+    if (!c.isHidden) {
+      const allItem = sourceStats.get('ALL');
+      if (allItem) allItem.count++;
+      if (sourceStats.has(c.sourceId)) {
+        sourceStats.get(c.sourceId).count++;
+      }
+    }
+  });
+  const sources = Array.from(sourceStats.values());
 
   if (forAdmin) {
     return {
       config,
+      sources,
       totalCount: enriched.length,
       channels: enriched,
     };
   }
 
-  // For Client Apps:
-  // 1. Exclude hidden channels
-  const visible = enriched.filter((c) => !c.isHidden);
+  // Filter by source if requested
+  let visible = enriched.filter((c) => !c.isHidden);
+  if (sourceId && sourceId !== 'ALL') {
+    visible = visible.filter((c) => c.sourceId === sourceId);
+  }
 
-  // 2. Sort: Pinned first (0), then by Group, then by Name
+  // Sort: Pinned first (0), then by Name
   visible.sort((a, b) => {
     if (a.isPinned && !b.isPinned) return -1;
     if (!a.isPinned && b.isPinned) return 1;
@@ -344,20 +453,132 @@ async function getChannels({ forceRefresh = false, forAdmin = false } = {}) {
 }
 
 /**
- * Update source configuration
+ * Get sources summary
+ */
+async function getSources() {
+  const config = loadConfig();
+  const channels = await getChannels();
+  const sourceStats = new Map();
+  sourceStats.set('ALL', { id: 'ALL', name: 'Tất Cả Các Nguồn', count: channels.length });
+
+  if (Array.isArray(config.playlists)) {
+    config.playlists.forEach((p) => {
+      const count = channels.filter(c => c.sourceId === p.id).length;
+      sourceStats.set(p.id, { id: p.id, name: p.name, type: p.type, enabled: p.enabled !== false, count });
+    });
+  }
+
+  return Array.from(sourceStats.values());
+}
+
+/**
+ * Add a new playlist
+ */
+function addPlaylist({ name, type = 'url', url = '', content = '', filename = '' }) {
+  const config = loadConfig();
+  if (!Array.isArray(config.playlists)) config.playlists = [];
+
+  const plId = 'pl-' + Date.now();
+  let safeFilename = '';
+
+  if (type === 'file' && content) {
+    ensureUploadDir();
+    safeFilename = 'playlist_' + Date.now() + '.m3u';
+    const targetPath = path.join(UPLOAD_DIR, safeFilename);
+    fs.writeFileSync(targetPath, content, 'utf-8');
+  }
+
+  const newPl = {
+    id: plId,
+    name: (name || (type === 'file' ? filename || 'File Playlist' : 'Link IPTV')).trim(),
+    type: type === 'file' ? 'file' : 'url',
+    url: type === 'url' ? url.trim() : undefined,
+    file: type === 'file' ? safeFilename : undefined,
+    enabled: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  config.playlists.push(newPl);
+  saveConfig(config);
+  clearCache();
+  return { success: true, playlist: newPl, config };
+}
+
+/**
+ * Delete a playlist
+ */
+function deletePlaylist(id) {
+  const config = loadConfig();
+  if (!Array.isArray(config.playlists)) return { success: false, error: 'Không có playlist nào' };
+
+  config.playlists = config.playlists.filter(p => p.id !== id);
+
+  // If all playlists deleted, restore default
+  if (config.playlists.length === 0) {
+    config.playlists.push({
+      id: 'pl-default',
+      name: 'Kênh Quốc Gia (iptv-org)',
+      type: 'url',
+      url: DEFAULT_SOURCE_URL,
+      enabled: true,
+    });
+  }
+
+  saveConfig(config);
+  clearCache();
+  return { success: true, config };
+}
+
+/**
+ * Toggle enable/disable playlist
+ */
+function togglePlaylist(id, enabled) {
+  const config = loadConfig();
+  if (!Array.isArray(config.playlists)) return { success: false, error: 'Không tìm thấy playlist' };
+
+  const pl = config.playlists.find(p => p.id === id);
+  if (!pl) return { success: false, error: 'Không tìm thấy playlist ' + id };
+
+  pl.enabled = enabled !== undefined ? Boolean(enabled) : !pl.enabled;
+  saveConfig(config);
+  clearCache();
+  return { success: true, playlist: pl, config };
+}
+
+/**
+ * Legacy compatibility: Update source configuration
  */
 function setSource(type, url) {
   const config = loadConfig();
   config.sourceType = type === 'url' ? 'url' : 'default';
-  if (url) config.sourceUrl = url.trim();
+  if (url) {
+    config.sourceUrl = url.trim();
+    // Also add or update in playlists
+    const existing = config.playlists.find(p => p.id === 'pl-url-main');
+    if (existing) {
+      existing.url = url.trim();
+      existing.enabled = true;
+    } else {
+      config.playlists.push({
+        id: 'pl-url-main',
+        name: 'Playlist URL Cá Nhân',
+        type: 'url',
+        url: url.trim(),
+        enabled: true,
+      });
+    }
+  } else {
+    // default
+    const existing = config.playlists.find(p => p.id === 'pl-default');
+    if (existing) existing.enabled = true;
+  }
   saveConfig(config);
-  cachedChannels = [];
-  lastFetchTime = 0;
+  clearCache();
   return config;
 }
 
 /**
- * Upload and set M3U file
+ * Legacy compatibility: Upload and set M3U file
  */
 function uploadM3uFile(filename, buffer) {
   ensureUploadDir();
@@ -369,11 +590,19 @@ function uploadM3uFile(filename, buffer) {
   const config = loadConfig();
   config.sourceType = 'file';
   config.uploadedFile = safeFilename;
-  saveConfig(config);
 
-  cachedChannels = [];
-  lastFetchTime = 0;
-  return { success: true, filename: safeFilename };
+  if (!Array.isArray(config.playlists)) config.playlists = [];
+  config.playlists.push({
+    id: 'pl-file-' + Date.now(),
+    name: filename || 'File Playlist M3U',
+    type: 'file',
+    file: safeFilename,
+    enabled: true,
+  });
+
+  saveConfig(config);
+  clearCache();
+  return { success: true, filename: safeFilename, config };
 }
 
 /**
@@ -397,6 +626,10 @@ function clearCache() {
 
 module.exports = {
   getChannels,
+  getSources,
+  addPlaylist,
+  deletePlaylist,
+  togglePlaylist,
   setSource,
   uploadM3uFile,
   updateChannelSettings,
@@ -406,3 +639,4 @@ module.exports = {
   parseM3U,
   DEFAULT_SOURCE_URL,
 };
+

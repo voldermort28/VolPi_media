@@ -1,5 +1,25 @@
 import 'match_model.dart';
 
+class IptvSourceModel {
+  final String id;
+  final String name;
+  final int count;
+
+  const IptvSourceModel({
+    required this.id,
+    required this.name,
+    this.count = 0,
+  });
+
+  factory IptvSourceModel.fromJson(Map<String, dynamic> json) {
+    return IptvSourceModel(
+      id: json['id']?.toString() ?? '',
+      name: json['name']?.toString() ?? 'Nguồn',
+      count: json['count'] is int ? json['count'] : 0,
+    );
+  }
+}
+
 class IptvChannelModel {
   final String id;
   final String name;
@@ -9,6 +29,8 @@ class IptvChannelModel {
   final Map<String, String> headers;
   final bool isPinned;
   final bool isHidden;
+  final String sourceId;
+  final String sourceName;
 
   const IptvChannelModel({
     required this.id,
@@ -19,6 +41,8 @@ class IptvChannelModel {
     this.headers = const {},
     this.isPinned = false,
     this.isHidden = false,
+    this.sourceId = 'pl-default',
+    this.sourceName = 'Kênh Quốc Gia',
   });
 
   factory IptvChannelModel.fromJson(Map<String, dynamic> json) {
@@ -40,6 +64,8 @@ class IptvChannelModel {
       headers: parsedHeaders,
       isPinned: json['isPinned'] == true,
       isHidden: json['isHidden'] == true,
+      sourceId: json['sourceId']?.toString() ?? 'pl-default',
+      sourceName: json['sourceName']?.toString() ?? 'Kênh Quốc Gia',
     );
   }
 
@@ -53,6 +79,8 @@ class IptvChannelModel {
       'headers': headers,
       'isPinned': isPinned,
       'isHidden': isHidden,
+      'sourceId': sourceId,
+      'sourceName': sourceName,
     };
   }
 

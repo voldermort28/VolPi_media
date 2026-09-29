@@ -20,6 +20,7 @@ class _IptvScreenState extends State<IptvScreen> {
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
+  String _selectedSourceId = 'ALL';
   String _selectedGroup = 'ALL';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
@@ -70,11 +71,35 @@ class _IptvScreenState extends State<IptvScreen> {
     }
   }
 
+  List<IptvSourceModel> _getAvailableSources() {
+    final Map<String, String> sourceNames = {};
+    final Map<String, int> sourceCounts = {};
+
+    for (final c in _allChannels) {
+      final sId = c.sourceId.isNotEmpty ? c.sourceId : 'pl-default';
+      final sName = c.sourceName.isNotEmpty ? c.sourceName : 'Kênh Quốc Gia';
+      sourceNames[sId] = sName;
+      sourceCounts[sId] = (sourceCounts[sId] ?? 0) + 1;
+    }
+
+    final List<IptvSourceModel> sources = [
+      IptvSourceModel(id: 'ALL', name: 'Tất Cả Các Nguồn', count: _allChannels.length),
+    ];
+
+    sourceNames.forEach((id, name) {
+      sources.add(IptvSourceModel(id: id, name: name, count: sourceCounts[id] ?? 0));
+    });
+
+    return sources;
+  }
+
   List<String> _getAvailableGroups() {
     final Set<String> groups = {};
     for (final c in _allChannels) {
-      if (c.group.isNotEmpty) {
-        groups.add(c.group);
+      if (_selectedSourceId == 'ALL' || c.sourceId == _selectedSourceId) {
+        if (c.group.isNotEmpty) {
+          groups.add(c.group);
+        }
       }
     }
     final sorted = groups.toList()..sort();
@@ -83,23 +108,139 @@ class _IptvScreenState extends State<IptvScreen> {
 
   List<IptvChannelModel> _getFilteredChannels() {
     return _allChannels.where((c) {
-      // Group filter
+      // 1. Source / Playlist filter
+      if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) {
+        return false;
+      }
+
+      // 2. Group filter
       if (_selectedGroup == '⭐ Yêu Thích') {
         if (!c.isPinned) return false;
       } else if (_selectedGroup != 'ALL') {
         if (c.group != _selectedGroup) return false;
       }
 
-      // Search query filter
+      // 3. Search query filter
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
         final nameMatch = c.name.toLowerCase().contains(q);
         final groupMatch = c.group.toLowerCase().contains(q);
-        if (!nameMatch && !groupMatch) return false;
+        final sourceMatch = c.sourceName.toLowerCase().contains(q);
+        if (!nameMatch && !groupMatch && !sourceMatch) return false;
       }
 
       return true;
     }).toList();
+  }
+
+  void _showSourceSelectionDialog(List<IptvSourceModel> sources) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: Color(0xFF334155), width: 1.5),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.playlist_play_rounded, color: Color(0xFF38BDF8), size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Chọn Nguồn Playlist IPTV',
+                  style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 420,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: sources.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, index) {
+                final source = sources[index];
+                final isSelected = _selectedSourceId == source.id;
+
+                return TvFocusableCard(
+                  onTap: () {
+                    setState(() {
+                      _selectedSourceId = source.id;
+                      _selectedGroup = 'ALL';
+                    });
+                    Navigator.of(dialogCtx).pop();
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF0284C7).withOpacity(0.25) : const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white38,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            source.name,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white70,
+                              fontSize: 13,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Text(
+                            '${source.count} kênh',
+                            style: const TextStyle(
+                              color: Color(0xFF38BDF8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Đóng', style: TextStyle(color: Colors.white60)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _playChannel(IptvChannelModel channel, List<IptvChannelModel> currentList) {
@@ -187,6 +328,11 @@ class _IptvScreenState extends State<IptvScreen> {
       );
     }
 
+    final sources = _getAvailableSources();
+    final currentSource = sources.firstWhere(
+      (s) => s.id == _selectedSourceId,
+      orElse: () => sources.first,
+    );
     final filteredChannels = _getFilteredChannels();
     final groups = _getAvailableGroups();
 
@@ -206,7 +352,7 @@ class _IptvScreenState extends State<IptvScreen> {
           backgroundColor: const Color(0xFF0F172A),
           body: Column(
             children: [
-              // Top Bar: Title, Search, Refresh Button
+              // Top Bar: Title, Source Dropdown Menu, Search, Refresh Button
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
                 decoration: const BoxDecoration(
@@ -238,7 +384,7 @@ class _IptvScreenState extends State<IptvScreen> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFF0284C7).withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.pad(BorderSide(color: const Color(0xFF0284C7).withOpacity(0.5))),
+                                  border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.5)),
                                 ),
                                 child: Text(
                                   '${filteredChannels.length} / ${_allChannels.length} kênh',
@@ -260,12 +406,61 @@ class _IptvScreenState extends State<IptvScreen> {
                       ),
                     ),
 
-                    // Search Field (Large & Medium screen)
-                    if (constraints.maxWidth >= 650)
-                      Container(
-                        width: 220,
+                    // DROPDOWN MENU: BỘ LỌC THEO NGUỒN LINK PLAYLIST
+                    TvFocusableCard(
+                      onTap: () => _showSourceSelectionDialog(sources),
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
                         height: 38,
-                        margin: const EdgeInsets.only(right: 12),
+                        margin: const EdgeInsets.only(right: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _selectedSourceId != 'ALL'
+                              ? const Color(0xFF0284C7).withOpacity(0.2)
+                              : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _selectedSourceId != 'ALL'
+                                ? const Color(0xFF38BDF8)
+                                : const Color(0xFF334155),
+                            width: _selectedSourceId != 'ALL' ? 1.4 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _selectedSourceId != 'ALL' ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
+                              color: const Color(0xFF38BDF8),
+                              size: 16,
+                            ),
+                            const SizedBox(width: 6),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: isLargeScreen ? 160 : 110),
+                              child: Text(
+                                currentSource.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 20),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Search Field (Large & Medium screen)
+                    if (constraints.maxWidth >= 680)
+                      Container(
+                        width: 200,
+                        height: 38,
+                        margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
                           color: const Color(0xFF1E293B),
                           borderRadius: BorderRadius.circular(8),
@@ -575,16 +770,46 @@ class _IptvScreenState extends State<IptvScreen> {
             ),
             const SizedBox(height: 3),
 
-            // Group Label
-            Text(
-              channel.group,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white38,
-                fontSize: 10,
-              ),
+            // Source & Group Label
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (_selectedSourceId == 'ALL' && channel.sourceName.isNotEmpty) ...[
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3), width: 0.6),
+                      ),
+                      child: Text(
+                        channel.sourceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Flexible(
+                  child: Text(
+                    channel.group,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 10,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

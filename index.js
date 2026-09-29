@@ -367,11 +367,50 @@ app.get("/api/iptv/channels", async (req, res) => {
   try {
     const forAdmin = req.query.admin === "true";
     const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
-    const data = await iptvService.getChannels({ forceRefresh, forAdmin });
+    const sourceId = req.query.sourceId || req.query.source || "";
+    const data = await iptvService.getChannels({ forceRefresh, forAdmin, sourceId });
     res.json(data);
   } catch (err) {
     console.error("Error fetching IPTV channels:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/iptv/sources", async (req, res) => {
+  try {
+    const sources = await iptvService.getSources();
+    res.json(sources);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/iptv/sources/add", (req, res) => {
+  try {
+    const result = iptvService.addPlaylist(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/iptv/sources/delete", (req, res) => {
+  try {
+    const { id } = req.body;
+    const result = iptvService.deletePlaylist(id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/iptv/sources/toggle", (req, res) => {
+  try {
+    const { id, enabled } = req.body;
+    const result = iptvService.togglePlaylist(id, enabled);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

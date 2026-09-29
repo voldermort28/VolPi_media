@@ -419,60 +419,84 @@
         </div>
       </div>
 
-      <!-- Playlist Source Controls: URL or File Upload -->
+      <!-- Playlist Source Controls: Add URL or Upload File -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
         
         <!-- Option A: Add by M3U URL -->
-        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-sky-500">
+        <div class="glass-card rounded-xl p-5 space-y-3.5 border-l-4 border-l-sky-500">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 font-bold text-white text-sm">
               <i data-lucide="link" class="w-4 h-4 text-sky-400"></i>
-              <span>Nguồn 1: Đường Link URL (.m3u / .m3u8)</span>
+              <span>Thêm Link M3U Mới (.m3u / .m3u8)</span>
             </div>
-            <span id="badge-source-url" class="text-[11px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-400 border border-slate-700">Online</span>
+            <span class="text-[11px] px-2 py-0.5 rounded font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30">Online Link</span>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1.5">Dán URL Playlist (Hỗ trợ link bóng đá theo ngày, link cá nhân):</label>
-            <div class="flex gap-2">
-              <input type="text" id="input-iptv-url" placeholder="https://raw.githubusercontent.com/.../playlist.m3u" 
-                class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
-              <button type="button" onclick="saveIptvUrlSource()" id="btn-save-iptv-url" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0">
-                <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
-                <span>Tải & Lưu URL</span>
-              </button>
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Tên gợi nhớ (Ví dụ: Bóng Đá Hôm Nay, Kênh VTV):</label>
+              <input type="text" id="input-iptv-url-name" placeholder="Bóng Đá Trực Tiếp..." 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
             </div>
-          </div>
-          <div class="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-            <span>Nguồn mặc định: Kho kênh VTV, HTV, Thể thao của iptv-org</span>
-            <button type="button" onclick="loadDefaultIptv()" class="text-sky-400 hover:text-sky-300 font-semibold underline cursor-pointer">Khôi phục mặc định</button>
+            <div>
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Đường dẫn URL playlist (.m3u / .m3u8):</label>
+              <div class="flex gap-2">
+                <input type="text" id="input-iptv-url" placeholder="https://raw.githubusercontent.com/.../playlist.m3u" 
+                  class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 font-mono">
+                <button type="button" onclick="addIptvUrlSource()" id="btn-save-iptv-url" class="bg-sky-600 hover:bg-sky-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Thêm Nguồn</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Option B: Upload M3U File -->
-        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-emerald-500">
+        <div class="glass-card rounded-xl p-5 space-y-3.5 border-l-4 border-l-emerald-500">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2 font-bold text-white text-sm">
               <i data-lucide="file-up" class="w-4 h-4 text-emerald-400"></i>
-              <span>Nguồn 2: Upload File Playlist (.m3u / .txt)</span>
+              <span>Upload File Playlist M3U (.m3u / .txt)</span>
             </div>
-            <span id="badge-source-file" class="text-[11px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-400 border border-slate-700">File máy tính</span>
+            <span class="text-[11px] px-2 py-0.5 rounded font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">File Máy Tính</span>
           </div>
-          <div>
-            <label class="block text-xs font-medium text-slate-300 mb-1.5">Chọn file M3U từ máy tính hoặc USB:</label>
-            <div class="flex gap-2">
-              <input type="file" id="input-iptv-file" accept=".m3u,.m3u8,.txt" 
-                class="flex-1 text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700 cursor-pointer">
-              <button type="button" onclick="uploadIptvFile()" id="btn-upload-iptv-file" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0">
-                <i data-lucide="upload" class="w-3.5 h-3.5"></i>
-                <span>Tải Lên</span>
-              </button>
+          <div class="space-y-2">
+            <div>
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Tên hiển thị gợi nhớ:</label>
+              <input type="text" id="input-iptv-file-name" placeholder="Playlist Cá Nhân..." 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500">
             </div>
-          </div>
-          <div class="text-[11px] text-slate-400">
-            Hỗ trợ kéo thả hoặc nạp file M3U tải từ nhà cung cấp, tự động bóc tách logo và tên kênh.
+            <div>
+              <label class="block text-[11px] font-medium text-slate-400 mb-1">Chọn file từ máy tính:</label>
+              <div class="flex gap-2">
+                <input type="file" id="input-iptv-file" accept=".m3u,.m3u8,.txt" 
+                  class="flex-1 text-xs text-slate-400 file:mr-2 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-300 hover:file:bg-slate-700 cursor-pointer">
+                <button type="button" onclick="uploadIptvFile()" id="btn-upload-iptv-file" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0">
+                  <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+                  <span>Tải Lên</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
+      </div>
+
+      <!-- Active Playlists Manager Cards -->
+      <div class="space-y-3 pt-1">
+        <div class="flex items-center justify-between text-xs text-slate-300 font-bold border-b border-slate-800 pb-2">
+          <div class="flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-emerald-400"></i>
+            <span>Các Nguồn Link / File IPTV Đang Hoạt Động (Đồng bộ đồng thời lên App)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="stat-total-playlists" class="text-slate-400 font-mono text-[11px]">1 nguồn</span>
+            <button type="button" onclick="loadDefaultIptv()" class="text-sky-400 hover:text-sky-300 font-semibold underline text-[11px] cursor-pointer">Khôi phục mặc định</button>
+          </div>
+        </div>
+        <div id="iptv-playlists-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <!-- Dynamically populated playlist cards -->
+        </div>
       </div>
 
       <!-- Channel Management Controls (Filters, Search, Stats) -->
@@ -485,15 +509,23 @@
             <span id="stat-hidden-channels" class="px-2.5 py-1 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 font-bold">🚫 0 đã ẩn</span>
           </div>
 
-          <div class="flex items-center gap-3">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <!-- Source Filter Dropdown -->
+            <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1">
+              <span class="text-[11px] text-slate-400 font-semibold whitespace-nowrap">Nguồn:</span>
+              <select id="iptv-source-filter" onchange="filterIptvSource(this.value)" class="bg-transparent text-xs text-sky-400 font-bold focus:outline-none cursor-pointer">
+                <option value="ALL">🌐 Tất Cả Nguồn</option>
+              </select>
+            </div>
+
             <!-- Search bar -->
-            <div class="relative w-full md:w-64">
-              <input type="text" id="iptv-search" oninput="searchIptv(this.value)" placeholder="🔍 Tìm kiếm kênh..." 
+            <div class="relative w-full md:w-52">
+              <input type="text" id="iptv-search" oninput="searchIptv(this.value)" placeholder="🔍 Tìm kênh..." 
                 class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
             </div>
 
             <!-- Save Settings Button -->
-            <button type="button" onclick="saveIptvSettings()" id="btn-save-iptv-settings" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold px-4 py-2 rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20 cursor-pointer shrink-0">
+            <button type="button" onclick="saveIptvSettings()" id="btn-save-iptv-settings" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20 cursor-pointer shrink-0">
               <i data-lucide="check-circle-2" class="w-4 h-4"></i>
               <span>Lưu Cấu Hình (Ghim & Ẩn)</span>
             </button>
@@ -514,6 +546,7 @@
                 <th class="py-3 px-4 w-14 text-center">Logo</th>
                 <th class="py-3 px-4 font-bold">Tên Kênh</th>
                 <th class="py-3 px-4">Nhóm Đài</th>
+                <th class="py-3 px-4">Nguồn Playlist</th>
                 <th class="py-3 px-4">Luồng Phát (URL)</th>
                 <th class="py-3 px-4 w-28 text-center">Trạng Thái</th>
                 <th class="py-3 px-4 w-24 text-center">Phát Thử</th>
@@ -521,7 +554,7 @@
             </thead>
             <tbody id="iptv-channels-tbody" class="divide-y divide-slate-800/60 bg-slate-950/40">
               <tr>
-                <td colspan="7" class="py-8 text-center text-slate-400">Đang tải danh sách kênh IPTV...</td>
+                <td colspan="8" class="py-8 text-center text-slate-400">Đang tải danh sách kênh IPTV...</td>
               </tr>
             </tbody>
           </table>
@@ -795,7 +828,9 @@
     // IPTV MANAGEMENT LOGIC
     // -------------------------------------------------------------
     let allIptvChannels = [];
+    let allIptvSources = [];
     let iptvConfig = {};
+    let currentIptvSource = 'ALL';
     let currentIptvGroup = 'ALL';
     let currentIptvSearch = '';
     let pinnedChannelIds = new Set();
@@ -814,47 +849,95 @@
         }
 
         allIptvChannels = data.channels || [];
+        allIptvSources = data.sources || [];
         iptvConfig = data.config || {};
 
         pinnedChannelIds = new Set(iptvConfig.pinnedChannelIds || []);
         hiddenChannelIds = new Set(iptvConfig.hiddenChannelIds || []);
 
-        // Update inputs and badges
-        const inputUrl = document.getElementById('input-iptv-url');
-        if (inputUrl && iptvConfig.sourceUrl) {
-          inputUrl.value = iptvConfig.sourceUrl;
-        }
-
-        const badgeUrl = document.getElementById('badge-source-url');
-        const badgeFile = document.getElementById('badge-source-file');
-        if (badgeUrl && badgeFile) {
-          if (iptvConfig.sourceType === 'url') {
-            badgeUrl.className = 'text-[11px] px-2 py-0.5 rounded font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40';
-            badgeUrl.textContent = '● Đang dùng URL';
-            badgeFile.className = 'text-[11px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-400 border border-slate-700';
-            badgeFile.textContent = 'File máy tính';
-          } else if (iptvConfig.sourceType === 'file') {
-            badgeFile.className = 'text-[11px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-            badgeFile.textContent = '● Đang dùng: ' + (iptvConfig.uploadedFile || 'File M3U');
-            badgeUrl.className = 'text-[11px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-400 border border-slate-700';
-            badgeUrl.textContent = 'Online';
-          } else {
-            badgeUrl.className = 'text-[11px] px-2 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40';
-            badgeUrl.textContent = '● Mặc định Quốc Gia';
-            badgeFile.className = 'text-[11px] px-2 py-0.5 rounded font-semibold bg-slate-800 text-slate-400 border border-slate-700';
-            badgeFile.textContent = 'File máy tính';
-          }
-        }
-
+        renderIptvPlaylistsManager();
+        renderIptvSourcesDropdown();
         renderIptvGroupTabs();
         renderIptvTable();
       } catch (err) {
         console.error('Error fetching IPTV data:', err);
         const tbody = document.getElementById('iptv-channels-tbody');
         if (tbody) {
-          tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-rose-400">Không thể nạp danh sách kênh: ' + err.message + '</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-rose-400">Không thể nạp danh sách kênh: ' + err.message + '</td></tr>';
         }
       }
+    }
+
+    function renderIptvPlaylistsManager() {
+      const container = document.getElementById('iptv-playlists-list');
+      const statTotal = document.getElementById('stat-total-playlists');
+      if (!container) return;
+
+      const playlists = Array.isArray(iptvConfig.playlists) ? iptvConfig.playlists : [];
+      if (statTotal) statTotal.textContent = playlists.length + ' nguồn';
+
+      if (playlists.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-4 text-center text-slate-500 text-xs">Chưa có nguồn playlist nào. Hãy thêm đường link URL hoặc file playlist ở trên.</div>';
+        return;
+      }
+
+      let html = '';
+      playlists.forEach((p) => {
+        const isEnabled = p.enabled !== false;
+        const channelCount = allIptvChannels.filter(c => c.sourceId === p.id).length;
+        const typeBadge = p.type === 'file'
+          ? '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">FILE</span>'
+          : '<span class="text-[10px] px-1.5 py-0.5 rounded font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">URL</span>';
+
+        const infoText = p.type === 'file' ? (p.file || 'File M3U') : (p.url || 'URL Online');
+
+        html += '<div class="glass-card rounded-xl p-3.5 border ' + (isEnabled ? 'border-slate-800 bg-slate-900/60' : 'border-slate-800/40 opacity-50 bg-slate-950/40') + ' flex flex-col justify-between space-y-2">' +
+          '<div class="flex items-start justify-between gap-2">' +
+            '<div class="flex items-center gap-1.5 min-w-0">' +
+              typeBadge +
+              '<span class="font-bold text-white text-xs truncate" title="' + p.name + '">' + p.name + '</span>' +
+            '</div>' +
+            '<span class="text-[11px] font-bold text-sky-400 bg-sky-950/60 border border-sky-800/60 px-2 py-0.5 rounded shrink-0">' + channelCount + ' kênh</span>' +
+          '</div>' +
+          '<div class="font-mono text-[10px] text-slate-400 truncate" title="' + infoText + '">' + infoText + '</div>' +
+          '<div class="flex items-center justify-between pt-1 border-t border-slate-800/60 text-xs">' +
+            '<label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-300 select-none">' +
+              '<input type="checkbox" ' + (isEnabled ? 'checked' : '') + ' onchange="toggleIptvPlaylist(\'' + p.id + '\', this.checked)" class="rounded bg-slate-900 border-slate-700 text-sky-500 focus:ring-0 cursor-pointer">' +
+              '<span>' + (isEnabled ? 'Đang bật' : 'Tạm tắt') + '</span>' +
+            '</label>' +
+            '<button type="button" onclick="deleteIptvPlaylist(\'' + p.id + '\', \'' + p.name.replace(/'/g, "\\'") + '\')" class="text-rose-400 hover:text-rose-300 text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition">' +
+              '<i data-lucide="trash-2" class="w-3.5 h-3.5"></i>' +
+              '<span>Xóa</span>' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+      });
+
+      container.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function renderIptvSourcesDropdown() {
+      const select = document.getElementById('iptv-source-filter');
+      if (!select) return;
+
+      let html = '<option value="ALL">🌐 Tất Cả Nguồn (' + allIptvChannels.length + ' kênh)</option>';
+      allIptvSources.forEach(s => {
+        if (s.id !== 'ALL') {
+          const selected = currentIptvSource === s.id ? 'selected' : '';
+          html += '<option value="' + s.id + '" ' + selected + '>📺 ' + s.name + ' (' + s.count + ' kênh)</option>';
+        }
+      });
+
+      select.innerHTML = html;
+      select.value = currentIptvSource;
+    }
+
+    function filterIptvSource(sourceId) {
+      currentIptvSource = sourceId;
+      currentIptvGroup = 'ALL';
+      renderIptvGroupTabs();
+      renderIptvTable();
     }
 
     function renderIptvGroupTabs() {
@@ -862,7 +945,11 @@
       if (!tabsContainer) return;
 
       const groupCounts = {};
-      allIptvChannels.forEach(c => {
+      const sourceFiltered = allIptvChannels.filter(c => {
+        return currentIptvSource === 'ALL' || c.sourceId === currentIptvSource;
+      });
+
+      sourceFiltered.forEach(c => {
         const g = c.group || 'Khác';
         groupCounts[g] = (groupCounts[g] || 0) + 1;
       });
@@ -872,7 +959,7 @@
       let html = '';
       groups.forEach(g => {
         const isAll = g === 'ALL';
-        const label = isAll ? 'Tất Cả (' + allIptvChannels.length + ')' : g + ' (' + groupCounts[g] + ')';
+        const label = isAll ? 'Tất Cả (' + sourceFiltered.length + ')' : g + ' (' + groupCounts[g] + ')';
         const isSelected = currentIptvGroup === g;
 
         const activeClass = isSelected
@@ -902,14 +989,16 @@
       const tbody = document.getElementById('iptv-channels-tbody');
       if (!tbody) return;
 
-      // Filter
+      // Filter by Source + Group + Search
       let filtered = allIptvChannels.filter(c => {
+        if (currentIptvSource !== 'ALL' && c.sourceId !== currentIptvSource) return false;
         if (currentIptvGroup !== 'ALL' && c.group !== currentIptvGroup) return false;
         if (currentIptvSearch) {
           const matchName = (c.name || '').toLowerCase().includes(currentIptvSearch);
           const matchGroup = (c.group || '').toLowerCase().includes(currentIptvSearch);
+          const matchSource = (c.sourceName || '').toLowerCase().includes(currentIptvSearch);
           const matchUrl = (c.url || '').toLowerCase().includes(currentIptvSearch);
-          if (!matchName && !matchGroup && !matchUrl) return false;
+          if (!matchName && !matchGroup && !matchSource && !matchUrl) return false;
         }
         return true;
       });
@@ -932,7 +1021,7 @@
       if (statHidden) statHidden.textContent = '🚫 ' + hiddenChannelIds.size + ' đã ẩn';
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400">Không tìm thấy kênh nào phù hợp bộ lọc.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-slate-400">Không tìm thấy kênh nào phù hợp bộ lọc nguồn hoặc thể loại.</td></tr>';
         return;
       }
 
@@ -966,7 +1055,8 @@
             '</div>' +
           '</td>' +
           '<td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300 border border-slate-700">' + (c.group || 'Chung') + '</span></td>' +
-          '<td class="py-3 px-4 font-mono text-[11px] text-slate-400 max-w-[200px] truncate" title="' + c.url + '">' + c.url + '</td>' +
+          '<td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/10 text-sky-300 border border-sky-500/20 truncate max-w-[130px] block" title="' + (c.sourceName || 'Mặc định') + '">' + (c.sourceName || 'Mặc định') + '</span></td>' +
+          '<td class="py-3 px-4 font-mono text-[11px] text-slate-400 max-w-[180px] truncate" title="' + c.url + '">' + c.url + '</td>' +
           '<td class="py-3 px-4 text-center">' + stateBtn + '</td>' +
           '<td class="py-3 px-4 text-center">' +
             '<button type="button" onclick="playChannelPreview(\'' + encodeURIComponent(c.url) + '\', \'' + encodeURIComponent(c.name || '') + '\')" class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-600/80 hover:bg-sky-500 text-white flex items-center justify-center gap-1 mx-auto transition cursor-pointer shadow">' +
@@ -985,7 +1075,6 @@
         pinnedChannelIds.delete(id);
       } else {
         pinnedChannelIds.add(id);
-        // Unhide if was hidden
         hiddenChannelIds.delete(id);
       }
       renderIptvTable();
@@ -996,7 +1085,6 @@
         hiddenChannelIds.delete(id);
       } else {
         hiddenChannelIds.add(id);
-        // Unpin if was pinned
         pinnedChannelIds.delete(id);
       }
       renderIptvTable();
@@ -1028,9 +1116,12 @@
       }
     }
 
-    async function saveIptvUrlSource() {
-      const input = document.getElementById('input-iptv-url');
-      const url = input ? input.value.trim() : '';
+    async function addIptvUrlSource() {
+      const nameInput = document.getElementById('input-iptv-url-name');
+      const urlInput = document.getElementById('input-iptv-url');
+      const name = nameInput ? nameInput.value.trim() : '';
+      const url = urlInput ? urlInput.value.trim() : '';
+
       if (!url) {
         showToast('Cảnh báo', 'Vui lòng nhập đường link URL playlist M3U!', false);
         return;
@@ -1040,17 +1131,19 @@
       if (btn) btn.disabled = true;
 
       try {
-        const res = await fetch('/api/iptv/set-source', {
+        const res = await fetch('/api/iptv/sources/add', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'url', url: url }),
+          body: JSON.stringify({ name: name || 'Link IPTV', type: 'url', url: url }),
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Đã lưu nguồn URL!', 'Hệ thống đang tải và phân tích danh sách kênh từ link mới...', true);
+          if (nameInput) nameInput.value = '';
+          if (urlInput) urlInput.value = '';
+          showToast('Đã thêm nguồn!', 'Đang tải và cập nhật các kênh từ đường link mới...', true);
           await fetchIptvData(true);
         } else {
-          showToast('Lỗi', data.error || 'Không thể cập nhật nguồn URL', false);
+          showToast('Lỗi', data.error || 'Không thể thêm nguồn', false);
         }
       } catch (err) {
         showToast('Lỗi', err.message, false);
@@ -1060,7 +1153,10 @@
     }
 
     async function uploadIptvFile() {
+      const nameInput = document.getElementById('input-iptv-file-name');
       const fileInput = document.getElementById('input-iptv-file');
+      const name = nameInput ? nameInput.value.trim() : '';
+
       if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
         showToast('Cảnh báo', 'Vui lòng chọn file M3U từ máy tính!', false);
         return;
@@ -1074,13 +1170,15 @@
         const reader = new FileReader();
         reader.onload = async function(e) {
           const content = e.target.result;
-          const res = await fetch('/api/iptv/upload-content', {
+          const res = await fetch('/api/iptv/sources/add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: content, filename: file.name }),
+            body: JSON.stringify({ name: name || file.name, type: 'file', content: content, filename: file.name }),
           });
           const data = await res.json();
           if (data.success) {
+            if (nameInput) nameInput.value = '';
+            fileInput.value = '';
             showToast('Tải file thành công!', 'Đã nạp file playlist ' + file.name + ' vào hệ thống.', true);
             await fetchIptvData(true);
           } else {
@@ -1092,6 +1190,47 @@
       } catch (err) {
         showToast('Lỗi', err.message, false);
         if (btn) btn.disabled = false;
+      }
+    }
+
+    async function toggleIptvPlaylist(id, enabled) {
+      try {
+        const res = await fetch('/api/iptv/sources/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, enabled }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Đã cập nhật', 'Trạng thái nguồn playlist đã thay đổi.', true);
+          await fetchIptvData(true);
+        }
+      } catch (err) {
+        showToast('Lỗi', err.message, false);
+      }
+    }
+
+    async function deleteIptvPlaylist(id, name) {
+      if (!confirm('Bạn có chắc chắn muốn xóa nguồn playlist "' + name + '" không?')) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/iptv/sources/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Đã xóa', 'Đã gỡ bỏ nguồn playlist ' + name, true);
+          if (currentIptvSource === id) {
+            currentIptvSource = 'ALL';
+          }
+          await fetchIptvData(true);
+        }
+      } catch (err) {
+        showToast('Lỗi', err.message, false);
       }
     }
 
@@ -1123,7 +1262,7 @@
         const res = await fetch('/api/iptv/refresh?admin=true', { method: 'POST' });
         const data = await res.json();
         if (data.success) {
-          showToast('Đã làm mới!', 'Tìm thấy ' + (data.count || 0) + ' kênh từ nguồn phát mới nhất.', true);
+          showToast('Đã làm mới!', 'Tìm thấy ' + (data.count || 0) + ' kênh từ các nguồn phát.', true);
           await fetchIptvData(true);
         } else {
           showToast('Lỗi', data.error || 'Không thể làm mới danh sách kênh', false);
