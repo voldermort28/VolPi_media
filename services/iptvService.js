@@ -1,105 +1,113 @@
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const axios = require('axios');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'iptv_config.json');
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
 
-// Default reputable public Vietnam IPTV source from iptv-org (daily automated health checks)
-const DEFAULT_SOURCE_URL = 'https://iptv-org.github.io/iptv/countries/vn.m3u';
+// Default reliable Vietnam IPTV source (tested daily with GitHub Actions, fast FPT Play/Viettel CDN)
+const DEFAULT_SOURCE_URL = 'https://raw.githubusercontent.com/khanh71/All-In-One-IPTV/main/http-iptv.m3u';
 
-// Built-in verified backup channels in case network is down
+// Built-in verified backup channels with direct CDN access
 const BUILTIN_FALLBACK_CHANNELS = [
   {
     id: 'vtv1-hd',
     name: 'VTV1 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv1.png',
-    url: 'https://vtv1.vtv.vn/vtv1hd.m3u8',
+    logo: 'https://i.postimg.cc/F1FvzstX/V1.png',
+    url: 'https://live.fptplay53.net/live/media/vtv1/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv2-hd',
     name: 'VTV2 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv2.png',
-    url: 'https://vtv2.vtv.vn/vtv2hd.m3u8',
+    logo: 'https://i.postimg.cc/yDR4tDRm/V2.png',
+    url: 'https://live.fptplay53.net/live/media/vtv2/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv3-hd',
     name: 'VTV3 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv3.png',
-    url: 'https://vtv3.vtv.vn/vtv3hd.m3u8',
+    logo: 'https://i.postimg.cc/B8cWZRM0/V3.png',
+    url: 'https://live.fptplay53.net/live/media/vtv3/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv4-hd',
     name: 'VTV4 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv4.png',
-    url: 'https://vtv4.vtv.vn/vtv4hd.m3u8',
+    logo: 'https://i.postimg.cc/Wqzxnzj0/V4.png',
+    url: 'https://live.fptplay53.net/live/media/vtv4/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv5-hd',
     name: 'VTV5 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv5.png',
-    url: 'https://vtv5.vtv.vn/vtv5hd.m3u8',
+    logo: 'https://i.postimg.cc/ZC91vWVM/V5.png',
+    url: 'https://live.fptplay53.net/live/media/vtv5/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv7-hd',
     name: 'VTV7 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv7.png',
-    url: 'https://vtv7.vtv.vn/vtv7hd.m3u8',
+    logo: 'https://i.postimg.cc/ykSbYwN8/V7.png',
+    url: 'https://live.fptplay53.net/live/media/vtv7/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv8-hd',
     name: 'VTV8 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv8.png',
-    url: 'https://vtv8.vtv.vn/vtv8hd.m3u8',
+    logo: 'https://i.postimg.cc/k2QYWK8w/V8.png',
+    url: 'https://live.fptplay53.net/fnxhd1/vtv8hd_vhls.smil/chunklist_b5000000.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'vtv9-hd',
     name: 'VTV9 HD',
-    logo: 'https://vtv1.vtv.vn/Content/Images/logo-vtv9.png',
-    url: 'https://vtv9.vtv.vn/vtv9hd.m3u8',
+    logo: 'https://i.postimg.cc/phT0NSS6/V9.png',
+    url: 'https://live.fptplay53.net/live/media/vtv9/live247-hls-avc/index.m3u8',
     group: 'VTV Quốc Gia',
   },
   {
     id: 'htv7-hd',
     name: 'HTV7 HD',
-    logo: 'https://upload.wikimedia.org/wikipedia/vi/a/a2/HTV7_logo_2016.png',
-    url: 'https://live.htv.com.vn/live/htv7.m3u8',
+    logo: 'https://i.imgur.com/n2PEK28.png',
+    url: 'https://live.fptplay53.net/epzhd1/htv7hd_vhls.smil/chunklist_b5000000.m3u8',
     group: 'HTV & Miền Nam',
   },
   {
     id: 'htv9-hd',
     name: 'HTV9 HD',
-    logo: 'https://upload.wikimedia.org/wikipedia/vi/6/6f/HTV9_logo_2016.png',
-    url: 'https://live.htv.com.vn/live/htv9.m3u8',
+    logo: 'https://i.imgur.com/6GSN524.png',
+    url: 'https://live.fptplay53.net/epzhd1/htv9hd_vhls.smil/chunklist_b5000000.m3u8',
     group: 'HTV & Miền Nam',
   },
   {
-    id: 'htv-the-thao',
-    name: 'HTV Thể Thao',
-    logo: 'https://upload.wikimedia.org/wikipedia/vi/8/8c/HTV_The_Thao_logo_2013.png',
-    url: 'https://live.htv.com.vn/live/htv_the_thao.m3u8',
-    group: 'Thể Thao & Bóng Đá',
+    id: 'vinhlong1-hd',
+    name: 'Vĩnh Long 1 HD',
+    logo: 'https://i.imgur.com/q3fjpYc.png',
+    url: 'https://live.fptplay53.net/epzhd2/vinhlong1_vhls.smil/chunklist_b5000000.m3u8',
+    group: 'Đài Địa Phương',
   },
   {
-    id: 'vtc1-hd',
-    name: 'VTC1 HD (Tin tức)',
-    logo: 'https://upload.wikimedia.org/wikipedia/vi/9/93/VTC1_2017.png',
-    url: 'https://vtc.gov.vn/live/vtc1.m3u8',
-    group: 'VTC & Tin Tức',
+    id: 'vinhlong2-hd',
+    name: 'Vĩnh Long 2 HD',
+    logo: 'https://i.imgur.com/zGv54Ed.png',
+    url: 'https://live.fptplay53.net/epzhd2/vinhlong2_vhls.smil/chunklist_b5000000.m3u8',
+    group: 'Đài Địa Phương',
   },
   {
-    id: 'vtc3-hd',
-    name: 'VTC3 HD (Thể thao)',
-    logo: 'https://upload.wikimedia.org/wikipedia/vi/4/46/VTC3_2017.png',
-    url: 'https://vtc.gov.vn/live/vtc3.m3u8',
-    group: 'Thể Thao & Bóng Đá',
+    id: 'vinhlong3-hd',
+    name: 'Vĩnh Long 3 HD',
+    logo: 'https://i.imgur.com/44c1Yoz.png',
+    url: 'https://live.fptplay53.net/epzhd2/vinhlong3_vhls.smil/chunklist_b5000000.m3u8',
+    group: 'Đài Địa Phương',
+  },
+  {
+    id: 'vinhlong4-hd',
+    name: 'Vĩnh Long 4 HD',
+    logo: 'https://i.imgur.com/JWDsJxB.png',
+    url: 'https://live.fptplay53.net/epzhd2/vinhlong4-hd_vhls.smil/chunklist_b5000000.m3u8',
+    group: 'Đài Địa Phương',
   },
 ];
 
@@ -174,6 +182,15 @@ function loadConfig() {
         });
       }
 
+      saveConfig(cfg);
+    }
+
+    // Auto-upgrade obsolete/broken iptv-org playlist to high-speed FPT/Viettel CDN All-In-One-IPTV
+    const defPl = (cfg.playlists || []).find(p => p.id === 'pl-default');
+    if (defPl && defPl.url && defPl.url.includes('iptv-org.github.io/iptv/countries/vn.m3u')) {
+      console.log('[IPTV Service] Upgrading default playlist to All-In-One-IPTV (FPT/Viettel CDN)');
+      defPl.url = DEFAULT_SOURCE_URL;
+      defPl.name = 'Kênh Quốc Gia & Địa Phương (FPT/Viettel CDN)';
       saveConfig(cfg);
     }
 
@@ -369,7 +386,7 @@ async function fetchRawChannels(config) {
     : [
         {
           id: 'pl-default',
-          name: 'Kênh Quốc Gia (iptv-org)',
+          name: 'Kênh Quốc Gia & Địa Phương',
           type: config.sourceType === 'file' ? 'file' : 'url',
           url: config.sourceUrl || DEFAULT_SOURCE_URL,
           file: config.uploadedFile,
@@ -588,7 +605,7 @@ function deletePlaylist(id) {
   if (config.playlists.length === 0) {
     config.playlists.push({
       id: 'pl-default',
-      name: 'Kênh Quốc Gia (iptv-org)',
+      name: 'Kênh Quốc Gia & Địa Phương',
       type: 'url',
       url: DEFAULT_SOURCE_URL,
       enabled: true,
@@ -751,21 +768,48 @@ async function handleStreamProxy(req, res) {
       return upstreamRes.data.pipe(res);
     }
 
+    const finalUrl = upstreamRes.request?.res?.responseUrl || targetUrl;
     const contentType = (upstreamRes.headers['content-type'] || '').toLowerCase();
+    const contentEncoding = (upstreamRes.headers['content-encoding'] || '').toLowerCase();
     const isM3u8 = targetUrl.toLowerCase().includes('.m3u8') ||
+                   targetUrl.toLowerCase().includes('.m3u') ||
+                   finalUrl.toLowerCase().includes('.m3u8') ||
+                   finalUrl.toLowerCase().includes('.m3u') ||
                    contentType.includes('mpegurl') ||
                    contentType.includes('application/x-mpegurl') ||
-                   contentType.includes('text/plain');
+                   contentType.includes('text/plain') ||
+                   contentType.includes('application/vnd.apple.mpegurl');
 
     if (isM3u8 && req.method !== 'HEAD') {
       const chunks = [];
       for await (const chunk of upstreamRes.data) {
         chunks.push(chunk);
       }
-      const rawText = Buffer.concat(chunks).toString('utf-8');
+      const buffer = Buffer.concat(chunks);
+      let rawText = '';
+      if (contentEncoding === 'gzip') {
+        try {
+          rawText = zlib.gunzipSync(buffer).toString('utf-8');
+        } catch (_) {
+          rawText = buffer.toString('utf-8');
+        }
+      } else if (contentEncoding === 'deflate') {
+        try {
+          rawText = zlib.inflateSync(buffer).toString('utf-8');
+        } catch (_) {
+          rawText = buffer.toString('utf-8');
+        }
+      } else if (contentEncoding === 'br') {
+        try {
+          rawText = zlib.brotliDecompressSync(buffer).toString('utf-8');
+        } catch (_) {
+          rawText = buffer.toString('utf-8');
+        }
+      } else {
+        rawText = buffer.toString('utf-8');
+      }
 
       if (rawText.includes('#EXTM3U')) {
-        const finalUrl = upstreamRes.request?.res?.responseUrl || targetUrl;
         const rewritten = rewriteM3u8Content(rawText, finalUrl, referer, userAgent);
 
         res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
@@ -808,7 +852,7 @@ async function handleStreamProxy(req, res) {
 }
 
 /**
- * Rewrites URLs in M3U8 content to route child manifests, encryption keys, and segments back through stream-proxy
+ * Rewrites URLs in M3U8 content to route child manifests, audio/sub renditions, encryption keys, and segments back through stream-proxy
  */
 function rewriteM3u8Content(m3u8Text, baseUrl, referer, userAgent) {
   const lines = m3u8Text.split(/\r?\n/);
@@ -821,24 +865,24 @@ function rewriteM3u8Content(m3u8Text, baseUrl, referer, userAgent) {
       continue;
     }
 
-    // Rewrite tags containing URI: #EXT-X-KEY:...,URI="..." or #EXT-X-MAP:URI="..."
-    if (trimmed.startsWith('#EXT-X-KEY:') || trimmed.startsWith('#EXT-X-MAP:')) {
-      const rewritten = line.replace(/URI="([^"]+)"/g, (match, uri) => {
-        try {
-          const absUrl = new URL(uri, baseUrl).href;
-          const proxied = `/api/iptv/stream-proxy?url=${encodeURIComponent(absUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ''}${userAgent ? `&ua=${encodeURIComponent(userAgent)}` : ''}`;
-          return `URI="${proxied}"`;
-        } catch (e) {
-          return match;
-        }
-      });
-      output.push(rewritten);
-      continue;
-    }
-
-    // Comment or metadata tag line: preserve
+    // Rewrite tags containing URI (e.g. #EXT-X-MEDIA, #EXT-X-KEY, #EXT-X-MAP, #EXT-X-PART, #EXT-X-PRELOAD-HINT)
     if (trimmed.startsWith('#')) {
-      output.push(line);
+      if (trimmed.includes('URI=')) {
+        const rewritten = line.replace(/URI=(?:"([^"]+)"|([^\s,]+))/g, (match, quotedUri, unquotedUri) => {
+          const rawUri = quotedUri || unquotedUri;
+          if (!rawUri) return match;
+          try {
+            const absUrl = new URL(rawUri, baseUrl).href;
+            const proxied = `/api/iptv/stream-proxy?url=${encodeURIComponent(absUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ''}${userAgent ? `&ua=${encodeURIComponent(userAgent)}` : ''}`;
+            return `URI="${proxied}"`;
+          } catch (e) {
+            return match;
+          }
+        });
+        output.push(rewritten);
+      } else {
+        output.push(line);
+      }
       continue;
     }
 
