@@ -275,7 +275,7 @@ class _IptvScreenState extends State<IptvScreen> {
     if (_isLoading) {
       return const Center(
         child: Column(
-          mainAxisAlignment: MainCrossAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             CircularProgressIndicator(color: Color(0xFF38BDF8)),
             SizedBox(height: 16),
@@ -293,7 +293,7 @@ class _IptvScreenState extends State<IptvScreen> {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisAlignment: MainCrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 54),
               const SizedBox(height: 14),
@@ -598,7 +598,7 @@ class _IptvScreenState extends State<IptvScreen> {
                 child: filteredChannels.isEmpty
                     ? Center(
                         child: Column(
-                          mainAxisAlignment: MainCrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.tv_off_rounded, color: Colors.white24, size: 56),
                             const SizedBox(height: 12),
