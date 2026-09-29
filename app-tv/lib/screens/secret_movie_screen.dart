@@ -20,39 +20,111 @@ class SecretMovieScreen extends StatefulWidget {
 }
 
 class _SecretMovieScreenState extends State<SecretMovieScreen> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
   List<MovieModel> _movies = [];
   bool _isLoading = true;
-  final TextEditingController _searchController = TextEditingController();
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  bool _isSearching = false;
   String? _searchQuery;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadMovies();
   }
 
   @override
   void dispose() {
-    // ZERO-TRACE: Wipe controller & local list from memory
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _movies.clear();
     widget.onExit();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+      if (!_isLoading && !_isLoadingMore && _hasMore) {
+        _loadMoreMovies();
+      }
+    }
+  }
+
   Future<void> _loadMovies({String? search}) async {
     setState(() {
       _isLoading = true;
+      _isLoadingMore = false;
+      _hasMore = true;
       _searchQuery = search;
     });
 
-    final results = await widget.apiService.getVlxxCatalog(searchQuery: search);
+    final results = await widget.apiService.getVlxxCatalog(searchQuery: search, skip: 0);
     if (mounted) {
       setState(() {
         _movies = results;
         _isLoading = false;
+        if (results.length < 30) {
+          _hasMore = false;
+        }
       });
     }
+  }
+
+  Future<void> _loadMoreMovies() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    final currentSkip = _movies.length;
+    final nextResults = await widget.apiService.getVlxxCatalog(
+      searchQuery: _searchQuery,
+      skip: currentSkip,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isLoadingMore = false;
+        if (nextResults.isEmpty) {
+          _hasMore = false;
+        } else {
+          final existingIds = _movies.map((m) => m.id).toSet();
+          final uniqueNew = nextResults.where((m) => !existingIds.contains(m.id)).toList();
+          if (uniqueNew.isEmpty) {
+            _hasMore = false;
+          } else {
+            _movies.addAll(uniqueNew);
+            if (nextResults.length < 30) {
+              _hasMore = false;
+            }
+          }
+        }
+      });
+    }
+  }
+
+  void _submitSearch() {
+    final query = _searchController.text.trim();
+    if (query.isNotEmpty) {
+      _loadMovies(search: query);
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _isSearching = false;
+    });
+    _loadMovies();
   }
 
   void _onMovieSelected(MovieModel movie) {
@@ -159,7 +231,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               child: Row(
                 children: [
                   TvFocusableCard(
-                    autoFocus: true,
+                    autoFocus: !_isSearching,
                     onTap: () => Navigator.of(context).pop(),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
@@ -171,17 +243,88 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                   const SizedBox(width: 12),
                   const Text('🎬', style: TextStyle(fontSize: 20)),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Kho Phim Riêng Tư',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    _searchQuery != null && _searchQuery!.isNotEmpty
+                        ? 'Tìm: "$_searchQuery"'
+                        : 'Kho Phim Riêng Tư',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const Spacer(),
+
+                  // Search toggle button or search input
+                  if (_isSearching)
+                    Expanded(
+                      flex: 3,
+                      child: Container(
+                        height: 38,
+                        margin: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: const Color(0xFFF43F5E), width: 1.5),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.search, color: Colors.white54, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _searchController,
+                                focusNode: _searchFocusNode,
+                                style: const TextStyle(color: Colors.white, fontSize: 13),
+                                decoration: const InputDecoration(
+                                  hintText: 'Nhập từ khóa, mã phim...',
+                                  hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                                onSubmitted: (_) => _submitSearch(),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: _clearSearch,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    TvFocusableCard(
+                      onTap: () {
+                        setState(() {
+                          _isSearching = true;
+                        });
+                        Future.delayed(const Duration(milliseconds: 100), () {
+                          _searchFocusNode.requestFocus();
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        color: const Color(0xFF1E293B),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.search, color: Colors.white70, size: 16),
+                            SizedBox(width: 6),
+                            Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  const SizedBox(width: 10),
+
                   // Exit & Lock button
                   TvFocusableCard(
                     onTap: () => Navigator.of(context).pop(),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       color: Colors.redAccent.withOpacity(0.2),
                       child: const Row(
                         children: [
@@ -196,12 +339,36 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               ),
             ),
 
-            // Content Grid
+            // Content Grid with Infinite Scroll
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator(color: Color(0xFFF43F5E)))
                   : _movies.isEmpty
-                      ? const Center(child: Text('Không tìm thấy phim.', style: TextStyle(color: Colors.white54)))
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.search_off, size: 48, color: Colors.white38),
+                              const SizedBox(height: 12),
+                              Text(
+                                _searchQuery != null ? 'Không tìm thấy phim phù hợp với "$_searchQuery"' : 'Không tìm thấy phim.',
+                                style: const TextStyle(color: Colors.white54, fontSize: 14),
+                              ),
+                              if (_searchQuery != null) ...[
+                                const SizedBox(height: 16),
+                                TvFocusableCard(
+                                  onTap: _clearSearch,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    color: const Color(0xFF1E293B),
+                                    child: const Text('Xem tất cả phim', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        )
                       : LayoutBuilder(
                           builder: (context, constraints) {
                             int crossAxisCount = 2;
@@ -215,19 +382,86 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                               crossAxisCount = 3;
                             }
 
-                            return GridView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: crossAxisCount,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 16,
-                                childAspectRatio: 0.68,
-                              ),
-                              itemCount: _movies.length,
-                              itemBuilder: (context, idx) {
-                                final movie = _movies[idx];
-                                return _buildMovieCard(movie);
-                              },
+                            return CustomScrollView(
+                              controller: _scrollController,
+                              slivers: [
+                                SliverPadding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                  sliver: SliverGrid(
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: crossAxisCount,
+                                      crossAxisSpacing: 12,
+                                      mainAxisSpacing: 16,
+                                      childAspectRatio: 0.68,
+                                    ),
+                                    delegate: SliverChildBuilderDelegate(
+                                      (context, idx) {
+                                        // Auto-prefetch when reaching near end on TV Remote D-pad
+                                        if (idx >= _movies.length - crossAxisCount &&
+                                            !_isLoading &&
+                                            !_isLoadingMore &&
+                                            _hasMore) {
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            if (mounted && !_isLoading && !_isLoadingMore && _hasMore) {
+                                              _loadMoreMovies();
+                                            }
+                                          });
+                                        }
+
+                                        final movie = _movies[idx];
+                                        return _buildMovieCard(movie);
+                                      },
+                                      childCount: _movies.length,
+                                    ),
+                                  ),
+                                ),
+
+                                // Bottom Loading Indicator
+                                if (_isLoadingMore)
+                                  const SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 24),
+                                      child: Center(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.5,
+                                                color: Color(0xFFF43F5E),
+                                              ),
+                                            ),
+                                            SizedBox(width: 12),
+                                            Text(
+                                              'Đang tải thêm phim...',
+                                              style: TextStyle(
+                                                color: Color(0xFF94A3B8),
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                // End of catalog message
+                                if (!_hasMore && _movies.isNotEmpty)
+                                  const SliverToBoxAdapter(
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 28),
+                                      child: Center(
+                                        child: Text(
+                                          '🎉 Đã hiển thị toàn bộ danh sách phim',
+                                          style: TextStyle(color: Colors.white38, fontSize: 13),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             );
                           },
                         ),

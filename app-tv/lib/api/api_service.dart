@@ -160,10 +160,15 @@ class ApiService {
   // 3. VLFILM / KHO PHIM BÍ MẬT (PROFILE PASSCODE 3105)
   // =========================================================================
 
-  Future<List<MovieModel>> getVlxxCatalog({String? searchQuery}) async {
-    String url = '$baseUrl/vlxx/catalog/movie/vlxx-catalog.json';
+  Future<List<MovieModel>> getVlxxCatalog({String? searchQuery, int skip = 0}) async {
+    String url = skip > 0
+        ? '$baseUrl/vlxx/catalog/movie/vlxx-catalog/skip=$skip.json'
+        : '$baseUrl/vlxx/catalog/movie/vlxx-catalog.json';
     if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-      url = '$baseUrl/vlxx/catalog/movie/vlxx-catalog/search=${Uri.encodeComponent(searchQuery.trim())}.json';
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/vlxx/catalog/movie/vlxx-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/vlxx/catalog/movie/vlxx-catalog/search=$encoded.json';
     }
 
     try {

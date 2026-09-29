@@ -1,9 +1,9 @@
 {
-  "version": "1.0.6",
-  "build": 7,
-  "tag_name": "v1.0.6",
-  "changelog": "• Sửa lỗi OTA TrollStore trên iOS (mở trực tiếp TrollStore, không nhảy sang ứng dụng kính lúp).\n• Thêm bộ lọc '🌸 Anime khác' trong Tab Anime.\n• Tách 2 thư mục '🎙️ Thuyết Minh' và '📝 Phụ Đề' riêng biệt cho các series anime.\n• Nâng cấp Trình phát video mới: Vuốt ngang để tua, nhấn đúp tua 10s, thanh timeline kéo thả trực quan và đổi Thuyết minh / Phụ đề trực tiếp khi xem.",
+  "version": "1.0.7",
+  "build": 8,
+  "tag_name": "v1.0.7",
+  "changelog": "• Hỗ trợ cuộn vô hạn (Infinite Scroll): Tự động tải thêm phim liên tục khi cuộn xuống dưới trong Kho Phim Riêng Tư (VLFilm).\n• Hỗ trợ điều hướng Remote D-pad trên Android TV tự động tải thêm trang mới khi duyệt xuống cuối danh sách.\n• Bổ sung thanh tìm kiếm phim theo từ khóa, diễn viên, mã phim trong Kho Phim.\n• Sửa lỗi thuật toán phân trang catalog Stremio (chia đúng 30 phim/trang, không bị nhảy cóc bỏ sót phim).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-29T01:45:00Z"
+  "published_at": "2026-09-29T06:14:00Z"
 }

@@ -31,12 +31,13 @@ builder.defineCatalogHandler(async (args) => {
       return { metas: [] };
     }
 
+    const skip = (extra && extra.skip) ? parseInt(extra.skip, 10) : 0;
+    const page = Math.floor(skip / 30) + 1;
+
     let videos = [];
     if (extra && extra.search) {
-      videos = await scraper.search(extra.search);
+      videos = await scraper.search(extra.search, page);
     } else {
-      const skip = (extra && extra.skip) ? parseInt(extra.skip, 10) : 0;
-      const page = Math.floor(skip / 20) + 1;
       videos = await scraper.getLatest(page);
     }
 

@@ -142,12 +142,12 @@ builder.defineCatalogHandler(async (args) => {
     }
 
     if (id === 'vlxx-catalog') {
+      const skip = extra && extra.skip ? parseInt(extra.skip, 10) : 0;
+      const page = Math.floor(skip / 30) + 1;
       let videos = [];
       if (extra && extra.search) {
-        videos = await vlxxScraper.search(extra.search);
+        videos = await vlxxScraper.search(extra.search, page);
       } else {
-        const skip = extra && extra.skip ? parseInt(extra.skip, 10) : 0;
-        const page = Math.floor(skip / 20) + 1;
         videos = await vlxxScraper.getLatest(page);
       }
       return {
