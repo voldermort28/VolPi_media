@@ -19,8 +19,8 @@ class _AnimeScreenState extends State<AnimeScreen> {
     {'id': 'yumei-top', 'name': '🌟 4 Thế Giới'},
     {'id': 'yumei-pokemon', 'name': '⚡ Pokemon'},
     {'id': 'yumei-sentai', 'name': '⚔️ Super Sentai'},
-    {'id': 'yumei-rider', 'name': '🏍️ Kamen Rider'},
     {'id': 'yumei-power-rangers', 'name': '⚡ Power Rangers'},
+    {'id': 'yumei-anime', 'name': '🌸 Anime khác'},
     {'id': 'yumei-movies', 'name': '🎬 Phim Lẻ Anime'},
   ];
 

@@ -949,45 +949,80 @@ async function getStreams(id) {
     const { rsc } = await fetchPage(webPath);
     const clean = rsc.replace(/"\$undefined"/g, 'null');
 
-    // Extract HLS sources
-    let srcMatches = [...clean.matchAll(/"hlsUrl":"([^"]+)"/g)].map((m) => m[1]);
-    let iframeMatches = [...clean.matchAll(/"iframeUrl":"([^"]+)"/g)].map((m) => m[1]);
+    // 1. Try extracting structured sources array (includes variant DUB / SUB)
+    const sourcesMatch = clean.match(/"sources":(\[\{.*?\}\])/);
+    if (sourcesMatch) {
+      try {
+        const sources = JSON.parse(sourcesMatch[1]);
+        sources.forEach((s) => {
+          if (!s.hlsUrl) return;
+          const isR2 = s.hlsUrl.includes('r2.yumei-anime.com');
+          const isSub = s.variant === 'SUB';
+          const variantLabel = isSub ? '📝 Phụ Đề Vietsub' : '🎙️ Thuyết Minh';
+          const serverLabel = isR2 ? 'Server #2 (Cloudflare R2)' : 'Server #1 (Cloudflare CDN)';
 
-    // If no direct video sources on this page (e.g. folder/series page), fetch first episode from meta
-    if (srcMatches.length === 0 && iframeMatches.length === 0) {
-      const meta = await getSeriesMeta(targetId);
-      if (meta && meta.videos && meta.videos.length > 0) {
-        const firstEpPath = decodePathId(meta.videos[0].epPath || meta.videos[0].id);
-        const firstPage = await fetchPage(firstEpPath);
-        const cleanFirst = firstPage.rsc.replace(/"\$undefined"/g, 'null');
-        srcMatches = [...cleanFirst.matchAll(/"hlsUrl":"([^"]+)"/g)].map((m) => m[1]);
-        iframeMatches = [...cleanFirst.matchAll(/"iframeUrl":"([^"]+)"/g)].map((m) => m[1]);
+          streams.push({
+            name: 'Yumei Anime',
+            title: `${variantLabel} - ${serverLabel} (Full HD 1080p)`,
+            url: s.hlsUrl,
+            variant: s.variant || (isSub ? 'SUB' : 'DUB'),
+            behaviorHints: {
+              notWebReady: false,
+              proxyHeaders: {
+                request: {
+                  'User-Agent': USER_AGENT,
+                  'Referer': 'https://yumei-anime.com/',
+                },
+              },
+            },
+          });
+        });
+      } catch (e) {
+        console.error('Error parsing sources JSON:', e.message);
       }
     }
 
-    const uniqueHls = [...new Set(srcMatches)];
-    uniqueHls.forEach((hlsUrl, idx) => {
-      const isR2 = hlsUrl.includes('r2.yumei-anime.com');
-      const serverName = isR2 ? 'Server #2 (Cloudflare R2 Direct)' : `Server #${idx + 1} (Cloudflare CDN)`;
+    // 2. Fallback to raw regex extraction if no structured sources found
+    if (streams.length === 0) {
+      let srcMatches = [...clean.matchAll(/"hlsUrl":"([^"]+)"/g)].map((m) => m[1]);
 
-      streams.push({
-        name: 'Yumei Anime',
-        title: `${serverName} - Full HD 1080p/720p`,
-        url: hlsUrl,
-        behaviorHints: {
-          notWebReady: false,
-          proxyHeaders: {
-            request: {
-              'User-Agent': USER_AGENT,
-              'Referer': 'https://yumei-anime.com/',
+      // If no direct video sources on this page (e.g. folder/series page), fetch first episode from meta
+      if (srcMatches.length === 0) {
+        const meta = await getSeriesMeta(targetId);
+        if (meta && meta.videos && meta.videos.length > 0) {
+          const firstEpPath = decodePathId(meta.videos[0].epPath || meta.videos[0].id);
+          const firstPage = await fetchPage(firstEpPath);
+          const cleanFirst = firstPage.rsc.replace(/"\$undefined"/g, 'null');
+          srcMatches = [...cleanFirst.matchAll(/"hlsUrl":"([^"]+)"/g)].map((m) => m[1]);
+        }
+      }
+
+      const uniqueHls = [...new Set(srcMatches)];
+      uniqueHls.forEach((hlsUrl, idx) => {
+        const isR2 = hlsUrl.includes('r2.yumei-anime.com');
+        const serverName = isR2 ? 'Server #2 (Cloudflare R2 Direct)' : `Server #${idx + 1} (Cloudflare CDN)`;
+
+        streams.push({
+          name: 'Yumei Anime',
+          title: `${serverName} - Full HD 1080p/720p`,
+          url: hlsUrl,
+          variant: 'DUB',
+          behaviorHints: {
+            notWebReady: false,
+            proxyHeaders: {
+              request: {
+                'User-Agent': USER_AGENT,
+                'Referer': 'https://yumei-anime.com/',
+              },
             },
           },
-        },
+        });
       });
-    });
+    }
 
-    // Extract iframeUrl if available
-    const uniqueIframes = [...new Set(iframeMatches)];
+    // Extract valid iframeUrl if available (filter out undefined/invalid)
+    const validIframes = [...clean.matchAll(/"iframeUrl":"(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
+    const uniqueIframes = [...new Set(validIframes)];
     uniqueIframes.forEach((iUrl, idx) => {
       streams.push({
         name: 'Yumei Web Player',

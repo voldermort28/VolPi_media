@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/anime_model.dart';
+import '../models/match_model.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -18,6 +19,7 @@ class AnimeDetailScreen extends StatefulWidget {
 class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   AnimeModel? _detailedAnime;
   bool _isLoading = true;
+  String _selectedVariant = 'DUB'; // 'DUB' for Thuyết Minh, 'SUB' for Phụ Đề
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
       builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
     );
 
-    final streamUrl = await widget.apiService.getAnimeEpisodeStream(
+    final streams = await widget.apiService.getAnimeEpisodeStreams(
       widget.anime.id,
       ep.season,
       ep.episode,
@@ -52,19 +54,38 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     if (!mounted) return;
     Navigator.of(context).pop();
 
-    if (streamUrl == null || streamUrl.isEmpty) {
+    if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Không tìm thấy link phát cho tập này.'), backgroundColor: Colors.amber),
       );
       return;
     }
 
+    StreamChannel selectedStream = streams.first;
+    if (_selectedVariant == 'SUB') {
+      final subMatch = streams.firstWhere(
+        (s) => s.title.toLowerCase().contains('phụ đề') || s.title.toLowerCase().contains('sub'),
+        orElse: () => streams.first,
+      );
+      selectedStream = subMatch;
+    } else {
+      final dubMatch = streams.firstWhere(
+        (s) => s.title.toLowerCase().contains('thuyết minh') || s.title.toLowerCase().contains('dub'),
+        orElse: () => streams.first,
+      );
+      selectedStream = dubMatch;
+    }
+
+    final variantLabel = _selectedVariant == 'SUB' ? 'Phụ Đề' : 'Thuyết Minh';
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
-          streamUrl: streamUrl,
-          title: widget.anime.name,
+          streamUrl: selectedStream.url,
+          title: '${widget.anime.name} ($variantLabel)',
           subtitle: 'Tập ${ep.episode}: ${ep.title}',
+          headers: selectedStream.headers,
+          availableChannels: streams,
           isLive: false,
         ),
       ),
@@ -174,12 +195,85 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Icon(Icons.list_alt_rounded, color: Color(0xFF38BDF8), size: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Danh Sách Tập (${episodes.length} tập)',
-                                style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                              Row(
+                                children: [
+                                  const Icon(Icons.list_alt_rounded, color: Color(0xFF38BDF8), size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Danh Sách Tập (${episodes.length} tập)',
+                                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              // Folder Switchers: Thuyet Minh & Phu De
+                              Row(
+                                children: [
+                                  TvFocusableCard(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedVariant = 'DUB';
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      color: _selectedVariant == 'DUB' ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.record_voice_over_rounded,
+                                            size: 14,
+                                            color: _selectedVariant == 'DUB' ? Colors.white : Colors.white70,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            '🎙️ Thuyết Minh',
+                                            style: TextStyle(
+                                              color: _selectedVariant == 'DUB' ? Colors.white : Colors.white70,
+                                              fontSize: 12,
+                                              fontWeight: _selectedVariant == 'DUB' ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TvFocusableCard(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedVariant = 'SUB';
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      color: _selectedVariant == 'SUB' ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.subtitles_rounded,
+                                            size: 14,
+                                            color: _selectedVariant == 'SUB' ? Colors.white : Colors.white70,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            '📝 Phụ Đề',
+                                            style: TextStyle(
+                                              color: _selectedVariant == 'SUB' ? Colors.white : Colors.white70,
+                                              fontSize: 12,
+                                              fontWeight: _selectedVariant == 'SUB' ? FontWeight.bold : FontWeight.normal,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

@@ -106,7 +106,12 @@ class ApiService {
     return null;
   }
 
-  Future<String?> getAnimeEpisodeStream(String animeId, int season, int episode, {String type = 'series'}) async {
+  Future<List<StreamChannel>> getAnimeEpisodeStreams(
+    String animeId,
+    int season,
+    int episode, {
+    String type = 'series',
+  }) async {
     final String streamId = type == 'movie' ? animeId : '$animeId:$season:$episode';
     final url = '$baseUrl/stream/$type/$streamId.json';
 
@@ -115,13 +120,47 @@ class ApiService {
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['streams'] != null && (data['streams'] as List).isNotEmpty) {
-          return data['streams'][0]['url'];
+          final List list = data['streams'];
+          return list
+              .where((s) => s['url'] != null && s['url'].toString().startsWith('http'))
+              .map((s) => StreamChannel(
+                    title: s['title'] ?? s['name'] ?? 'Server',
+                    url: s['url'],
+                    headers: (s['behaviorHints']?['proxyHeaders']?['request'] as Map<String, dynamic>?)?.map(
+                          (k, v) => MapEntry(k, v.toString()),
+                        ) ??
+                        {'Referer': 'https://yumei-anime.com/'},
+                  ))
+              .toList();
         }
       }
     } catch (e) {
       // Log error
     }
-    return null;
+    return [];
+  }
+
+  Future<String?> getAnimeEpisodeStream(
+    String animeId,
+    int season,
+    int episode, {
+    String type = 'series',
+    String? variant,
+  }) async {
+    final streams = await getAnimeEpisodeStreams(animeId, season, episode, type: type);
+    if (streams.isEmpty) return null;
+
+    if (variant != null) {
+      final isSub = variant.toUpperCase() == 'SUB';
+      final match = streams.firstWhere(
+        (s) => isSub
+            ? (s.title.toLowerCase().contains('phụ đề') || s.title.toLowerCase().contains('sub'))
+            : (s.title.toLowerCase().contains('thuyết minh') || s.title.toLowerCase().contains('dub')),
+        orElse: () => streams.first,
+      );
+      return match.url;
+    }
+    return streams.first.url;
   }
 
   // =========================================================================

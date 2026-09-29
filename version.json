@@ -1,9 +1,9 @@
 {
-  "version": "1.0.5",
-  "build": 6,
-  "tag_name": "v1.0.5",
-  "changelog": "• Cập nhật hiển thị đầy đủ 2 phần phim Mighty Morphin S01, S02 và Movie của Power Rangers (96 video).\n• Tối ưu hoá hệ thống nạp phim đa tầng cho Super Sentai & Anime.\n• Đồng bộ hệ thống cập nhật OTA 1 chạm trên Android TV và iOS (TrollStore).\n• Nâng cấp tốc độ phát trực tiếp bóng đá và anime.",
+  "version": "1.0.6",
+  "build": 7,
+  "tag_name": "v1.0.6",
+  "changelog": "• Sửa lỗi OTA TrollStore trên iOS (mở trực tiếp TrollStore, không nhảy sang ứng dụng kính lúp).\n• Thêm bộ lọc '🌸 Anime khác' trong Tab Anime.\n• Tách 2 thư mục '🎙️ Thuyết Minh' và '📝 Phụ Đề' riêng biệt cho các series anime.\n• Nâng cấp Trình phát video mới: Vuốt ngang để tua, nhấn đúp tua 10s, thanh timeline kéo thả trực quan và đổi Thuyết minh / Phụ đề trực tiếp khi xem.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-28T05:01:00Z"
+  "published_at": "2026-09-29T01:45:00Z"
 }

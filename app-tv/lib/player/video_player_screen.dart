@@ -38,6 +38,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late String _currentTitle;
   late Map<String, String> _currentHeaders;
 
+  // Swipe Gesture Seeking (Vuốt ngang để tua)
+  bool _isDragging = false;
+  Duration _dragStartPosition = Duration.zero;
+  double _dragTotalDeltaX = 0.0;
+  Duration _dragTargetPosition = Duration.zero;
+  Timer? _hudFadeTimer;
+  String? _hudIcon; // 'FORWARD', 'REWIND'
+  String? _hudText;
+
+  // Double-tap Quick Seek Indicators
+  bool _showDoubleTapLeft = false;
+  bool _showDoubleTapRight = false;
+  Timer? _doubleTapTimer;
+
   @override
   void initState() {
     super.initState();
@@ -64,6 +78,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       await _controller.initialize();
       _controller.play();
 
+      _controller.addListener(_videoListener);
+
       if (mounted) {
         setState(() {
           _isInitialized = true;
@@ -80,8 +96,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _videoListener() {
+    if (mounted && _isInitialized) {
+      setState(() {});
+    }
+  }
+
   void _switchChannel(StreamChannel channel) {
     if (_currentStreamUrl == channel.url) return;
+    _controller.removeListener(_videoListener);
     _controller.dispose();
     setState(() {
       _currentStreamUrl = channel.url;
@@ -94,12 +117,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _controller.value.isPlaying) {
+      if (mounted && _controller.value.isPlaying && !_isDragging) {
         setState(() {
           _showControls = false;
         });
       }
     });
+  }
+
+  void _showControlsBriefly() {
+    setState(() {
+      _showControls = true;
+    });
+    _startHideControlsTimer();
   }
 
   void _toggleControls() {
@@ -125,18 +155,130 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  String _formatDuration(Duration d) {
+    final int totalSeconds = d.inSeconds;
+    final int hours = totalSeconds ~/ 3600;
+    final int minutes = (totalSeconds % 3600) ~/ 60;
+    final int seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    }
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   void _seekRelative(int seconds) {
     if (!_isInitialized || widget.isLive) return;
     final current = _controller.value.position;
+    final duration = _controller.value.duration;
     final target = current + Duration(seconds: seconds);
-    _controller.seekTo(target);
-    _showControls = true;
-    _startHideControlsTimer();
+    final clamped = target < Duration.zero
+        ? Duration.zero
+        : (target > duration ? duration : target);
+
+    _controller.seekTo(clamped);
+    _triggerHud(
+      isForward: seconds > 0,
+      text: '${seconds > 0 ? '+' : ''}${seconds}s',
+      target: clamped,
+    );
+    _showControlsBriefly();
+  }
+
+  void _triggerHud({required bool isForward, required String text, required Duration target}) {
+    _hudFadeTimer?.cancel();
+    setState(() {
+      _hudIcon = isForward ? 'FORWARD' : 'REWIND';
+      _hudText = text;
+      _dragTargetPosition = target;
+    });
+    _hudFadeTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+        });
+      }
+    });
+  }
+
+  // --- Touch Gestures Handling ---
+  void _onHorizontalDragStart(DragStartDetails details) {
+    if (!_isInitialized || widget.isLive) return;
+    _dragStartPosition = _controller.value.position;
+    _dragTotalDeltaX = 0.0;
+    _isDragging = true;
+    _hudFadeTimer?.cancel();
+  }
+
+  void _onHorizontalDragUpdate(DragUpdateDetails details) {
+    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    _dragTotalDeltaX += details.primaryDelta ?? 0.0;
+
+    // 1px drag = ~0.4s seek
+    final deltaSeconds = (_dragTotalDeltaX * 0.4).toInt();
+    final duration = _controller.value.duration;
+    final targetSeconds = (_dragStartPosition.inSeconds + deltaSeconds).clamp(0, duration.inSeconds);
+    final target = Duration(seconds: targetSeconds);
+
+    setState(() {
+      _dragTargetPosition = target;
+      _hudIcon = deltaSeconds >= 0 ? 'FORWARD' : 'REWIND';
+      final sign = deltaSeconds >= 0 ? '+' : '';
+      _hudText = '$sign${deltaSeconds}s';
+    });
+  }
+
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    _isDragging = false;
+    _controller.seekTo(_dragTargetPosition);
+
+    _hudFadeTimer?.cancel();
+    _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+        });
+      }
+    });
+    _showControlsBriefly();
+  }
+
+  void _onDoubleTapSide(bool isRight) {
+    if (!_isInitialized || widget.isLive) return;
+    if (isRight) {
+      _seekRelative(10);
+      _doubleTapTimer?.cancel();
+      setState(() {
+        _showDoubleTapRight = true;
+        _showDoubleTapLeft = false;
+      });
+    } else {
+      _seekRelative(-10);
+      _doubleTapTimer?.cancel();
+      setState(() {
+        _showDoubleTapLeft = true;
+        _showDoubleTapRight = false;
+      });
+    }
+    _doubleTapTimer = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) {
+        setState(() {
+          _showDoubleTapLeft = false;
+          _showDoubleTapRight = false;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _hideControlsTimer?.cancel();
+    _hudFadeTimer?.cancel();
+    _doubleTapTimer?.cancel();
+    _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -144,6 +286,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+
     return Focus(
       autofocus: true,
       onKeyEvent: (node, event) {
@@ -165,10 +309,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             return KeyEventResult.handled;
           }
           if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
-            setState(() {
-              _showControls = true;
-            });
-            _startHideControlsTimer();
+            _showControlsBriefly();
             return KeyEventResult.handled;
           }
           if (key == LogicalKeyboardKey.escape) {
@@ -182,10 +323,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         backgroundColor: Colors.black,
         body: GestureDetector(
           onTap: _toggleControls,
+          onHorizontalDragStart: _onHorizontalDragStart,
+          onHorizontalDragUpdate: _onHorizontalDragUpdate,
+          onHorizontalDragEnd: _onHorizontalDragEnd,
+          behavior: HitTestBehavior.opaque,
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // VIDEO CANVAS
+              // 1. VIDEO CANVAS
               if (_isInitialized)
                 Center(
                   child: AspectRatio(
@@ -243,7 +388,113 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // OSD OVERLAY CONTROLS
+              // 2. DOUBLE-TAP SEEK ZONES (Left 35% & Right 35%)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: screenSize.width * 0.35,
+                child: GestureDetector(
+                  onDoubleTap: () => _onDoubleTapSide(false),
+                  behavior: HitTestBehavior.translucent,
+                  child: Container(),
+                ),
+              ),
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                width: screenSize.width * 0.35,
+                child: GestureDetector(
+                  onDoubleTap: () => _onDoubleTapSide(true),
+                  behavior: HitTestBehavior.translucent,
+                  child: Container(),
+                ),
+              ),
+
+              // 3. DOUBLE-TAP RIPPLE INDICATORS
+              if (_showDoubleTapLeft)
+                Positioned(
+                  left: screenSize.width * 0.15,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(40),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.replay_10_rounded, color: Color(0xFF38BDF8), size: 36),
+                        SizedBox(width: 8),
+                        Text('-10s', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              if (_showDoubleTapRight)
+                Positioned(
+                  right: screenSize.width * 0.15,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(40),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('+10s', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        SizedBox(width: 8),
+                        Icon(Icons.forward_10_rounded, color: Color(0xFF38BDF8), size: 36),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // 4. SWIPE SEEK HUD OVERLAY (Center Indicator)
+              if (_hudIcon != null)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF38BDF8).withOpacity(0.3),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded,
+                          color: const Color(0xFF38BDF8),
+                          size: 44,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          _hudText ?? '',
+                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // 5. OSD OVERLAY CONTROLS (Top Bar, Center Play/Seek, Bottom Timeline)
               AnimatedOpacity(
                 opacity: _showControls ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 200),
@@ -315,22 +566,55 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                           ),
 
-                          // Center Play/Pause Indicator
-                          IconButton(
-                            iconSize: 64,
-                            icon: Icon(
-                              _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                              color: const Color(0xFF38BDF8),
-                            ),
-                            onPressed: _togglePlayPause,
+                          // Center Play/Seek Controls Row
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              if (!widget.isLive) ...[
+                                TvFocusableCard(
+                                  onTap: () => _seekRelative(-10),
+                                  borderRadius: BorderRadius.circular(30),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.black38,
+                                    child: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 36),
+                                  ),
+                                ),
+                                const SizedBox(width: 32),
+                              ],
+                              TvFocusableCard(
+                                onTap: _togglePlayPause,
+                                borderRadius: BorderRadius.circular(40),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                    color: const Color(0xFF38BDF8),
+                                    size: 68,
+                                  ),
+                                ),
+                              ),
+                              if (!widget.isLive) ...[
+                                const SizedBox(width: 32),
+                                TvFocusableCard(
+                                  onTap: () => _seekRelative(10),
+                                  borderRadius: BorderRadius.circular(30),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.black38,
+                                    child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 36),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
 
-                          // Bottom Bar with Channel Switcher
+                          // Bottom Bar with Timeline & Channel/Variant Switcher
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                             child: Column(
                               children: [
-                                // Available Channels / BLV Switcher row
+                                // Available Channels / Streams Switcher Row
                                 if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
                                   SizedBox(
                                     height: 38,
@@ -346,7 +630,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             onTap: () => _switchChannel(ch),
                                             borderRadius: BorderRadius.circular(8),
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                                               color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
                                               child: Text(
                                                 ch.title,
@@ -365,17 +649,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   const SizedBox(height: 10),
                                 ],
 
-                                // Progress Bar for VOD
-                                if (!widget.isLive && _isInitialized)
-                                  VideoProgressIndicator(
-                                    _controller,
-                                    allowScrubbing: true,
-                                    colors: const VideoProgressColors(
-                                      playedColor: Color(0xFF38BDF8),
-                                      bufferedColor: Colors.white24,
-                                      backgroundColor: Colors.white10,
-                                    ),
+                                // Progress Slider for VOD
+                                if (!widget.isLive && _isInitialized) ...[
+                                  Row(
+                                    children: [
+                                      Text(
+                                        _formatDuration(_controller.value.position),
+                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: SliderTheme(
+                                          data: SliderTheme.of(context).copyWith(
+                                            activeTrackColor: const Color(0xFF38BDF8),
+                                            inactiveTrackColor: Colors.white24,
+                                            thumbColor: const Color(0xFF38BDF8),
+                                            overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                                            trackHeight: 4.0,
+                                          ),
+                                          child: Slider(
+                                            value: _controller.value.position.inSeconds.toDouble().clamp(
+                                                  0.0,
+                                                  _controller.value.duration.inSeconds.toDouble(),
+                                                ),
+                                            max: _controller.value.duration.inSeconds.toDouble() > 0
+                                                ? _controller.value.duration.inSeconds.toDouble()
+                                                : 1.0,
+                                            onChanged: (val) {
+                                              _startHideControlsTimer();
+                                              _controller.seekTo(Duration(seconds: val.toInt()));
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        _formatDuration(_controller.value.duration),
+                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
                                   ),
+                                ],
                               ],
                             ),
                           ),

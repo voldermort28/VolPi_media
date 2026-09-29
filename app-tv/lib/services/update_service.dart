@@ -109,19 +109,13 @@ class UpdateService {
   /// Triggers 1-click in-place update for TrollStore on iOS
   static Future<bool> installIpaTrollStore(String ipaUrl) async {
     try {
-      // 1. Try apple-magnifier URL scheme (TrollStore default URL scheme)
-      final magnifierUri = Uri.parse('apple-magnifier://install?url=${Uri.encodeComponent(ipaUrl)}');
-      if (await canLaunchUrl(magnifierUri)) {
-        return await launchUrl(magnifierUri, mode: LaunchMode.externalApplication);
-      }
-
-      // 2. Try trollstore:// URL scheme
+      // 1. Try trollstore:// URL scheme (Official TrollStore 2.0+ scheme)
       final trollstoreUri = Uri.parse('trollstore://install?url=${Uri.encodeComponent(ipaUrl)}');
       if (await canLaunchUrl(trollstoreUri)) {
         return await launchUrl(trollstoreUri, mode: LaunchMode.externalApplication);
       }
 
-      // 3. Fallback: Open direct download link in Safari
+      // 2. Fallback: Open direct download link in Safari
       final directUri = Uri.parse(ipaUrl);
       return await launchUrl(directUri, mode: LaunchMode.externalApplication);
     } catch (e) {
