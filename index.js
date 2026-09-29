@@ -361,7 +361,10 @@ app.get("/api/matches", async (req, res) => {
 
 // -------------------------------------------------------------
 // IPTV API ENDPOINTS
-// -------------------------------------------------------------
+// Stream Proxy to bypass CORS / Referer restrictions
+app.all("/api/iptv/stream-proxy", (req, res) => {
+  return iptvService.handleStreamProxy(req, res);
+});
 
 app.get("/api/iptv/channels", async (req, res) => {
   try {

@@ -146,7 +146,15 @@ function loadConfig() {
     // Migration: populate playlists if empty or not array
     if (!Array.isArray(cfg.playlists) || cfg.playlists.length === 0) {
       cfg.playlists = [];
-      if (cfg.sourceType === 'file' && cfg.uploadedFile) {
+      cfg.playlists.push({
+        id: 'pl-default',
+        name: 'Kênh Quốc Gia (iptv-org)',
+        type: 'url',
+        url: DEFAULT_SOURCE_URL,
+        enabled: true,
+      });
+
+      if (cfg.uploadedFile) {
         cfg.playlists.push({
           id: 'pl-file-1',
           name: 'File Playlist M3U',
@@ -154,25 +162,19 @@ function loadConfig() {
           file: cfg.uploadedFile,
           enabled: true,
         });
-      } else if (cfg.sourceType === 'url' && cfg.sourceUrl && cfg.sourceUrl !== DEFAULT_SOURCE_URL) {
+      }
+
+      if (cfg.sourceUrl && cfg.sourceUrl !== DEFAULT_SOURCE_URL) {
         cfg.playlists.push({
-          id: 'pl-url-1',
-          name: 'Playlist URL Tùy Chỉnh',
+          id: 'pl-url-user',
+          name: 'Bóng Đá Trực Tiếp (THTT)',
           type: 'url',
           url: cfg.sourceUrl,
           enabled: true,
         });
       }
 
-      if (cfg.playlists.length === 0) {
-        cfg.playlists.push({
-          id: 'pl-default',
-          name: 'Kênh Quốc Gia (iptv-org)',
-          type: 'url',
-          url: DEFAULT_SOURCE_URL,
-          enabled: true,
-        });
-      }
+      saveConfig(cfg);
     }
 
     return cfg;
@@ -202,6 +204,7 @@ function parseM3U(content) {
 
   const lines = content.split(/\r?\n/);
   const channels = [];
+  const usedIds = new Set();
   let curMeta = null;
 
   for (let i = 0; i < lines.length; i++) {
@@ -234,8 +237,10 @@ function parseM3U(content) {
           curMeta.tvgId = val;
         } else if (key === 'http-user-agent' || key === 'user-agent') {
           curMeta.headers['User-Agent'] = val;
-        } else if (key === 'http-referrer' || key === 'referer') {
+        } else if (key === 'http-referrer' || key === 'referrer' || key === 'referer' || key === 'http-referer') {
           curMeta.headers['Referer'] = val;
+        } else if (key === 'http-origin' || key === 'origin') {
+          curMeta.headers['Origin'] = val;
         }
       }
 
@@ -253,30 +258,81 @@ function parseM3U(content) {
       }
     } else if (line.startsWith('#EXTVLCOPT:') || line.startsWith('#EXTHTTP:')) {
       if (curMeta) {
-        if (line.includes('http-user-agent=')) {
-          curMeta.headers['User-Agent'] = line.split('http-user-agent=')[1].trim();
+        if (line.startsWith('#EXTHTTP:')) {
+          try {
+            const jsonStr = line.substring(9).trim();
+            const parsed = JSON.parse(jsonStr);
+            Object.assign(curMeta.headers, parsed);
+          } catch (e) {}
         }
-        if (line.includes('http-referrer=')) {
-          curMeta.headers['Referer'] = line.split('http-referrer=')[1].trim();
+        const opt = line.substring(line.indexOf(':') + 1).trim();
+        const eqIdx = opt.indexOf('=');
+        if (eqIdx !== -1) {
+          const k = opt.substring(0, eqIdx).toLowerCase();
+          const v = opt.substring(eqIdx + 1).trim();
+          if (k === 'http-referrer' || k === 'referrer' || k === 'referer' || k === 'http-referer') {
+            curMeta.headers['Referer'] = v;
+          } else if (k === 'http-user-agent' || k === 'user-agent') {
+            curMeta.headers['User-Agent'] = v;
+          } else if (k === 'http-origin' || k === 'origin') {
+            curMeta.headers['Origin'] = v;
+          }
         }
       }
     } else if (!line.startsWith('#')) {
       // Stream URL line
       if (line.startsWith('http://') || line.startsWith('https://')) {
+        let streamUrl = line;
+        const headers = curMeta?.headers ? { ...curMeta.headers } : {};
+
+        // Parse inline pipe parameters: url|Referer=...&User-Agent=...
+        if (streamUrl.includes('|')) {
+          const pipeParts = streamUrl.split('|');
+          streamUrl = pipeParts[0].trim();
+          const paramStr = pipeParts.slice(1).join('|').trim();
+          const pairs = paramStr.split('&');
+          for (const pair of pairs) {
+            const eq = pair.indexOf('=');
+            if (eq !== -1) {
+              const pk = pair.substring(0, eq).trim();
+              const pv = pair.substring(eq + 1).trim();
+              if (pk.toLowerCase() === 'referer' || pk.toLowerCase() === 'referrer') {
+                headers['Referer'] = pv;
+              } else if (pk.toLowerCase() === 'user-agent') {
+                headers['User-Agent'] = pv;
+              } else {
+                headers[pk] = pv;
+              }
+            }
+          }
+        }
+
         const channelName = curMeta?.name || `Kênh #${channels.length + 1}`;
         const rawGroup = curMeta?.group || 'Kênh Chung';
         const normalizedGroup = normalizeGroupName(rawGroup, channelName);
 
         const idBase = curMeta?.tvgId || channelName;
         const cleanId = idBase.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || `ch-${channels.length + 1}`;
+        
+        let uniqueId = cleanId;
+        let counter = 1;
+        while (usedIds.has(uniqueId)) {
+          uniqueId = `${cleanId}-${counter++}`;
+        }
+        usedIds.add(uniqueId);
+
+        const ref = headers['Referer'] || headers['referer'] || '';
+        const ua = headers['User-Agent'] || headers['user-agent'] || '';
+        const proxyUrl = `/api/iptv/stream-proxy?url=${encodeURIComponent(streamUrl)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}${ua ? `&ua=${encodeURIComponent(ua)}` : ''}`;
 
         channels.push({
-          id: cleanId,
+          id: uniqueId,
           name: channelName,
           logo: curMeta?.logo || '',
-          url: line,
+          url: streamUrl,
+          proxyUrl: proxyUrl,
           group: normalizedGroup,
-          headers: curMeta?.headers || {},
+          headers: headers,
         });
 
         curMeta = null;
@@ -478,6 +534,21 @@ function addPlaylist({ name, type = 'url', url = '', content = '', filename = ''
   const config = loadConfig();
   if (!Array.isArray(config.playlists)) config.playlists = [];
 
+  const cleanUrl = (url || '').trim();
+  const cleanName = (name || '').trim();
+
+  // If url already exists in playlists, update/enable it
+  if (type === 'url' && cleanUrl) {
+    const existing = config.playlists.find(p => p.type === 'url' && p.url === cleanUrl);
+    if (existing) {
+      if (cleanName) existing.name = cleanName;
+      existing.enabled = true;
+      saveConfig(config);
+      clearCache();
+      return { success: true, playlist: existing, config, updated: true };
+    }
+  }
+
   const plId = 'pl-' + Date.now();
   let safeFilename = '';
 
@@ -490,9 +561,9 @@ function addPlaylist({ name, type = 'url', url = '', content = '', filename = ''
 
   const newPl = {
     id: plId,
-    name: (name || (type === 'file' ? filename || 'File Playlist' : 'Link IPTV')).trim(),
+    name: cleanName || (type === 'file' ? filename || 'File Playlist' : 'Link IPTV'),
     type: type === 'file' ? 'file' : 'url',
-    url: type === 'url' ? url.trim() : undefined,
+    url: type === 'url' ? cleanUrl : undefined,
     file: type === 'file' ? safeFilename : undefined,
     enabled: true,
     createdAt: new Date().toISOString(),
@@ -624,6 +695,166 @@ function clearCache() {
   lastFetchTime = 0;
 }
 
+/**
+ * Stream Proxy to bypass CORS & Referer restrictions on Web & Smart TV
+ * Rewrites .m3u8 playlists so all sub-manifests and chunks stream through this proxy.
+ * Binary segments (.ts, .aac, .mp4) are piped directly with CORS and upstream headers.
+ */
+async function handleStreamProxy(req, res) {
+  // Always attach CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', '*');
+
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  const targetUrl = req.query.url;
+  if (!targetUrl || (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://'))) {
+    return res.status(400).send('Invalid or missing stream URL parameter');
+  }
+
+  const referer = req.query.ref || '';
+  const userAgent = req.query.ua || '';
+
+  const upstreamHeaders = {
+    'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': '*/*',
+    'Accept-Encoding': 'identity', // Ensure plain text m3u8 so we can rewrite without gzip decoding
+  };
+
+  if (referer) {
+    upstreamHeaders['Referer'] = referer;
+    try {
+      upstreamHeaders['Origin'] = new URL(referer).origin;
+    } catch (_) {}
+  }
+
+  if (req.headers['range']) {
+    upstreamHeaders['Range'] = req.headers['range'];
+  }
+
+  try {
+    const upstreamRes = await axios({
+      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+      url: targetUrl,
+      headers: upstreamHeaders,
+      responseType: 'stream',
+      timeout: 15000,
+      validateStatus: () => true,
+      maxRedirects: 5,
+    });
+
+    if (upstreamRes.status >= 400) {
+      res.status(upstreamRes.status);
+      return upstreamRes.data.pipe(res);
+    }
+
+    const contentType = (upstreamRes.headers['content-type'] || '').toLowerCase();
+    const isM3u8 = targetUrl.toLowerCase().includes('.m3u8') ||
+                   contentType.includes('mpegurl') ||
+                   contentType.includes('application/x-mpegurl') ||
+                   contentType.includes('text/plain');
+
+    if (isM3u8 && req.method !== 'HEAD') {
+      const chunks = [];
+      for await (const chunk of upstreamRes.data) {
+        chunks.push(chunk);
+      }
+      const rawText = Buffer.concat(chunks).toString('utf-8');
+
+      if (rawText.includes('#EXTM3U')) {
+        const finalUrl = upstreamRes.request?.res?.responseUrl || targetUrl;
+        const rewritten = rewriteM3u8Content(rawText, finalUrl, referer, userAgent);
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        return res.status(upstreamRes.status).send(rewritten);
+      } else {
+        res.setHeader('Content-Type', contentType || 'text/plain');
+        return res.status(upstreamRes.status).send(rawText);
+      }
+    }
+
+    // Binary stream chunk (.ts, AAC, audio/video)
+    res.setHeader('Content-Type', contentType || 'video/MP2T');
+    if (upstreamRes.headers['content-length']) {
+      res.setHeader('Content-Length', upstreamRes.headers['content-length']);
+    }
+    if (upstreamRes.headers['content-range']) {
+      res.setHeader('Content-Range', upstreamRes.headers['content-range']);
+    }
+    if (upstreamRes.headers['accept-ranges']) {
+      res.setHeader('Accept-Ranges', upstreamRes.headers['accept-ranges']);
+    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.status(upstreamRes.status);
+
+    upstreamRes.data.on('error', (err) => {
+      console.error('[Stream Proxy Stream Error]:', err.message);
+      if (!res.headersSent) res.status(502).end();
+    });
+
+    upstreamRes.data.pipe(res);
+  } catch (err) {
+    console.error(`[Stream Proxy Error for ${targetUrl}]:`, err.message);
+    if (!res.headersSent) {
+      res.status(502).send('Error proxying stream: ' + err.message);
+    }
+  }
+}
+
+/**
+ * Rewrites URLs in M3U8 content to route child manifests, encryption keys, and segments back through stream-proxy
+ */
+function rewriteM3u8Content(m3u8Text, baseUrl, referer, userAgent) {
+  const lines = m3u8Text.split(/\r?\n/);
+  const output = [];
+
+  for (let line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      output.push(line);
+      continue;
+    }
+
+    // Rewrite tags containing URI: #EXT-X-KEY:...,URI="..." or #EXT-X-MAP:URI="..."
+    if (trimmed.startsWith('#EXT-X-KEY:') || trimmed.startsWith('#EXT-X-MAP:')) {
+      const rewritten = line.replace(/URI="([^"]+)"/g, (match, uri) => {
+        try {
+          const absUrl = new URL(uri, baseUrl).href;
+          const proxied = `/api/iptv/stream-proxy?url=${encodeURIComponent(absUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ''}${userAgent ? `&ua=${encodeURIComponent(userAgent)}` : ''}`;
+          return `URI="${proxied}"`;
+        } catch (e) {
+          return match;
+        }
+      });
+      output.push(rewritten);
+      continue;
+    }
+
+    // Comment or metadata tag line: preserve
+    if (trimmed.startsWith('#')) {
+      output.push(line);
+      continue;
+    }
+
+    // Media segment or sub-manifest URI
+    try {
+      const absUrl = new URL(trimmed, baseUrl).href;
+      const proxied = `/api/iptv/stream-proxy?url=${encodeURIComponent(absUrl)}${referer ? `&ref=${encodeURIComponent(referer)}` : ''}${userAgent ? `&ua=${encodeURIComponent(userAgent)}` : ''}`;
+      output.push(proxied);
+    } catch (e) {
+      output.push(line);
+    }
+  }
+
+  return output.join('\n');
+}
+
 module.exports = {
   getChannels,
   getSources,
@@ -637,6 +868,7 @@ module.exports = {
   loadConfig,
   saveConfig,
   parseM3U,
+  handleStreamProxy,
   DEFAULT_SOURCE_URL,
 };
 

@@ -25,6 +25,7 @@ class IptvChannelModel {
   final String name;
   final String logo;
   final String url;
+  final String proxyUrl;
   final String group;
   final Map<String, String> headers;
   final bool isPinned;
@@ -37,6 +38,7 @@ class IptvChannelModel {
     required this.name,
     this.logo = '',
     required this.url,
+    this.proxyUrl = '',
     this.group = 'Chung',
     this.headers = const {},
     this.isPinned = false,
@@ -60,6 +62,7 @@ class IptvChannelModel {
       name: json['name']?.toString() ?? 'Kênh truyền hình',
       logo: json['logo']?.toString() ?? '',
       url: json['url']?.toString() ?? '',
+      proxyUrl: json['proxyUrl']?.toString() ?? '',
       group: json['group']?.toString() ?? 'Chung',
       headers: parsedHeaders,
       isPinned: json['isPinned'] == true,
@@ -75,6 +78,7 @@ class IptvChannelModel {
       'name': name,
       'logo': logo,
       'url': url,
+      'proxyUrl': proxyUrl,
       'group': group,
       'headers': headers,
       'isPinned': isPinned,
@@ -84,12 +88,29 @@ class IptvChannelModel {
     };
   }
 
+  /// Resolves the actual playback stream URL.
+  /// If the stream specifies custom Referer headers, routes through the VPS proxy to bypass CDN 403 Forbidden.
+  String getPlaybackUrl({String? baseUrl}) {
+    final bool hasReferer = headers.containsKey('Referer') || headers.containsKey('referer');
+    if (hasReferer && proxyUrl.isNotEmpty) {
+      if (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://')) {
+        return proxyUrl;
+      }
+      if (baseUrl != null && baseUrl.isNotEmpty) {
+        final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+        final cleanProxy = proxyUrl.startsWith('/') ? proxyUrl : '/$proxyUrl';
+        return '$cleanBase$cleanProxy';
+      }
+    }
+    return url;
+  }
+
   /// Converts this channel to a StreamChannel for VideoPlayerScreen
-  StreamChannel toStreamChannel() {
+  StreamChannel toStreamChannel({String? baseUrl}) {
     return StreamChannel(
       name: group,
       title: name,
-      url: url,
+      url: getPlaybackUrl(baseUrl: baseUrl),
       headers: headers,
     );
   }

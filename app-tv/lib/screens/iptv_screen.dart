@@ -254,12 +254,12 @@ class _IptvScreenState extends State<IptvScreen> {
       return;
     }
 
-    final availableChannels = currentList.map((c) => c.toStreamChannel()).toList();
+    final availableChannels = currentList.map((c) => c.toStreamChannel(baseUrl: widget.apiService.baseUrl)).toList();
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
-          streamUrl: channel.url,
+          streamUrl: channel.getPlaybackUrl(baseUrl: widget.apiService.baseUrl),
           title: channel.name,
           subtitle: channel.group,
           headers: channel.headers,

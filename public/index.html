@@ -524,6 +524,12 @@
                 class="w-full bg-slate-950 border border-slate-700 rounded-lg pl-3 pr-8 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500">
             </div>
 
+            <!-- Refresh Button -->
+            <button type="button" onclick="refreshIptvDataManually()" id="btn-refresh-iptv" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-sky-400 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer shrink-0" title="Cập nhật lại danh sách kênh mới nhất từ máy chủ">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="icon-refresh-iptv"></i>
+              <span>Làm Mới</span>
+            </button>
+
             <!-- Save Settings Button -->
             <button type="button" onclick="saveIptvSettings()" id="btn-save-iptv-settings" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shadow-emerald-500/20 cursor-pointer shrink-0">
               <i data-lucide="check-circle-2" class="w-4 h-4"></i>
@@ -564,11 +570,12 @@
     <div id="iptv-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm hidden p-4">
       <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl relative">
         <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div class="flex items-center gap-2">
-            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
             <h3 id="modal-channel-title" class="font-bold text-white text-base truncate">Phát thử kênh</h3>
+            <span id="modal-channel-badge" class="text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0"></span>
           </div>
-          <button type="button" onclick="closeChannelPreview()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer">
+          <button type="button" onclick="closeChannelPreview()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer shrink-0">
             <i data-lucide="x" class="w-5 h-5"></i>
           </button>
         </div>
@@ -1059,7 +1066,7 @@
           '<td class="py-3 px-4 font-mono text-[11px] text-slate-400 max-w-[180px] truncate" title="' + c.url + '">' + c.url + '</td>' +
           '<td class="py-3 px-4 text-center">' + stateBtn + '</td>' +
           '<td class="py-3 px-4 text-center">' +
-            '<button type="button" onclick="playChannelPreview(\'' + encodeURIComponent(c.url) + '\', \'' + encodeURIComponent(c.name || '') + '\')" class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-600/80 hover:bg-sky-500 text-white flex items-center justify-center gap-1 mx-auto transition cursor-pointer shadow">' +
+            '<button type="button" onclick="playChannelPreview(\'' + encodeURIComponent(c.url) + '\', \'' + encodeURIComponent(c.name || '') + '\', \'' + encodeURIComponent(c.headers?.Referer || '') + '\', \'' + encodeURIComponent(c.proxyUrl || '') + '\')" class="px-2.5 py-1 rounded-md text-[11px] font-bold bg-sky-600/80 hover:bg-sky-500 text-white flex items-center justify-center gap-1 mx-auto transition cursor-pointer shadow">' +
               '<i data-lucide="play" class="w-3 h-3 fill-current"></i><span>Xem</span>' +
             '</button>' +
           '</td>' +
@@ -1277,19 +1284,68 @@
       }
     }
 
-    function playChannelPreview(encodedUrl, encodedName) {
+    async function refreshIptvDataManually() {
+      const btn = document.getElementById('btn-refresh-iptv');
+      const icon = document.getElementById('icon-refresh-iptv');
+      if (btn) btn.disabled = true;
+      if (icon) icon.classList.add('animate-spin');
+
+      try {
+        const res = await fetch('/api/iptv/refresh?admin=true', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Đã làm mới', 'Đã cập nhật lại toàn bộ kênh từ các nguồn link/file!', true);
+          await fetchIptvData(true);
+        } else {
+          showToast('Lỗi', data.error || 'Không thể làm mới', false);
+        }
+      } catch (err) {
+        showToast('Lỗi', err.message, false);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (icon) icon.classList.remove('animate-spin');
+      }
+    }
+
+    function playChannelPreview(encodedUrl, encodedName, encodedReferer, encodedProxyUrl) {
       const url = decodeURIComponent(encodedUrl);
       const name = decodeURIComponent(encodedName);
+      const referer = encodedReferer ? decodeURIComponent(encodedReferer) : '';
+      const proxyUrl = encodedProxyUrl ? decodeURIComponent(encodedProxyUrl) : '';
 
       const modal = document.getElementById('iptv-modal');
       const title = document.getElementById('modal-channel-title');
+      const badge = document.getElementById('modal-channel-badge');
       const urlEl = document.getElementById('modal-channel-url');
       const video = document.getElementById('iptv-preview-video');
 
       if (!modal || !video) return;
 
       if (title) title.textContent = 'Đang phát: ' + name;
-      if (urlEl) urlEl.textContent = url;
+
+      // Streams with Referer or CORS restrictions use proxy
+      let initialUrl = url;
+      let isUsingProxy = false;
+
+      if (referer || !url.startsWith('http')) {
+        initialUrl = proxyUrl || ('/api/iptv/stream-proxy?url=' + encodeURIComponent(url) + (referer ? '&ref=' + encodeURIComponent(referer) : ''));
+        isUsingProxy = true;
+      }
+
+      function updateBadge() {
+        if (badge) {
+          if (isUsingProxy) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            badge.textContent = '🛡️ VPS Proxy (Vượt tường lửa)';
+          } else {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded font-mono font-bold shrink-0 bg-sky-500/20 text-sky-300 border border-sky-500/30';
+            badge.textContent = '⚡ Direct CDN';
+          }
+        }
+      }
+
+      updateBadge();
+      if (urlEl) urlEl.textContent = isUsingProxy ? (proxyUrl || initialUrl) : url;
 
       modal.classList.remove('hidden');
 
@@ -1298,24 +1354,41 @@
         hlsPlayerInstance = null;
       }
 
+      let hasRetriedWithProxy = isUsingProxy;
+
       if (window.Hls && Hls.isSupported()) {
         hlsPlayerInstance = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
         });
-        hlsPlayerInstance.loadSource(url);
+
+        hlsPlayerInstance.loadSource(initialUrl);
         hlsPlayerInstance.attachMedia(video);
+
         hlsPlayerInstance.on(Hls.Events.MANIFEST_PARSED, function() {
           video.play().catch(e => console.log('Autoplay blocked:', e));
         });
+
         hlsPlayerInstance.on(Hls.Events.ERROR, function(event, data) {
           if (data.fatal) {
-            console.warn('HLS Fatal Error:', data.type);
+            console.warn('HLS Fatal Error:', data.type, data.details);
+            if (!hasRetriedWithProxy) {
+              hasRetriedWithProxy = true;
+              isUsingProxy = true;
+              updateBadge();
+              const fallbackProxy = proxyUrl || ('/api/iptv/stream-proxy?url=' + encodeURIComponent(url) + (referer ? '&ref=' + encodeURIComponent(referer) : ''));
+              console.log('Switching to VPS stream proxy fallback:', fallbackProxy);
+              if (urlEl) urlEl.textContent = fallbackProxy;
+              showToast('Đang kết nối lại', 'Kênh chặn CORS/Referer, đang chuyển tiếp qua VPS proxy...', true);
+              hlsPlayerInstance.loadSource(fallbackProxy);
+              hlsPlayerInstance.attachMedia(video);
+              return;
+            }
             showToast('Lỗi luồng phát', 'Không thể giải mã luồng HLS trực tiếp này: ' + data.details, false);
           }
         });
       } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = url;
+        video.src = initialUrl;
         video.play().catch(e => console.log('Autoplay blocked:', e));
       } else {
         showToast('Lỗi trình duyệt', 'Trình duyệt không hỗ trợ chuẩn phát video HLS .m3u8', false);
