@@ -766,7 +766,8 @@ app.get("/hls/:id/:server/master.m3u8", async (req, res) => {
     }).join("\n");
 
     res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Accel-Buffering", "no");
     return res.send(rewritten);
   } catch (err) {
     console.error("Error generating HLS manifest:", err.message);
@@ -805,6 +806,7 @@ app.get("/seg", async (req, res) => {
     res.setHeader("Content-Type", "video/mp2t");
     res.setHeader("Content-Length", tsBuf.length);
     res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("X-Accel-Buffering", "no");
     return res.send(tsBuf);
   } catch (err) {
     console.error("Error proxying TS segment:", err.message);

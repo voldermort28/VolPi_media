@@ -1,21 +1,19 @@
 const axios = require('axios');
-const scraper = require('./scraper');
+const scraper = require('./scrapers/vlxx');
 
 async function testHlsProxy() {
   console.log('Testing manifest retrieval...');
-  const rawId = '3219';
-  const server = '1';
+  const rawId = '3230';
 
-  const streams = await scraper.getStreams(rawId);
-  console.log('Raw streams:', streams);
+  const rawVlUrl = await scraper.getRawManifestUrl(rawId, 1);
+  console.log('Raw manifest URL:', rawVlUrl);
 
-  if (streams.length > 0) {
-    const rawVlUrl = streams[0].url;
+  if (rawVlUrl) {
     console.log('Fetching raw .vl:', rawVlUrl);
     const res = await axios.get(rawVlUrl, {
       headers: {
         'Referer': 'https://play.vlstream.net/',
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+        'User-Agent': scraper.USER_AGENT,
       },
     });
 
@@ -28,7 +26,7 @@ async function testHlsProxy() {
       const segRes = await axios.get(firstSeg, {
         responseType: 'arraybuffer',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+          'User-Agent': scraper.USER_AGENT,
         },
       });
       const buf = Buffer.from(segRes.data);
@@ -46,3 +44,4 @@ async function testHlsProxy() {
 }
 
 testHlsProxy().catch(console.error);
+

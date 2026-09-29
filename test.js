@@ -1,4 +1,4 @@
-const scraper = require('./scraper');
+const scraper = require('./scrapers/vlxx');
 
 async function runTests() {
   console.log('--- 1. Testing getLatest() ---');
@@ -21,12 +21,14 @@ async function runTests() {
   const details = await scraper.getVideoDetails(testId);
   console.log('Thông tin chi tiết:', details);
 
-  console.log(`\n--- 4. Testing getStreams("${testId}") ---`);
-  const streams = await scraper.getStreams(testId);
-  console.log(`Tìm thấy ${streams.length} stream server:`);
-  console.log(JSON.stringify(streams, null, 2));
+  console.log(`\n--- 4. Testing stream manifests for "${testId}" ---`);
+  const s1 = await scraper.getRawManifestUrl(testId, 1);
+  const s2 = await scraper.getRawManifestUrl(testId, 2);
+  console.log('Server #1:', s1);
+  console.log('Server #2:', s2);
 
   console.log('\n✅ All tests completed!');
 }
 
 runTests().catch(console.error);
+
