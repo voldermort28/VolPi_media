@@ -32,6 +32,39 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Configure Gradle Mirrors and Properties
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx3072m -XX:MaxMetaspaceSize=512m" >> ~/.gradle/gradle.properties
+          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+          cat << 'EOF' > ~/.gradle/init.gradle
+          allprojects {
+              buildscript {
+                  repositories {
+                      google()
+                      mavenCentral()
+                      maven { url 'https://repo1.maven.org/maven2/' }
+                      maven { url 'https://plugins.gradle.org/m2/' }
+                  }
+              }
+              repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://repo1.maven.org/maven2/' }
+                  maven { url 'https://plugins.gradle.org/m2/' }
+              }
+          }
+          beforeSettings { settings ->
+              settings.pluginManagement.repositories {
+                  google()
+                  mavenCentral()
+                  maven { url 'https://repo1.maven.org/maven2/' }
+                  maven { url 'https://plugins.gradle.org/m2/' }
+                  gradlePluginPortal()
+              }
+          }
+          EOF
+
       - name: Scaffold Platform Wrapper
         working-directory: app-tv
         run: |
@@ -41,6 +74,8 @@ jobs:
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
+          sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/build.gradle || true
+          sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/settings.gradle || true
 
       - name: Get Dependencies
         working-directory: app-tv
@@ -48,7 +83,7 @@ jobs:
 
       - name: Build Release APK
         working-directory: app-tv
-        run: flutter build apk --release
+        run: flutter build apk --release || (echo "Retrying flutter build apk with verbose logs..." && flutter build apk --release -v)
 
       - name: Prepare Release APK with Version
         working-directory: app-tv
