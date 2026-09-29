@@ -200,6 +200,7 @@ function registerItemMetadata(item) {
   cardRegistry.set(item.id, {
     badge: item.badge,
     title: item.cardTitle || item.name,
+    fullTitle: item.name,
     subtitle: item.subtitle || item.description,
     category: item.categoryName || item.genre,
     bgUrl: item.rawPoster || item.poster,
@@ -275,47 +276,79 @@ function getTopCategoriesItems() {
   return items;
 }
 
-// 2. POKEMON ITEMS (5 Main Branch Cards matching https://yumei-anime.com/thu-vien/pokemon)
+let cachedPokemonItems = null;
+let lastPokemonCache = 0;
+
+// 2. POKEMON ITEMS (Unpacked TV Series & Horizons matching https://yumei-anime.com/thu-vien/pokemon)
 async function getPokemonCatalogItems() {
-  const mainCards = [
-    {
-      id: encodePathId('s', '/thu-vien/pokemon/tv-series'),
-      name: 'Pokemon: TV Series (29 mục)',
-      cardTitle: 'TV Series',
-      badge: '29 mục',
-      subtitle: 'Hành trình 29 mùa của Satoshi & Pikachu',
-      categoryName: 'Pokemon TV Series',
-      type: 'series',
-      genre: 'Pokemon',
-      rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a16c0c4edca254fdde172f5/variants/medium.webp',
-      description: 'Pokemon TV Series: Trọn bộ 29 mùa với hơn 1.200 tập phim của Satoshi và Pikachu.',
-      genres: ['Pokemon', 'Pokemon TV Series'],
-    },
-    {
-      id: encodePathId('s', '/thu-vien/pokemon/horizons'),
-      name: 'Pokemon: Horizons (8 mục)',
-      cardTitle: 'Horizons',
-      badge: '8 mục',
-      subtitle: 'Thế hệ mới Liko & Roy với 8 chương',
-      categoryName: 'Pokemon Horizons',
-      type: 'series',
-      genre: 'Pokemon',
-      rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a1ee40fdadf8f2c621e57cd/variants/medium.webp',
-      description: 'Pokemon Horizons: Hành trình thế hệ mới của Liko & Roy qua 8 chương (148 tập phim).',
-      genres: ['Pokemon', 'Pokemon Horizons'],
-    },
+  if (cachedPokemonItems && Date.now() - lastPokemonCache < TTL) {
+    return cachedPokemonItems;
+  }
+
+  const items = [];
+
+  // 1. Unpack all 29 Seasons from /thu-vien/pokemon/tv-series
+  try {
+    const tvCards = await getFolderCards('/thu-vien/pokemon/tv-series');
+    for (const sc of tvCards) {
+      const it = {
+        id: encodePathId('s', sc.path),
+        name: `Pokemon TV: ${sc.title} (${sc.count})`,
+        cardTitle: sc.title,
+        badge: sc.count || 'TV Series',
+        subtitle: `Pokemon TV Series - ${sc.title}`,
+        categoryName: 'Pokemon TV Series',
+        type: 'series',
+        genre: 'Pokemon TV Series',
+        rawPoster: sc.poster || 'https://cdn.yumei-anime.com/assets/content/images/6a16c0a5edca254fdde1712a/variants/medium.webp',
+        description: `Pokemon TV Series: ${sc.title} (${sc.count}). Hành trình của Satoshi & Pikachu. Bản Vietsub & Thuyết minh Full HD.`,
+        genres: ['Pokemon', 'Pokemon TV Series'],
+      };
+      applyCardUrls(it);
+      items.push(it);
+    }
+  } catch (e) {
+    console.error('Error fetching Pokemon TV series seasons:', e.message);
+  }
+
+  // 2. Unpack all 8 Chapters from /thu-vien/pokemon/horizons
+  try {
+    const hzCards = await getFolderCards('/thu-vien/pokemon/horizons');
+    for (const hc of hzCards) {
+      const it = {
+        id: encodePathId('s', hc.path),
+        name: `Pokemon Horizons: ${hc.title} (${hc.count})`,
+        cardTitle: hc.title,
+        badge: hc.count || 'Horizons',
+        subtitle: `Pokemon Horizons - ${hc.title}`,
+        categoryName: 'Pokemon Horizons',
+        type: 'series',
+        genre: 'Pokemon Horizons',
+        rawPoster: hc.poster || 'https://cdn.yumei-anime.com/assets/content/images/6a1ee40fdadf8f2c621e57cd/variants/medium.webp',
+        description: `Pokemon Horizons (Chân Trời Mới): ${hc.title} (${hc.count}). Hành trình thế hệ mới của Liko & Roy. Bản Vietsub Full HD.`,
+        genres: ['Pokemon', 'Pokemon Horizons'],
+      };
+      applyCardUrls(it);
+      items.push(it);
+    }
+  } catch (e) {
+    console.error('Error fetching Pokemon Horizons chapters:', e.message);
+  }
+
+  // 3. Other Pokemon Categories (The Movies, TV Specials, Pikachu Shorts)
+  const otherPokemon = [
     {
       id: encodePathId('s', '/thu-vien/pokemon/movies'),
       name: 'Pokemon: The Movies (25 mục)',
-      cardTitle: 'Movies',
+      cardTitle: 'The Movies',
       badge: '25 mục',
       subtitle: '25 Phim điện ảnh Pokemon chiếu rạp',
       categoryName: 'Pokemon Movies',
       type: 'series',
-      genre: 'Pokemon',
+      genre: 'Pokemon Movies',
       rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a16c0e8edca254fdde17519/M23_poster_4.png',
       description: 'Tuyển tập 25 phim điện ảnh Pokemon chiếu rạp từ 1998 đến nay.',
-      genres: ['Pokemon', 'Phim Chiếu Rạp'],
+      genres: ['Pokemon', 'Phim Chiếu Rạp', 'Pokemon Movies'],
     },
     {
       id: encodePathId('s', '/thu-vien/pokemon/tv-specials'),
@@ -325,7 +358,7 @@ async function getPokemonCatalogItems() {
       subtitle: 'Tổng hợp các tập phim đặc biệt ngoại truyện',
       categoryName: 'Pokemon Specials',
       type: 'series',
-      genre: 'Pokemon',
+      genre: 'Pokemon Specials',
       rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a16c0b2edca254fdde171d5/variants/medium.webp',
       description: 'Tổng hợp 56 tập phim đặc biệt Pokemon TV Specials Vietsub.',
       genres: ['Pokemon', 'Pokemon Specials'],
@@ -338,15 +371,21 @@ async function getPokemonCatalogItems() {
       subtitle: 'Tuyển tập phim hoạt hình ngắn Pikachu',
       categoryName: 'Pikachu Shorts',
       type: 'series',
-      genre: 'Pokemon',
+      genre: 'Pokemon Shorts',
       rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a16c190dd62087d7e6678bb/PK26.png',
       description: 'Tuyển tập 26 tập phim hoạt hình ngắn hài hước của Pikachu.',
       genres: ['Pokemon', 'Pikachu Shorts'],
     },
   ];
 
-  mainCards.forEach(applyCardUrls);
-  return mainCards;
+  otherPokemon.forEach(applyCardUrls);
+  items.push(...otherPokemon);
+
+  if (items.length > 0) {
+    cachedPokemonItems = items;
+    lastPokemonCache = Date.now();
+  }
+  return items;
 }
 
 // 3. SUPER SENTAI ITEMS
@@ -663,15 +702,15 @@ async function getCatalog(catalogId, extra = {}, requestedType) {
     if (extra?.genre && extra.genre !== 'Tất cả') {
       const g = extra.genre.toLowerCase();
       if (g.includes('tv series') || g.includes('mùa')) {
-        items = allPk.filter((i) => i.name.includes('TV Series'));
-      } else if (g.includes('horizons')) {
-        items = allPk.filter((i) => i.name.includes('Horizons'));
+        items = allPk.filter((i) => i.name.includes('TV Series') || i.categoryName === 'Pokemon TV Series' || (i.genres && i.genres.includes('Pokemon TV Series')));
+      } else if (g.includes('horizons') || g.includes('chương')) {
+        items = allPk.filter((i) => i.name.includes('Horizons') || i.categoryName === 'Pokemon Horizons' || (i.genres && i.genres.includes('Pokemon Horizons')));
       } else if (g.includes('movies') || g.includes('chiếu rạp')) {
-        items = allPk.filter((i) => i.name.includes('The Movies'));
+        items = allPk.filter((i) => i.name.includes('The Movies') || i.categoryName === 'Pokemon Movies');
       } else if (g.includes('specials') || g.includes('đặc biệt')) {
-        items = allPk.filter((i) => i.name.includes('Specials'));
+        items = allPk.filter((i) => i.name.includes('Specials') || i.categoryName === 'Pokemon Specials');
       } else if (g.includes('shorts') || g.includes('pikachu')) {
-        items = allPk.filter((i) => i.name.includes('Shorts'));
+        items = allPk.filter((i) => i.name.includes('Shorts') || i.categoryName === 'Pikachu Shorts');
       } else {
         items = allPk;
       }
@@ -857,14 +896,17 @@ async function getSeriesMeta(seriesId, requestedType = 'series') {
     return a.episode - b.episode;
   });
 
+  const reg = cardRegistry.get(seriesId);
+  const cardPoster = reg?.bgUrl || fallbackPoster;
+  const cardTitle = reg?.fullTitle || reg?.title || seriesTitle;
   const resultMeta = {
     id: seriesId,
     type: 'series',
-    name: seriesTitle,
-    poster: fallbackPoster,
-    background: fallbackPoster,
+    name: cardTitle,
+    poster: cardPoster,
+    background: cardPoster,
     posterShape: 'poster',
-    description: `${seriesTitle}. Trọn bộ Vietsub Full HD từ Yumei Anime.`,
+    description: (reg?.subtitle ? `${reg.subtitle}\n` : '') + `${cardTitle}. Trọn bộ Vietsub Full HD từ Yumei Anime.`,
     genres: ['Anime Vietsub', 'Yumei Anime'],
     videos,
   };
