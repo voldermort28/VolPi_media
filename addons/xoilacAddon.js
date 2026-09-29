@@ -42,6 +42,13 @@ builder.defineCatalogHandler(async (args) => {
     const metas = matches.map((m) => ({
       id: m.id,
       name: m.title,
+      homeTeam: m.homeTeam,
+      awayTeam: m.awayTeam,
+      homeLogo: m.homeLogo,
+      awayLogo: m.awayLogo,
+      league: m.league,
+      time: m.time,
+      priority: m.priority,
       poster: `${host}/thumb/xoilac/${m.slug}.svg`,
       background: `${host}/thumb/xoilac/${m.slug}.svg`,
       posterShape: 'landscape',

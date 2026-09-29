@@ -1,9 +1,9 @@
 {
-  "version": "1.0.7",
-  "build": 8,
-  "tag_name": "v1.0.7",
-  "changelog": "• Hỗ trợ cuộn vô hạn (Infinite Scroll): Tự động tải thêm phim liên tục khi cuộn xuống dưới trong Kho Phim Riêng Tư (VLFilm).\n• Hỗ trợ điều hướng Remote D-pad trên Android TV tự động tải thêm trang mới khi duyệt xuống cuối danh sách.\n• Bổ sung thanh tìm kiếm phim theo từ khóa, diễn viên, mã phim trong Kho Phim.\n• Sửa lỗi thuật toán phân trang catalog Stremio (chia đúng 30 phim/trang, không bị nhảy cóc bỏ sót phim).",
+  "version": "1.0.8",
+  "build": 9,
+  "tag_name": "v1.0.8",
+  "changelog": "• Tab Bóng đá: Bổ sung avatar/logo các đội bóng kích thước siêu nhẹ, tối ưu bộ nhớ RAM tivi.\n• Tab Bóng đá: Bổ sung khu vực '⭐ Đội Bóng Yêu Thích & Tâm Điểm' riêng biệt cho Việt Nam, Manchester United, Manchester City, Liverpool, Arsenal, Chelsea, Tottenham, Brighton, Brentford, Barcelona, Real Madrid, Bayern Munich, PSG, Juventus, Inter, Milan, Dortmund...\n• Tab Yumei: Hiển thị thumbnail phim bộ và phim lẻ mượt mà từ CDN WebP, không tải thumbnail cho các tập lẻ để tiết kiệm tối đa dung lượng bộ nhớ TV và VPS.\n• Tab Kho phim: Tối ưu thumbnail siêu nhẹ truyền trực tiếp (stream proxy) không lưu đĩa VPS.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-29T06:14:00Z"
+  "published_at": "2026-09-29T06:33:00Z"
 }

@@ -529,6 +529,28 @@ app.get("/thumb/vlxx/:id.svg", async (req, res) => {
   }
 });
 
+// VLXX Direct JPG Thumbnail Proxy (Zero disk write, lightweight stream pipe)
+app.get("/thumb/vlxx/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id.replace(/\.jpg$/, "");
+    const currentBase = vlxxScraper.getBaseUrl();
+    const url = `${currentBase}/img/${rawId}.jpg`;
+    const imgRes = await axios.get(url, {
+      responseType: "stream",
+      headers: {
+        "User-Agent": vlxxScraper.USER_AGENT,
+      },
+      timeout: 8000,
+    });
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=604800");
+    res.setHeader("X-Accel-Buffering", "no");
+    return imgRes.data.pipe(res);
+  } catch (err) {
+    return res.status(404).send("Image not found");
+  }
+});
+
 // 2. Xôi Lạc Card SVG (Extra Large +50% & Team Highlights)
 app.get("/thumb/xoilac/:slug.svg", async (req, res) => {
   try {

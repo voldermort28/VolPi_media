@@ -45,8 +45,8 @@ builder.defineCatalogHandler(async (args) => {
     const metas = videos.map((v) => ({
       id: v.id,
       name: v.title,
-      poster: `${host}/thumb/vlxx/${v.rawId}.svg`,
-      background: `${host}/thumb/vlxx/${v.rawId}.svg`,
+      poster: `${host}/thumb/vlxx/${v.rawId}.jpg`,
+      background: `${host}/thumb/vlxx/${v.rawId}.jpg`,
       posterShape: 'landscape',
       type: 'movie',
       description: v.ribbon ? `[${v.ribbon}] ${v.title}` : v.title,
@@ -74,8 +74,8 @@ builder.defineMetaHandler(async (args) => {
       meta: {
         id: details.id,
         name: details.name,
-        poster: `${host}/thumb/vlxx/${rawId}.svg`,
-        background: `${host}/thumb/vlxx/${rawId}.svg`,
+        poster: `${host}/thumb/vlxx/${rawId}.jpg`,
+        background: `${host}/thumb/vlxx/${rawId}.jpg`,
         posterShape: 'landscape',
         description: details.description,
         genres: details.genres,

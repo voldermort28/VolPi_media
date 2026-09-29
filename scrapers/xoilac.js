@@ -24,7 +24,26 @@ function clearCache() {
 function getTeamPriority(match) {
   const q = `${match.homeTeam} ${match.awayTeam} ${match.title} ${match.slug}`.toLowerCase();
   
-  // 1. Manchester United (Level 1 - Supreme Favorite #1)
+  // 1. Việt Nam & Manchester United (Level 1 - Supreme Favorites #1)
+  if (
+    q.includes('việt nam') ||
+    q.includes('viet nam') ||
+    q.includes('vietnam') ||
+    q.includes('u23 việt nam') ||
+    q.includes('u22 việt nam') ||
+    q.includes('u19 việt nam') ||
+    q.includes('đt việt nam')
+  ) {
+    return {
+      level: 1,
+      tag: '⭐ [VIỆT NAM]',
+      badgeText: '⭐ ĐỘI TUYỂN VIỆT NAM ⭐',
+      color: '#dc2626',
+      badgeBg: '#7f1d1d',
+      textColor: '#fde047',
+    };
+  }
+
   if (
     q.includes('manchester united') ||
     q.includes('manchester utd') ||
@@ -45,15 +64,25 @@ function getTeamPriority(match) {
     };
   }
 
-  // 2. Highlighted Big Teams (Level 2)
+  // 2. Highlighted Big Teams & User Favorites (Level 2)
   const bigTeams = [
-    { names: ['real madrid'], label: 'Real Madrid' },
-    { names: ['barcelona', 'barca'], label: 'Barcelona' },
-    { names: ['manchester city', 'man city', 'mancity'], label: 'Man City' },
+    { names: ['manchester city', 'man city', 'mancity', ' man city'], label: 'Man City' },
     { names: ['liverpool'], label: 'Liverpool' },
     { names: ['arsenal'], label: 'Arsenal' },
     { names: ['chelsea'], label: 'Chelsea' },
     { names: ['tottenham', 'spurs'], label: 'Tottenham' },
+    { names: ['brighton'], label: 'Brighton' },
+    { names: ['brentford'], label: 'Brentford' },
+    { names: ['real madrid'], label: 'Real Madrid' },
+    { names: ['barcelona', 'barca'], label: 'Barcelona' },
+    { names: ['bayern munich', 'bayern'], label: 'Bayern Munich' },
+    { names: ['paris saint-germain', 'psg', 'paris sg'], label: 'PSG' },
+    { names: ['juventus', 'juve'], label: 'Juventus' },
+    { names: ['inter milan'], label: 'Inter Milan' },
+    { names: ['ac milan'], label: 'AC Milan' },
+    { names: ['dortmund', 'bvb'], label: 'Dortmund' },
+    { names: ['atletico madrid', 'atletico'], label: 'Atletico Madrid' },
+    { names: ['leverkusen', 'bayer leverkusen'], label: 'Leverkusen' },
   ];
 
   for (const team of bigTeams) {
@@ -140,8 +169,15 @@ async function getLiveMatches() {
       const league = $card.find('.grid-match__league, .grid-match__league-name').first().text().trim() || 'Bóng đá';
       const homeTeam = $card.find('.grid-match__team--home-name, .team--home .team-name, .home-team').first().text().trim() || 'Đội nhà';
       const awayTeam = $card.find('.grid-match__team--away-name, .team--away .team-name, .away-team').first().text().trim() || 'Đội khách';
-      const homeLogo = $card.find('.team-logo-group-home-logo img, .team--home img').first().attr('src') || '';
-      const awayLogo = $card.find('.team-logo-group-away-logo img, .team--away img').first().attr('src') || '';
+      let homeLogo = $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('src') ||
+                     $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('data-src') || '';
+      let awayLogo = $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('src') ||
+                     $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('data-src') || '';
+
+      if (homeLogo && homeLogo.startsWith('//')) homeLogo = 'https:' + homeLogo;
+      else if (homeLogo && homeLogo.startsWith('/')) homeLogo = currentBaseUrl + homeLogo;
+      if (awayLogo && awayLogo.startsWith('//')) awayLogo = 'https:' + awayLogo;
+      else if (awayLogo && awayLogo.startsWith('/')) awayLogo = currentBaseUrl + awayLogo;
 
       if (!time && title) {
         const matchTime = title.match(/lúc\s+(\d{1,2}:\d{2})\s+ngày\s+(\d{1,2}\/\d{1,2})/i);

@@ -210,8 +210,8 @@ function registerItemMetadata(item) {
 function applyCardUrls(it) {
   const host = getHostUrl();
   registerItemMetadata(it);
-  it.poster = `${host}/thumb/yumei/${it.id}.svg?v=2`;
-  it.background = `${host}/thumb/yumei/${it.id}.svg?v=2`;
+  it.poster = it.rawPoster || `${host}/thumb/yumei/${it.id}.svg?v=2`;
+  it.background = it.rawPoster || `${host}/thumb/yumei/${it.id}.svg?v=2`;
   it.posterShape = 'poster';
 }
 

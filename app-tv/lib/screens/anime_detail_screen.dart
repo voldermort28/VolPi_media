@@ -149,6 +149,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                               imageUrl: anime.poster,
                               width: 220,
                               height: 310,
+                              memCacheWidth: 220,
+                              memCacheHeight: 310,
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) => Container(
                                 width: 220,

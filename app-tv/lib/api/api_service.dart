@@ -18,24 +18,34 @@ class ApiService {
   /// If forceRefresh is true, appends timestamp query to bypass any client/CDN cache.
   Future<List<MatchModel>> getLiveMatches({bool forceRefresh = false}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final url = forceRefresh
+
+    // 1. Try direct /api/matches first (richest metadata & logo URLs)
+    final apiUrl = '$baseUrl/api/matches?_t=$timestamp';
+    try {
+      final res = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is List && data.isNotEmpty) {
+          final matches = data.map((item) => MatchModel.fromJson(item)).toList();
+          _sortMatches(matches);
+          return matches;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback to Stremio catalog endpoint
+    final catalogUrl = forceRefresh
         ? '$baseUrl/xoilac/catalog/tv/xoilac-catalog.json?_t=$timestamp'
         : '$baseUrl/xoilac/catalog/tv/xoilac-catalog.json';
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await http.get(Uri.parse(catalogUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['metas'] != null) {
           final List list = data['metas'];
           final matches = list.map((item) => MatchModel.fromJson(item)).toList();
-          
-          // Sort: MU #1, Hot Big Teams #2, Others #3
-          matches.sort((a, b) {
-            int scoreA = a.isMuFavorite ? 0 : (a.isHot ? 1 : 2);
-            int scoreB = b.isMuFavorite ? 0 : (b.isHot ? 1 : 2);
-            return scoreA.compareTo(scoreB);
-          });
+          _sortMatches(matches);
           return matches;
         }
       }
@@ -43,6 +53,15 @@ class ApiService {
       // Log or handle error
     }
     return [];
+  }
+
+  void _sortMatches(List<MatchModel> matches) {
+    // Sort: Việt Nam & MU #1, Favorite Clubs & Hot #2, Others #3
+    matches.sort((a, b) {
+      int scoreA = (a.isVietnam || a.isMuFavorite) ? 0 : (a.isFavorite ? 1 : 2);
+      int scoreB = (b.isVietnam || b.isMuFavorite) ? 0 : (b.isFavorite ? 1 : 2);
+      return scoreA.compareTo(scoreB);
+    });
   }
 
   /// Fetches available stream channels (with BLV names and proxy headers) for a match.

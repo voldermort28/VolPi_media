@@ -158,6 +158,8 @@ class _AnimeScreenState extends State<AnimeScreen> {
                 children: [
                   CachedNetworkImage(
                     imageUrl: anime.poster,
+                    memCacheWidth: 200,
+                    memCacheHeight: 300,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
                       color: const Color(0xFF334155),

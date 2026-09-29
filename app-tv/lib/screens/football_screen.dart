@@ -172,6 +172,9 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
+  List<MatchModel> get _favoriteMatches => _matches.where((m) => m.isFavorite).toList();
+  List<MatchModel> get _otherMatches => _matches.where((m) => !m.isFavorite).toList();
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -251,7 +254,7 @@ class _FootballScreenState extends State<FootballScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 48),
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           Text(_errorMessage!, style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           const SizedBox(height: 16),
                           TvFocusableCard(
@@ -270,7 +273,7 @@ class _FootballScreenState extends State<FootballScreen> {
                       color: const Color(0xFF38BDF8),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          // Grid columns adaptive: TV (>1000px: 3 cols, Tablet 2 cols, Phone 1 col)
+                          // Grid columns adaptive: TV (>1100px: 3 cols, Tablet >650px: 2 cols, Phone: 1 col)
                           int crossAxisCount = 1;
                           if (constraints.maxWidth > 1100) {
                             crossAxisCount = 3;
@@ -278,19 +281,44 @@ class _FootballScreenState extends State<FootballScreen> {
                             crossAxisCount = 2;
                           }
 
-                          return GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 14,
-                              mainAxisSpacing: 14,
-                              mainAxisExtent: 140,
-                            ),
-                            itemCount: _matches.length,
-                            itemBuilder: (context, idx) {
-                              final match = _matches[idx];
-                              return _buildMatchCard(match);
-                            },
+                          final favs = _favoriteMatches;
+                          final others = _otherMatches;
+
+                          return CustomScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            slivers: [
+                              if (favs.isNotEmpty) ...[
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '⭐ Đội Bóng Yêu Thích & Tâm Điểm',
+                                    count: favs.length.toString(),
+                                    color: const Color(0xFFF59E0B),
+                                    subtitle: 'Việt Nam • Man Utd • Man City • Arsenal • Chelsea • Real • Barca...',
+                                  ),
+                                ),
+                                _buildMatchGrid(favs, crossAxisCount),
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '⚽ Tất Cả Trận Đấu Hôm Nay',
+                                    count: others.length.toString(),
+                                    color: const Color(0xFF38BDF8),
+                                  ),
+                                ),
+                                _buildMatchGrid(others, crossAxisCount),
+                              ] else ...[
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '⚽ Tất Cả Trận Đấu Hôm Nay',
+                                    count: _matches.length.toString(),
+                                    color: const Color(0xFF38BDF8),
+                                  ),
+                                ),
+                                _buildMatchGrid(_matches, crossAxisCount),
+                              ],
+                              const SliverToBoxAdapter(
+                                child: SizedBox(height: 24),
+                              ),
+                            ],
                           );
                         },
                       ),
@@ -300,19 +328,110 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
+  Widget _buildSectionHeader({
+    required String title,
+    required String count,
+    required Color color,
+    String? subtitle,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withOpacity(0.6), width: 0.8),
+            ),
+            child: Text(
+              '$count trận',
+              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                subtitle,
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount) {
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverGrid(
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
+          mainAxisExtent: 144,
+        ),
+        delegate: SliverChildBuilderDelegate(
+          (context, idx) => _buildMatchCard(matches[idx]),
+          childCount: matches.length,
+        ),
+      ),
+    );
+  }
+
   Widget _buildMatchCard(MatchModel match) {
     Color cardBg = const Color(0xFF1E293B);
     Color borderColor = const Color(0xFF334155);
     Color focusBorder = const Color(0xFF38BDF8);
 
-    if (match.isMuFavorite) {
-      cardBg = const Color(0xFF450A0A).withOpacity(0.6);
+    if (match.isVietnam) {
+      cardBg = const Color(0xFF500724).withOpacity(0.7);
+      borderColor = const Color(0xFFDC2626);
+      focusBorder = const Color(0xFFFDE047);
+    } else if (match.isMuFavorite) {
+      cardBg = const Color(0xFF450A0A).withOpacity(0.7);
       borderColor = const Color(0xFF991B1B);
       focusBorder = const Color(0xFFEF4444);
+    } else if (match.isFavorite) {
+      cardBg = const Color(0xFF422006).withOpacity(0.7);
+      borderColor = const Color(0xFFB45309);
+      focusBorder = const Color(0xFFF59E0B);
     } else if (match.isHot) {
-      cardBg = const Color(0xFF451A03).withOpacity(0.6);
-      borderColor = const Color(0xFF9A3412);
-      focusBorder = const Color(0xFFF97316);
+      cardBg = const Color(0xFF312E81).withOpacity(0.5);
+      borderColor = const Color(0xFF4F46E5);
+      focusBorder = const Color(0xFF818CF8);
+    }
+
+    Widget footerWidget;
+    if (match.isVietnam) {
+      footerWidget = const Text('⭐ ĐỘI TUYỂN VIỆT NAM ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isMuFavorite) {
+      footerWidget = const Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isFavorite && match.favoriteBadgeText.isNotEmpty) {
+      footerWidget = Text('⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐', style: const TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isHot) {
+      footerWidget = const Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+    } else {
+      footerWidget = const Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: Color(0xFF64748B), fontSize: 10));
     }
 
     return TvFocusableCard(
@@ -355,7 +474,7 @@ class _FootballScreenState extends State<FootballScreen> {
               ],
             ),
 
-            // Teams Row
+            // Teams Row with Logos
             Row(
               children: [
                 // Home Team
@@ -366,21 +485,21 @@ class _FootballScreenState extends State<FootballScreen> {
                       Flexible(
                         child: Text(
                           match.homeTeam,
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                           textAlign: TextAlign.right,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _buildTeamLogo(match.homeLogo),
+                      _buildTeamLogo(match.homeLogo, teamName: match.homeTeam),
                     ],
                   ),
                 ),
 
                 // VS Badge
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 10),
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.white12,
@@ -393,12 +512,12 @@ class _FootballScreenState extends State<FootballScreen> {
                 Expanded(
                   child: Row(
                     children: [
-                      _buildTeamLogo(match.awayLogo),
+                      _buildTeamLogo(match.awayLogo, teamName: match.awayTeam),
                       const SizedBox(width: 8),
                       Flexible(
                         child: Text(
                           match.awayTeam,
-                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -409,16 +528,11 @@ class _FootballScreenState extends State<FootballScreen> {
               ],
             ),
 
-            // Footer Tags (MU / Tâm điểm)
+            // Footer Tags (MU / Vietnam / Favorite / Normal)
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (match.isMuFavorite)
-                  const Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold))
-                else if (match.isHot)
-                  const Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold))
-                else
-                  const Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: Color(0xFF64748B), fontSize: 10)),
+                footerWidget,
               ],
             ),
           ],
@@ -427,18 +541,49 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildTeamLogo(String url) {
-    if (url.isEmpty) {
-      return const CircleAvatar(radius: 14, backgroundColor: Colors.white12, child: Icon(Icons.shield_outlined, size: 14, color: Colors.white38));
+  Widget _buildTeamLogo(String url, {String teamName = ''}) {
+    final String initial = teamName.trim().isNotEmpty ? teamName.trim().substring(0, 1).toUpperCase() : '?';
+
+    Widget placeholder = Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF334155),
+        border: Border.all(color: Colors.white24, width: 0.8),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+      ),
+    );
+
+    if (url.isEmpty || !url.startsWith('http')) {
+      return placeholder;
     }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: CachedNetworkImage(
-        imageUrl: url,
-        width: 28,
-        height: 28,
-        fit: BoxFit.contain,
-        errorWidget: (_, __, ___) => const CircleAvatar(radius: 14, backgroundColor: Colors.white12, child: Icon(Icons.shield_outlined, size: 14, color: Colors.white38)),
+
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.white.withOpacity(0.06),
+        border: Border.all(color: Colors.white24, width: 0.8),
+      ),
+      child: ClipOval(
+        child: CachedNetworkImage(
+          imageUrl: url,
+          width: 32,
+          height: 32,
+          memCacheWidth: 64,
+          memCacheHeight: 64,
+          maxWidthDiskCache: 120,
+          maxHeightDiskCache: 120,
+          fit: BoxFit.contain,
+          placeholder: (_, __) => placeholder,
+          errorWidget: (_, __, ___) => placeholder,
+        ),
       ),
     );
   }

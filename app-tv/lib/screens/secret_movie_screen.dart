@@ -489,6 +489,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                 children: [
                   CachedNetworkImage(
                     imageUrl: movie.poster,
+                    memCacheWidth: 240,
+                    memCacheHeight: 160,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
                       color: const Color(0xFF334155),
