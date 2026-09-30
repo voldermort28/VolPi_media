@@ -3,8 +3,8 @@ const path = require('path');
 const crypto = require('crypto');
 
 const AUTH_CONFIG_PATH = path.join(__dirname, '..', 'auth_config.json');
-const DEFAULT_USERNAME = process.env.ADMIN_USER || 'admin';
-const DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+const DEFAULT_USERNAME = process.env.ADMIN_USER || 'voldermort28';
+const DEFAULT_PASSWORD = process.env.ADMIN_PASSWORD || 'Ailophuc28?';
 const BACKUP_PIN = '3105'; // Matches the in-app secret movie PIN
 
 function hashPassword(password, salt) {

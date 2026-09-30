@@ -822,13 +822,9 @@
 
       if (title) title.textContent = 'Đang phát: ' + name;
 
-      let initialUrl = url;
-      let isUsingProxy = false;
-
-      if (referer || !url.startsWith('http')) {
-        initialUrl = proxyUrl || ('/api/iptv/stream-proxy?url=' + encodeURIComponent(url) + (referer ? '&ref=' + encodeURIComponent(referer) : ''));
-        isUsingProxy = true;
-      }
+      // In web browser preview, always use VPS proxy to bypass browser Mixed Content (HTTP on HTTPS), CORS and Anti-hotlink Referer rules
+      let initialUrl = proxyUrl || ('/api/iptv/stream-proxy?url=' + encodeURIComponent(url) + (referer ? '&ref=' + encodeURIComponent(referer) : ''));
+      let isUsingProxy = true;
 
       function updateBadge() {
         if (badge) {
