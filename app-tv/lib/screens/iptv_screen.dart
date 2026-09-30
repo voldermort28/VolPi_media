@@ -615,7 +615,7 @@ class _IptvScreenState extends State<IptvScreen> {
                         padding: const EdgeInsets.all(16),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: crossAxisCount,
-                          childAspectRatio: 1.15,
+                          childAspectRatio: 0.92,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 14,
                         ),
@@ -653,7 +653,7 @@ class _IptvScreenState extends State<IptvScreen> {
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Top Row: Pinned badge or Live indicator
+            // Top Row: Badges (Pinned, Time, Live, Category)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -680,31 +680,75 @@ class _IptvScreenState extends State<IptvScreen> {
                       ],
                     ),
                   )
+                else if (channel.displayTime.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0284C7).withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.access_time_rounded, color: Color(0xFF38BDF8), size: 9),
+                        const SizedBox(width: 3),
+                        Text(
+                          channel.displayTime,
+                          style: const TextStyle(
+                            color: Color(0xFF38BDF8),
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 else
                   const SizedBox(width: 12),
 
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.circle, color: Colors.redAccent, size: 6),
-                      SizedBox(width: 4),
-                      Text(
-                        'LIVE',
-                        style: TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 9,
-                          fontWeight: FontWeight.bold,
+                if (channel.isLive)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.4), width: 0.8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.circle, color: Colors.redAccent, size: 6),
+                        SizedBox(width: 4),
+                        Text(
+                          'LIVE',
+                          style: TextStyle(
+                            color: Colors.redAccent,
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                      ],
+                    ),
+                  )
+                else if (channel.category == 'OTHER_SPORTS')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purpleAccent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'Thể thao',
+                      style: TextStyle(
+                        color: Colors.purpleAccent,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
-                  ),
-                ),
+                    ),
+                  )
+                else
+                  const SizedBox(width: 12),
               ],
             ),
 
@@ -756,16 +800,17 @@ class _IptvScreenState extends State<IptvScreen> {
 
             const Spacer(),
 
-            // Channel Name
+            // Channel Name (Clean title, 2 lines)
             Text(
-              channel.name,
-              maxLines: 1,
+              channel.displayTitle,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 12,
+                height: 1.25,
               ),
             ),
             const SizedBox(height: 3),

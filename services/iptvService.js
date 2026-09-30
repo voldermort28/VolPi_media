@@ -395,6 +395,7 @@ function parseM3U(content) {
         channels.push({
           id: uniqueId,
           name: channelName,
+          cleanTitle: extractCleanTitle(channelName),
           logo: curMeta?.logo || '',
           url: streamUrl,
           proxyUrl: proxyUrl,
@@ -476,6 +477,25 @@ function parseMatchTime(name) {
     matchTime,
     matchTimestamp: dateObj.getTime(),
   };
+}
+
+/**
+ * Trims live/status indicators, match start time, and sport emojis from match title.
+ * Allows displaying match time on Line 1 and clean full team names on Line 2 without truncation.
+ * Example: "🟢 23:00 30/09 ⚽ Ba Lan U21 vs Thụy Điển U21 (HD XMEN)" -> "Ba Lan U21 vs Thụy Điển U21 (HD XMEN)"
+ */
+function extractCleanTitle(name) {
+  if (!name || typeof name !== 'string') return '';
+  let title = name;
+  const m = title.match(/\d{1,2}:\d{2}(\s+\d{1,2}[\/\.-]\d{1,2})?/);
+  if (m) {
+    let after = title.substring(m.index + m[0].length).trim();
+    after = after.replace(/^[\p{Emoji}\s\u200B-\u200D\uFE0F\-–—:]+/u, '').trim();
+    if (after) title = after;
+  } else {
+    title = title.replace(/^[\p{Emoji}\s\u200B-\u200D\uFE0F\-–—:]+/u, '').trim();
+  }
+  return title || name;
 }
 
 /**
@@ -655,9 +675,11 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
 
     const cat = classifyChannel(c.name, c.group);
     const timeInfo = parseMatchTime(c.name);
+    const cleanTitle = extractCleanTitle(c.name);
 
     return {
       ...c,
+      cleanTitle,
       sourceId: c.sourceId || 'pl-default',
       sourceName: c.sourceName || 'Chung',
       category: cat,
@@ -1163,6 +1185,7 @@ module.exports = {
   parseM3U,
   handleStreamProxy,
   parseMatchTime,
+  extractCleanTitle,
   classifyChannel,
   compareChannels,
   DEFAULT_SOURCE_URL,

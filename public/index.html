@@ -699,12 +699,23 @@
           html += '<div class="rounded-xl p-4 border ' + borderClass + ' glass-card space-y-3 flex flex-col justify-between">' +
             '<div class="flex items-center justify-between text-xs">' +
               '<span class="text-sky-400 font-bold truncate max-w-[170px]">' + (m.league || 'Bóng đá') + '</span>' +
-              '<span class="text-slate-400 font-mono text-[11px] bg-slate-800 px-2 py-0.5 rounded">' + (m.time || '') + '</span>' +
+              '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">⏰ ' + (m.time || '') + '</span>' +
             '</div>' +
-            '<div class="flex items-center justify-between gap-3 py-1">' +
-              '<div class="flex-1 text-right font-extrabold text-white text-xs truncate">' + (m.homeTeam || '') + '</div>' +
-              '<div class="px-2 py-0.5 rounded bg-rose-600/90 text-white text-[10px] font-black">VS</div>' +
-              '<div class="flex-1 text-left font-extrabold text-white text-xs truncate">' + (m.awayTeam || '') + '</div>' +
+            '<div class="space-y-1.5 py-1">' +
+              '<div class="flex items-center justify-between gap-2">' +
+                '<div class="flex items-center gap-2 flex-1 min-w-0">' +
+                  '<span class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>' +
+                  '<span class="font-extrabold text-white text-[13px] leading-tight break-words">' + (m.homeTeam || '') + '</span>' +
+                '</div>' +
+                '<span class="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded shrink-0">Chủ</span>' +
+              '</div>' +
+              '<div class="flex items-center justify-between gap-2">' +
+                '<div class="flex items-center gap-2 flex-1 min-w-0">' +
+                  '<span class="w-2 h-2 rounded-full bg-rose-400 shrink-0"></span>' +
+                  '<span class="font-extrabold text-white text-[13px] leading-tight break-words">' + (m.awayTeam || '') + '</span>' +
+                '</div>' +
+                '<span class="text-[10px] font-mono text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded shrink-0">Khách</span>' +
+              '</div>' +
             '</div>' +
             '<div class="flex items-center justify-between pt-2 border-t border-slate-800/60 text-[11px]">' +
               '<div>' + badgeHtml + '</div>' +

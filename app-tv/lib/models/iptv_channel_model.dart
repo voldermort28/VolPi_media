@@ -23,6 +23,7 @@ class IptvSourceModel {
 class IptvChannelModel {
   final String id;
   final String name;
+  final String cleanTitle;
   final String logo;
   final String url;
   final String proxyUrl;
@@ -32,10 +33,15 @@ class IptvChannelModel {
   final bool isHidden;
   final String sourceId;
   final String sourceName;
+  final bool isLive;
+  final String matchTime;
+  final int matchTimestamp;
+  final String category;
 
   const IptvChannelModel({
     required this.id,
     required this.name,
+    this.cleanTitle = '',
     this.logo = '',
     required this.url,
     this.proxyUrl = '',
@@ -45,7 +51,31 @@ class IptvChannelModel {
     this.isHidden = false,
     this.sourceId = 'pl-default',
     this.sourceName = 'Kênh Quốc Gia',
+    this.isLive = false,
+    this.matchTime = '',
+    this.matchTimestamp = 0,
+    this.category = 'FIXED_TV',
   });
+
+  static String extractCleanTitle(String rawName) {
+    if (rawName.isEmpty) return '';
+    final timeMatch = RegExp(r'\d{1,2}:\d{2}(\s+\d{1,2}[\/\.-]\d{1,2})?').firstMatch(rawName);
+    if (timeMatch != null) {
+      var after = rawName.substring(timeMatch.end).trim();
+      after = after.replaceFirst(RegExp(r'^[\s\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\-–—:]+', unicode: true), '').trim();
+      if (after.isNotEmpty) return after;
+    }
+    var cleaned = rawName.replaceFirst(RegExp(r'^[\s\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\-–—:]+', unicode: true), '').trim();
+    return cleaned.isNotEmpty ? cleaned : rawName;
+  }
+
+  static String extractMatchTime(String rawName) {
+    final timeMatch = RegExp(r'\d{1,2}:\d{2}(\s+\d{1,2}[\/\.-]\d{1,2})?').firstMatch(rawName);
+    return timeMatch != null ? timeMatch.group(0)! : '';
+  }
+
+  String get displayTitle => cleanTitle.isNotEmpty ? cleanTitle : extractCleanTitle(name);
+  String get displayTime => matchTime.isNotEmpty ? matchTime : extractMatchTime(name);
 
   factory IptvChannelModel.fromJson(Map<String, dynamic> json) {
     Map<String, String> parsedHeaders = {};
@@ -57,9 +87,14 @@ class IptvChannelModel {
       });
     }
 
+    final rawName = json['name']?.toString() ?? 'Kênh truyền hình';
+    final parsedCleanTitle = json['cleanTitle']?.toString() ?? '';
+    final parsedMatchTime = json['matchTime']?.toString() ?? '';
+
     return IptvChannelModel(
       id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Kênh truyền hình',
+      name: rawName,
+      cleanTitle: parsedCleanTitle.isNotEmpty ? parsedCleanTitle : extractCleanTitle(rawName),
       logo: json['logo']?.toString() ?? '',
       url: json['url']?.toString() ?? '',
       proxyUrl: json['proxyUrl']?.toString() ?? '',
@@ -69,6 +104,10 @@ class IptvChannelModel {
       isHidden: json['isHidden'] == true,
       sourceId: json['sourceId']?.toString() ?? 'pl-default',
       sourceName: json['sourceName']?.toString() ?? 'Kênh Quốc Gia',
+      isLive: json['isLive'] == true,
+      matchTime: parsedMatchTime.isNotEmpty ? parsedMatchTime : extractMatchTime(rawName),
+      matchTimestamp: json['matchTimestamp'] is int ? json['matchTimestamp'] : (int.tryParse(json['matchTimestamp']?.toString() ?? '0') ?? 0),
+      category: json['category']?.toString() ?? 'FIXED_TV',
     );
   }
 
@@ -76,6 +115,7 @@ class IptvChannelModel {
     return {
       'id': id,
       'name': name,
+      'cleanTitle': cleanTitle,
       'logo': logo,
       'url': url,
       'proxyUrl': proxyUrl,
@@ -85,6 +125,10 @@ class IptvChannelModel {
       'isHidden': isHidden,
       'sourceId': sourceId,
       'sourceName': sourceName,
+      'isLive': isLive,
+      'matchTime': matchTime,
+      'matchTimestamp': matchTimestamp,
+      'category': category,
     };
   }
 

@@ -319,13 +319,25 @@
 
       if (window.lucide) lucide.createIcons();
 
-      toast.classList.remove('translate-y-20', 'opacity-0');
-      toast.classList.add('translate-y-0', 'opacity-100');
-
       setTimeout(() => {
         toast.classList.remove('translate-y-0', 'opacity-100');
         toast.classList.add('translate-y-20', 'opacity-0');
       }, 3500);
+    }
+
+    // Clean match title helper
+    function cleanMatchName(name) {
+      if (!name || typeof name !== 'string') return '';
+      let title = name;
+      const m = title.match(/\d{1,2}:\d{2}(\s+\d{1,2}[\/\.-]\d{1,2})?/);
+      if (m) {
+        let after = title.substring(m.index + m[0].length).trim();
+        after = after.replace(/^[\p{Emoji}\s\u200B-\u200D\uFE0F\-–—:]+/u, '').trim();
+        if (after) title = after;
+      } else {
+        title = title.replace(/^[\p{Emoji}\s\u200B-\u200D\uFE0F\-–—:]+/u, '').trim();
+      }
+      return title || name;
     }
 
     // Logout
@@ -672,25 +684,36 @@
                 <span class="text-[11px] font-bold text-slate-500">TV</span>
               `}
             </td>
-            <td class="py-2.5 px-4 font-bold text-white max-w-[280px]" title="${c.name}">
-              <div class="flex flex-wrap items-center gap-1.5">
-                ${c.isLive ? `
-                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                    LIVE
-                  </span>
+            <td class="py-2.5 px-4 min-w-[260px] max-w-[420px]" title="${c.name}">
+              <div class="flex flex-col gap-1.5">
+                ${(c.isLive || c.matchTime || c.category === 'OTHER_SPORTS' || c.category === 'FOOTBALL') ? `
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    ${c.isLive ? `
+                      <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        LIVE
+                      </span>
+                    ` : ''}
+                    ${c.matchTime ? `
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                        ⏰ ${c.matchTime}
+                      </span>
+                    ` : ''}
+                    ${c.category === 'FOOTBALL' ? `
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/25">
+                        ⚽ Bóng đá
+                      </span>
+                    ` : ''}
+                    ${c.category === 'OTHER_SPORTS' ? `
+                      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/25">
+                        Thể thao
+                      </span>
+                    ` : ''}
+                  </div>
                 ` : ''}
-                ${c.matchTime ? `
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">
-                    ⏰ ${c.matchTime}
-                  </span>
-                ` : ''}
-                ${c.category === 'OTHER_SPORTS' ? `
-                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/25">
-                    Thể thao
-                  </span>
-                ` : ''}
-                <span class="truncate block max-w-full">${c.name}</span>
+                <div class="font-bold text-white text-[13px] leading-snug break-words">
+                  ${c.cleanTitle || cleanMatchName(c.name)}
+                </div>
               </div>
             </td>
             <td class="py-2.5 px-4">

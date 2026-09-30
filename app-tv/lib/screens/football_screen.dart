@@ -388,7 +388,7 @@ class _FootballScreenState extends State<FootballScreen> {
           crossAxisCount: crossAxisCount,
           crossAxisSpacing: 14,
           mainAxisSpacing: 14,
-          mainAxisExtent: 144,
+          mainAxisExtent: 168,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, idx) => _buildMatchCard(matches[idx]),
@@ -463,67 +463,76 @@ class _FootballScreenState extends State<FootballScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.black38,
+                    color: const Color(0xFF0284C7).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3), width: 0.8),
                   ),
-                  child: Text(
-                    match.time,
-                    style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.access_time_rounded, color: Color(0xFF38BDF8), size: 10),
+                      const SizedBox(width: 4),
+                      Text(
+                        match.time,
+                        style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
 
-            // Teams Row with Logos
-            Row(
+            // Teams Stacked Rows (Home & Away each get full width)
+            Column(
               children: [
                 // Home Team
-                Expanded(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          match.homeTeam,
-                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.right,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                Row(
+                  children: [
+                    _buildTeamLogo(match.homeLogo, teamName: match.homeTeam),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        match.homeTeam,
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(width: 8),
-                      _buildTeamLogo(match.homeLogo, teamName: match.homeTeam),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Chủ', style: TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
-
-                // VS Badge
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white12,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text('VS', style: TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-
+                const SizedBox(height: 6),
                 // Away Team
-                Expanded(
-                  child: Row(
-                    children: [
-                      _buildTeamLogo(match.awayLogo, teamName: match.awayTeam),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          match.awayTeam,
-                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                Row(
+                  children: [
+                    _buildTeamLogo(match.awayLogo, teamName: match.awayTeam),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        match.awayTeam,
+                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text('Khách', style: TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w600)),
+                    ),
+                  ],
                 ),
               ],
             ),
