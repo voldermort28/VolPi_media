@@ -93,7 +93,7 @@
     </div>
 
     <!-- Download Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
 
       <!-- Card 1: Android TV / Phone -->
       <div class="glass-card rounded-2xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between glow-cyan">
@@ -107,7 +107,7 @@
           </div>
 
           <h3 class="text-xl font-bold text-white mb-1">Android APK</h3>
-          <p class="text-slate-400 text-xs mb-4">Tương thích với Smart TV Android, Google TV, Android Box và Điện thoại Android (Android 5.0 trở lên).</p>
+          <p class="text-slate-400 text-xs mb-4">Tương thích Smart TV Android, Google TV, Android Box và Điện thoại Android (Android 5.0+).</p>
 
           <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 mb-6 flex items-center justify-between text-xs">
             <div>
@@ -128,7 +128,7 @@
                 <i data-lucide="qr-code" class="w-3.5 h-3.5 text-sky-400"></i>
                 <span>Quét mã QR tải nhanh</span>
               </div>
-              <p class="text-slate-400 leading-relaxed">Dùng camera điện thoại hoặc ứng dụng Downloader trên Android TV quét mã để tải về trực tiếp.</p>
+              <p class="text-slate-400 leading-relaxed">Dùng camera điện thoại hoặc ứng dụng Downloader trên TV quét mã để tải về.</p>
             </div>
           </div>
         </div>
@@ -152,8 +152,8 @@
             <span class="text-xs px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 font-bold">iOS / iPadOS</span>
           </div>
 
-          <h3 class="text-xl font-bold text-white mb-1">iOS IPA (TrollStore / Sideload)</h3>
-          <p class="text-slate-400 text-xs mb-4">Hỗ trợ cài trực tiếp qua TrollStore (không bị thu hồi chứng chỉ) hoặc Sideloadly, AltStore, ESign.</p>
+          <h3 class="text-xl font-bold text-white mb-1">iOS IPA</h3>
+          <p class="text-slate-400 text-xs mb-4">Cài trực tiếp qua TrollStore (không bị thu hồi chứng chỉ) hoặc Sideloadly, AltStore, ESign.</p>
 
           <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 mb-6 flex items-center justify-between text-xs">
             <div>
@@ -191,6 +191,56 @@
         </div>
       </div>
 
+      <!-- Card 3: macOS App -->
+      <div class="glass-card rounded-2xl p-6 sm:p-7 relative overflow-hidden flex flex-col justify-between glow-cyan">
+        <div class="absolute -top-16 -right-16 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <i data-lucide="laptop" class="w-7 h-7"></i>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">macOS Desktop</span>
+          </div>
+
+          <h3 class="text-xl font-bold text-white mb-1">macOS App</h3>
+          <p class="text-slate-400 text-xs mb-4">Bản Native Desktop cho MacBook, Mac mini, iMac (Apple Silicon M1-M4 & Intel).</p>
+
+          <div class="bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 mb-6 flex items-center justify-between text-xs">
+            <div>
+              <span class="text-slate-500 block">Tên tệp</span>
+              <span class="text-slate-200 font-medium">VolPi-Media-macOS.zip</span>
+            </div>
+            <div class="text-right">
+              <span class="text-slate-500 block">Dung lượng</span>
+              <span class="text-blue-400 font-semibold">~25 MB</span>
+            </div>
+          </div>
+
+          <!-- Features -->
+          <div class="space-y-2.5 mb-6 bg-slate-800/30 p-3.5 rounded-xl border border-slate-700/50 text-xs text-slate-300">
+            <div class="flex items-center gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+              <span>Giao diện Sidebar máy tính hiện đại</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+              <span>Điều khiển bằng cả bàn phím & chuột</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <i data-lucide="check" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+              <span>Phát mượt luồng HLS Apple AVPlayer</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <a id="macos-btn" href="/download/VolPi-Media-macOS.zip" download class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 transition-all">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>Tải Bản macOS (.zip)</span>
+          </a>
+        </div>
+      </div>
+
     </div>
 
     <!-- Changelog Section -->
@@ -199,7 +249,7 @@
         <div class="w-8 h-8 rounded-lg bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400">
           <i data-lucide="sparkles" class="w-4 h-4"></i>
         </div>
-        <h3 class="text-lg font-bold text-white">Điểm mới trong bản cập nhật <span id="changelog-version" class="text-sky-400 font-extrabold">v1.0.6</span></h3>
+        <h3 class="text-lg font-bold text-white">Điểm mới trong bản cập nhật <span id="changelog-version" class="text-sky-400 font-extrabold">v1.0.14</span></h3>
       </div>
       <div id="changelog-content" class="text-slate-300 text-sm leading-relaxed space-y-2 whitespace-pre-line bg-slate-900/40 p-4 rounded-xl border border-slate-800/60 font-mono text-xs">
         Đang tải thông tin...
@@ -207,27 +257,34 @@
     </div>
 
     <!-- Installation Guides -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs text-slate-400">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 text-xs text-slate-400">
       <div class="glass-panel p-4 rounded-xl">
         <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
           <i data-lucide="tv" class="w-4 h-4 text-sky-400"></i>
           <span>Cài trên Android TV</span>
         </div>
-        <p class="leading-relaxed">Mở ứng dụng <strong>Downloader</strong> trên TV, nhập link rút gọn hoặc quét mã QR phía trên để tải và cài đặt trực tiếp file APK.</p>
+        <p class="leading-relaxed">Mở ứng dụng <strong>Downloader</strong> trên TV, nhập link rút gọn hoặc quét mã QR để tải và cài đặt trực tiếp file APK.</p>
       </div>
       <div class="glass-panel p-4 rounded-xl">
         <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
           <i data-lucide="smartphone" class="w-4 h-4 text-purple-400"></i>
-          <span>Cài trên iOS (TrollStore)</span>
+          <span>Cài trên iPhone / iPad</span>
         </div>
-        <p class="leading-relaxed">Mở trình duyệt Safari trên iPhone, bấm nút <strong>"Cài Nhanh qua TrollStore"</strong> để ứng dụng tự động nạp và cài đặt vĩnh viễn.</p>
+        <p class="leading-relaxed">Mở Safari trên iPhone, bấm <strong>"Cài Nhanh qua TrollStore"</strong> để ứng dụng tự động nạp và cài đặt vĩnh viễn.</p>
+      </div>
+      <div class="glass-panel p-4 rounded-xl">
+        <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
+          <i data-lucide="laptop" class="w-4 h-4 text-blue-400"></i>
+          <span>Cài trên macOS</span>
+        </div>
+        <p class="leading-relaxed">Tải file <strong>.zip</strong>, giải nén và kéo file <strong>volpi_media.app</strong> vào thư mục <strong>Applications</strong> để mở sử dụng.</p>
       </div>
       <div class="glass-panel p-4 rounded-xl">
         <div class="font-bold text-slate-200 mb-2 flex items-center gap-2 text-sm">
           <i data-lucide="refresh-cw" class="w-4 h-4 text-emerald-400"></i>
-          <span>Cập nhật OTA tự động</span>
+          <span>Cập nhật tự động</span>
         </div>
-        <p class="leading-relaxed">Sau khi cài đặt lần đầu, mỗi khi có bản mới, ứng dụng sẽ <strong>tự động thông báo và cập nhật 1 chạm ngay trong app</strong> mà không cần tải lại thủ công.</p>
+        <p class="leading-relaxed">Sau khi cài đặt lần đầu, ứng dụng sẽ <strong>tự động thông báo khi có bản mới</strong> để bạn cập nhật nhanh chóng.</p>
       </div>
     </div>
 
@@ -260,7 +317,9 @@
           document.getElementById('trollstore-btn').href = 'trollstore://install?url=' + encodeURIComponent(data.ipaUrl);
           document.getElementById('ipa-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=100x100&margin=4&data=' + encodeURIComponent(data.ipaUrl);
         }
-      })
+        if (data.macosUrl) {
+          document.getElementById('macos-btn').href = data.macosUrl;
+        }
       .catch(err => console.error('Error fetching version:', err));
   </script>
 </body>

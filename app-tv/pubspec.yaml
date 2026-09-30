@@ -1,7 +1,7 @@
 name: volpi_media
-description: "VolPi Media - Ứng dụng xem Trực tiếp bóng đá, Anime Yumei và Phim lẻ cho Android TV, iPhone và iPad"
+description: "VolPi Media - Ứng dụng xem Trực tiếp bóng đá, Anime Yumei và Phim lẻ cho Android TV, iPhone, iPad và macOS"
 publish_to: 'none'
-version: 1.0.13+14
+version: 1.0.14+15
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

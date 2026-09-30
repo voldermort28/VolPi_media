@@ -168,8 +168,8 @@ app.post("/api/upload-release", (req, res) => {
   }
 
   const filename = req.query.filename;
-  if (!filename || (!filename.endsWith(".apk") && !filename.endsWith(".ipa"))) {
-    return res.status(400).json({ error: "Invalid filename. Must end with .apk or .ipa" });
+  if (!filename || (!filename.endsWith(".apk") && !filename.endsWith(".ipa") && !filename.endsWith(".zip"))) {
+    return res.status(400).json({ error: "Invalid filename. Must end with .apk, .ipa or .zip" });
   }
 
   const downloadDir = path.join(__dirname, "public", "download");
@@ -179,7 +179,10 @@ app.post("/api/upload-release", (req, res) => {
 
   const isApk = filename.endsWith(".apk");
   const isIpa = filename.endsWith(".ipa");
-  const targetFilename = isApk ? "VolPi-Media-AndroidTV.apk" : "VolPi-Media-iOS.ipa";
+  const isZip = filename.endsWith(".zip");
+  const targetFilename = isApk
+    ? "VolPi-Media-AndroidTV.apk"
+    : (isIpa ? "VolPi-Media-iOS.ipa" : "VolPi-Media-macOS.zip");
   const tmpPath = path.join(downloadDir, `${targetFilename}.tmp`);
   const finalFilePath = path.join(downloadDir, targetFilename);
 
@@ -200,6 +203,7 @@ app.post("/api/upload-release", (req, res) => {
           if (
             (isApk && f.toLowerCase().endsWith(".apk")) ||
             (isIpa && f.toLowerCase().endsWith(".ipa")) ||
+            (isZip && f.toLowerCase().endsWith(".zip")) ||
             f.endsWith(".tmp") ||
             f.endsWith(".part")
           ) {
@@ -220,6 +224,7 @@ app.post("/api/upload-release", (req, res) => {
       const version = req.query.version;
       if (version) {
         const versionFile = path.join(__dirname, "version.json");
+        const publicVersionFile = path.join(downloadDir, "version.json");
         let data = {};
         if (fs.existsSync(versionFile)) {
           try {
@@ -230,8 +235,10 @@ app.post("/api/upload-release", (req, res) => {
         data.tag_name = version.startsWith("v") ? version : `v${version}`;
         data.apkUrl = "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk";
         data.ipaUrl = "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa";
+        data.macosUrl = "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip";
         data.updated_at = new Date().toISOString();
         fs.writeFileSync(versionFile, JSON.stringify(data, null, 2), "utf-8");
+        try { fs.writeFileSync(publicVersionFile, JSON.stringify(data, null, 2), "utf-8"); } catch (_) {}
       }
 
       const size = fs.existsSync(finalFilePath) ? fs.statSync(finalFilePath).size : 0;

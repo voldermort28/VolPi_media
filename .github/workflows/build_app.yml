@@ -233,3 +233,108 @@ jobs:
           curl -f -X POST -H "Content-Type: application/octet-stream" \
             --data-binary "@app-tv/VolPi-Media-iOS.ipa" \
             "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.RELEASE_TAG }}&token=volpi_ota_deploy_secret_9988" || true
+
+  build-macos:
+    name: Build macOS Desktop App (.app / .zip)
+    runs-on: macos-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Scaffold Platform Wrapper
+        working-directory: app-tv
+        run: |
+          cp pubspec.yaml /tmp/pubspec.yaml || true
+          mkdir -p /tmp/macos_entitlements
+          cp macos/Runner/*.entitlements /tmp/macos_entitlements/ 2>/dev/null || true
+          flutter create . --platforms=macos --org=com.volpi --project-name=volpi_media
+          mkdir -p macos/Runner
+          cp /tmp/macos_entitlements/*.entitlements macos/Runner/ 2>/dev/null || true
+          cp /tmp/pubspec.yaml pubspec.yaml || true
+
+          # Grant Sandbox Network Entitlements for IPTV & API streaming
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" macos/Runner/DebugProfile.entitlements 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.client true" macos/Runner/DebugProfile.entitlements
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.client bool true" macos/Runner/Release.entitlements 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.client true" macos/Runner/Release.entitlements
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.server bool true" macos/Runner/DebugProfile.entitlements 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.server true" macos/Runner/DebugProfile.entitlements
+          /usr/libexec/PlistBuddy -c "Add :com.apple.security.network.server bool true" macos/Runner/Release.entitlements 2>/dev/null || /usr/libexec/PlistBuddy -c "Set :com.apple.security.network.server true" macos/Runner/Release.entitlements
+
+          # Configure release build settings for CI runner
+          mkdir -p macos/Flutter
+          echo "CODE_SIGNING_ALLOWED=NO" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY=-" >> macos/Flutter/Release.xcconfig
+
+      - name: Get Dependencies
+        working-directory: app-tv
+        run: flutter pub get
+
+      - name: Build macOS App (Release)
+        working-directory: app-tv
+        run: |
+          sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Development";/CODE_SIGN_IDENTITY = "-";/g' macos/Runner.xcodeproj/project.pbxproj || true
+          sed -i '' 's/buildSettings = {/buildSettings = {\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "-";\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;/g' macos/Runner.xcodeproj/project.pbxproj || true
+          flutter build macos --release
+
+      - name: Extract Release Tag
+        working-directory: app-tv
+        run: |
+          RAW_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ' | tr -d '\r')
+          CLEAN_VERSION=$(echo $RAW_VERSION | cut -d '+' -f 1)
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            RELEASE_TAG="${{ github.ref_name }}"
+          else
+            RELEASE_TAG="v${CLEAN_VERSION}"
+          fi
+          echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
+
+      - name: Create macOS Zip Package
+        working-directory: app-tv
+        run: |
+          APP_PATH=$(find build/macos -name "*.app" -type d | head -n 1)
+          if [ -n "$APP_PATH" ]; then
+            APP_DIR=$(dirname "$APP_PATH")
+            APP_NAME=$(basename "$APP_PATH")
+            echo "Target .app found: $APP_PATH"
+            # Apply ad-hoc signature so macOS allows opening
+            codesign --force --deep --sign - "$APP_PATH" || true
+            cd "$APP_DIR"
+            zip -r -y "../../../VolPi-Media-macOS.zip" "$APP_NAME"
+            cd ../../..
+            cp VolPi-Media-macOS.zip "VolPi-Media-macOS-${RELEASE_TAG}.zip"
+          else
+            echo "Error: .app file not found in build/macos"
+            exit 1
+          fi
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VolPi-Media-macOS
+          path: app-tv/VolPi-Media-macOS.zip
+
+      - name: Attach macOS Zip to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          files: |
+            app-tv/VolPi-Media-macOS.zip
+            app-tv/VolPi-Media-macOS-${{ env.RELEASE_TAG }}.zip
+
+      - name: Deploy macOS Zip to VPS OTA Server
+        continue-on-error: true
+        run: |
+          echo "Deploying macOS Zip to VPS OTA server..."
+          curl -f -X POST -H "Content-Type: application/octet-stream" \
+            --data-binary "@app-tv/VolPi-Media-macOS.zip" \
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-macOS.zip&version=${{ env.RELEASE_TAG }}&token=volpi_ota_deploy_secret_9988" || true

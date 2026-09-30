@@ -72,6 +72,18 @@ class _UpdateDialogState extends State<UpdateDialog> {
           });
         }
       }
+    } else {
+      // macOS / Desktop platforms
+      final targetUrl = widget.updateInfo.releaseUrl.isNotEmpty
+          ? widget.updateInfo.releaseUrl
+          : 'https://stremio.laboon.vn/download';
+      final uri = Uri.parse(targetUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -283,7 +295,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
                                 ? 'Đang cập nhật...'
                                 : Platform.isIOS
                                     ? 'Cài qua TrollStore'
-                                    : 'Cập nhật ngay',
+                                    : Platform.isAndroid
+                                        ? 'Cập nhật ngay'
+                                        : 'Tải bản mới',
                             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ],

@@ -1,9 +1,10 @@
 {
-  "version": "1.0.13",
-  "build": 14,
-  "tag_name": "v1.0.13",
-  "changelog": "• Tính năng IPTV mới: Tích hợp trình phát IPTV đa nguồn, bộ lọc nguồn, đồng bộ trực tiếp với Web.\n• Hỗ trợ luồng đa âm thanh (multi-track audio) và LL-HLS qua VPS Proxy.\n• Nâng cấp danh sách kênh Quốc Gia & Địa Phương CDN FPT/Viettel siêu tốc.\n• Tối ưu tua nhanh mượt mà bằng remote Android TV.\n• Tối ưu thumbnail dung lượng siêu nhẹ.",
+  "version": "1.0.14",
+  "build": 15,
+  "tag_name": "v1.0.14",
+  "changelog": "• Bổ sung bản cài đặt Native Desktop cho macOS (MacBook, Mac mini, iMac) hỗ trợ điều hướng phím & chuột.\n• Giao diện Sidebar hiện đại: Gom nhóm danh mục Thể Thao (Bóng đá, Môn khác), Kênh cố định và Nguồn phát bên trái.\n• Hiển thị thời gian và tên 2 đội bóng trên dòng riêng biệt rõ ràng, không bị che khuất.\n• Tối ưu luồng phát HLS tương thích chuẩn Apple AVPlayer trên iOS và macOS.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-29T08:28:00Z"
+  "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
+  "published_at": "2026-10-01T01:15:00Z"
 }

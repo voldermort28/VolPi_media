@@ -1,9 +1,10 @@
 {
-  "version": "1.0.11",
-  "build": 12,
-  "tag_name": "v1.0.11",
-  "changelog": "• Bổ sung Dropdown Menu lọc theo từng nguồn Link / File IPTV riêng biệt (phân biệt rõ ràng giữa Link Bóng Đá Hôm Nay, Link Truyền Hình Quốc Gia, Playlist M3U cá nhân).\n• Quản lý đa nguồn phát tập trung: Cho phép thêm đồng thời nhiều link và file playlist M3U cùng lúc trên stremio.laboon.vn kèm nút bật/tắt hoặc xóa nguồn.\n• Giao diện TV tối ưu: Hỗ trợ remote D-pad chọn nhanh nguồn phát qua popup menu mượt mà, tự động cập nhật lại danh mục và số lượng kênh tương ứng.",
+  "version": "1.0.14",
+  "build": 15,
+  "tag_name": "v1.0.14",
+  "changelog": "• Bổ sung bản cài đặt Native Desktop cho macOS (MacBook, Mac mini, iMac) hỗ trợ điều hướng phím & chuột.\n• Giao diện Sidebar hiện đại: Gom nhóm danh mục Thể Thao (Bóng đá, Môn khác), Kênh cố định và Nguồn phát bên trái.\n• Hiển thị thời gian và tên 2 đội bóng trên dòng riêng biệt rõ ràng, không bị che khuất.\n• Tối ưu luồng phát HLS tương thích chuẩn Apple AVPlayer trên iOS và macOS.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
-  "published_at": "2026-09-29T07:25:00Z"
+  "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
+  "published_at": "2026-10-01T01:15:00Z"
 }
