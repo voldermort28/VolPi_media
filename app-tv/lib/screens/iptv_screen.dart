@@ -424,254 +424,543 @@ class _IptvScreenState extends State<IptvScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool isLargeScreen = constraints.maxWidth >= 900;
-        final bool isMediumScreen = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+        final bool showSidebar = constraints.maxWidth >= 700;
+        final bool isLargeScreen = constraints.maxWidth >= 1100;
+        final bool isMediumScreen = constraints.maxWidth >= 850 && constraints.maxWidth < 1100;
 
         int crossAxisCount = 2;
         if (isLargeScreen) {
-          crossAxisCount = 5;
+          crossAxisCount = 4;
         } else if (isMediumScreen) {
           crossAxisCount = 3;
         }
 
         return Scaffold(
           backgroundColor: const Color(0xFF0F172A),
-          body: Column(
-            children: [
-              // Top Bar: Title, Source Dropdown Menu, Search, Refresh Button
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
-                ),
-                child: Row(
+          body: showSidebar
+              ? Row(
                   children: [
-                    // Header title & count
+                    // LEFT SIDEBAR (Category, Source, Groups)
+                    _buildLeftSidebar(sources, groups),
+
+                    // RIGHT MAIN CONTENT (Header & Full Height Channel Grid)
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.live_tv_rounded, color: Color(0xFF38BDF8), size: 22),
-                              const SizedBox(width: 8),
-                              const Text(
-                                'Truyền Hình (IPTV)',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0284C7).withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.5)),
-                                ),
-                                child: Text(
-                                  '${filteredChannels.length} / ${_allChannels.length} kênh',
-                                  style: const TextStyle(
-                                    color: Color(0xFF38BDF8),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'Đồng bộ tức thì từ stremio.laboon.vn • D-pad Lên/Xuống để chuyển kênh',
-                            style: TextStyle(color: Colors.white38, fontSize: 11),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // DROPDOWN MENU: BỘ LỌC THEO NGUỒN LINK PLAYLIST
-                    TvFocusableCard(
-                      onTap: () => _showSourceSelectionDialog(sources),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        height: 38,
-                        margin: const EdgeInsets.only(right: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _selectedSourceId != 'ALL'
-                              ? const Color(0xFF0284C7).withOpacity(0.2)
-                              : const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _selectedSourceId != 'ALL'
-                                ? const Color(0xFF38BDF8)
-                                : const Color(0xFF334155),
-                            width: _selectedSourceId != 'ALL' ? 1.4 : 1.0,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _selectedSourceId != 'ALL' ? Icons.filter_alt_rounded : Icons.filter_alt_outlined,
-                              color: const Color(0xFF38BDF8),
-                              size: 16,
-                            ),
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: BoxConstraints(maxWidth: isLargeScreen ? 160 : 110),
-                              child: Text(
-                                currentSource.name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 20),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // Search Field (Large & Medium screen)
-                    if (constraints.maxWidth >= 680)
-                      Container(
-                        width: 200,
-                        height: 38,
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
-                          decoration: InputDecoration(
-                            hintText: 'Tìm kiếm kênh...',
-                            hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                            prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 16),
-                            suffixIcon: _searchQuery.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
-                                    onPressed: () {
-                                      setState(() {
-                                        _searchController.clear();
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  )
-                                : null,
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                          ),
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val.trim();
-                            });
-                          },
-                        ),
-                      ),
-
-                    // Refresh Button (1-click sync from server)
-                    TvFocusableCard(
-                      onTap: _isRefreshing
-                          ? () {}
-                          : () {
-                              _loadChannels(forceRefresh: true, triggerServerFetch: true);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Đang làm mới danh sách kênh từ nguồn phát...'),
-                                  backgroundColor: Color(0xFF0284C7),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFF334155)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _isRefreshing
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Color(0xFF38BDF8),
-                                    ),
-                                  )
-                                : const Icon(Icons.rotate_right_rounded, color: Color(0xFF38BDF8), size: 18),
-                            const SizedBox(width: 6),
-                            const Text(
-                              'Làm mới',
-                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
+                      child: _buildMainContent(filteredChannels, crossAxisCount, isLargeScreen),
                     ),
                   ],
+                )
+              : _buildMobileContent(sources, groups, filteredChannels, crossAxisCount),
+        );
+      },
+    );
+  }
+
+  Widget _buildLeftSidebar(List<IptvSourceModel> sources, List<String> groups) {
+    return Container(
+      width: 250,
+      decoration: const BoxDecoration(
+        color: Color(0xFF0B1322),
+        border: Border(right: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sidebar Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3)),
+                  ),
+                  child: const Icon(Icons.live_tv_rounded, color: Color(0xFF38BDF8), size: 20),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TRUYỀN HÌNH',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      Text(
+                        'IPTV & Thể Thao',
+                        style: TextStyle(
+                          color: Color(0xFF38BDF8),
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(color: Color(0xFF1E293B), height: 1, thickness: 1),
+
+          // Sidebar Navigation List
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              children: [
+                const Padding(
+                  padding: EdgeInsets.only(left: 6, bottom: 8),
+                  child: Text(
+                    'MÔN THỂ THAO & PHÂN LOẠI',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+
+                // Categories
+                ...kIptvCategories.map((cat) {
+                  final isSelected = _selectedCategory == cat.id;
+                  final count = _getCategoryCount(cat.id);
+
+                  Color activeColor = const Color(0xFF0284C7);
+                  Color activeBorder = const Color(0xFF38BDF8);
+                  Color countBadgeBg = const Color(0xFF075985);
+
+                  if (cat.id == 'FOOTBALL') {
+                    activeColor = const Color(0xFF059669);
+                    activeBorder = const Color(0xFF34D399);
+                    countBadgeBg = const Color(0xFF064E3B);
+                  } else if (cat.id == 'OTHER_SPORTS') {
+                    activeColor = const Color(0xFF7C3AED);
+                    activeBorder = const Color(0xFFA78BFA);
+                    countBadgeBg = const Color(0xFF4C1D95);
+                  } else if (cat.id == 'PINNED') {
+                    activeColor = const Color(0xFFD97706);
+                    activeBorder = const Color(0xFFF59E0B);
+                    countBadgeBg = const Color(0xFF78350F);
+                  } else if (cat.id == 'ALL') {
+                    activeColor = const Color(0xFF334155);
+                    activeBorder = const Color(0xFF64748B);
+                    countBadgeBg = const Color(0xFF1E293B);
+                  }
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: TvFocusableCard(
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = cat.id;
+                          _selectedGroup = 'ALL';
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                        decoration: BoxDecoration(
+                          color: isSelected ? activeColor : const Color(0xFF161E2E),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? activeBorder : const Color(0xFF1E293B),
+                            width: isSelected ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              cat.icon,
+                              size: 18,
+                              color: isSelected ? Colors.white : Colors.white60,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                cat.title,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white70,
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected ? countBadgeBg : const Color(0xFF0F172A),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected ? activeBorder.withOpacity(0.5) : const Color(0xFF334155),
+                                  width: 0.6,
+                                ),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+
+                const SizedBox(height: 12),
+                const Padding(
+                  padding: EdgeInsets.only(left: 6, bottom: 8),
+                  child: Text(
+                    'NGUỒN PLAYLIST',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+
+                TvFocusableCard(
+                  onTap: () => _showSourceSelectionDialog(sources),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: _selectedSourceId != 'ALL'
+                          ? const Color(0xFF0284C7).withOpacity(0.2)
+                          : const Color(0xFF161E2E),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _selectedSourceId != 'ALL' ? const Color(0xFF38BDF8) : const Color(0xFF1E293B),
+                        width: 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.playlist_play_rounded, size: 18, color: Color(0xFF38BDF8)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            sources.firstWhere((s) => s.id == _selectedSourceId, orElse: () => sources.first).name,
+                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.arrow_drop_down_rounded, color: Colors.white60, size: 20),
+                      ],
+                    ),
+                  ),
+                ),
+
+                if (groups.length > 2) ...[
+                  const SizedBox(height: 14),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6, bottom: 8),
+                    child: Text(
+                      'NHÓM ĐÀI / GIẢI ĐẤU',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                  ),
+                  ...groups.map((group) {
+                    final isSelected = _selectedGroup == group;
+                    final isFav = group == '⭐ Yêu Thích';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: TvFocusableCard(
+                        onTap: () {
+                          setState(() {
+                            _selectedGroup = group;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? (isFav ? const Color(0xFFD97706) : const Color(0xFF0284C7))
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isSelected
+                                  ? (isFav ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8))
+                                  : Colors.transparent,
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Text(
+                            group == 'ALL' ? 'Tất cả nhóm' : group,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.white60,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainContent(List<IptvChannelModel> filteredChannels, int crossAxisCount, bool isLargeScreen) {
+    return Column(
+      children: [
+        // Top Toolbar
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+          ),
+          child: Row(
+            children: [
+              Text(
+                _getCategoryTitle(_selectedCategory),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.5)),
+                ),
+                child: Text(
+                  '${filteredChannels.length} / ${_allChannels.length} kênh',
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
 
-              // 1. Sport & Category Filter Pills (Bóng đá default first)
-              _buildCategoryPills(),
+              const Spacer(),
 
-              // 2. Sub-group Filter Pills (only when multiple groups exist)
-              _buildGroupPills(groups),
+              // Search bar
+              SizedBox(
+                width: 220,
+                height: 38,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF161E2E),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: 'Tìm kiếm kênh...',
+                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                      prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 16),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    onChanged: (val) {
+                      setState(() {
+                        _searchQuery = val.trim();
+                      });
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
 
-              // Channels Grid
-              Expanded(
-                child: filteredChannels.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.tv_off_rounded, color: Colors.white24, size: 56),
-                            const SizedBox(height: 12),
-                            Text(
-                              _searchQuery.isNotEmpty
-                                  ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
-                                  : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
-                              style: const TextStyle(color: Colors.white60, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          childAspectRatio: 0.92,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                        ),
-                        itemCount: filteredChannels.length,
-                        itemBuilder: (context, index) {
-                          final channel = filteredChannels[index];
-                          return _buildChannelCard(channel, filteredChannels);
-                        },
+              // Refresh Button
+              TvFocusableCard(
+                onTap: _isRefreshing
+                    ? () {}
+                    : () {
+                        _loadChannels(forceRefresh: true, triggerServerFetch: true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đang làm mới danh sách kênh từ nguồn phát...'),
+                            backgroundColor: Color(0xFF0284C7),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF334155)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _isRefreshing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Color(0xFF38BDF8),
+                              ),
+                            )
+                          : const Icon(Icons.rotate_right_rounded, color: Color(0xFF38BDF8), size: 18),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Làm mới',
+                        style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
                       ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
-        );
-      },
+        ),
+
+        // Channels Grid (Full height!)
+        Expanded(
+          child: filteredChannels.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.tv_off_rounded, color: Colors.white24, size: 56),
+                      const SizedBox(height: 12),
+                      Text(
+                        _searchQuery.isNotEmpty
+                            ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
+                            : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
+                        style: const TextStyle(color: Colors.white60, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: 0.92,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                  ),
+                  itemCount: filteredChannels.length,
+                  itemBuilder: (context, index) {
+                    final channel = filteredChannels[index];
+                    return _buildChannelCard(channel, filteredChannels);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMobileContent(List<IptvSourceModel> sources, List<String> groups, List<IptvChannelModel> filteredChannels, int crossAxisCount) {
+    return Column(
+      children: [
+        // Mobile Top Bar
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.live_tv_rounded, color: Color(0xFF38BDF8), size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Truyền Hình',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              TvFocusableCard(
+                onTap: () => _showSourceSelectionDialog(sources),
+                borderRadius: BorderRadius.circular(6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                  color: const Color(0xFF1E293B),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.playlist_play_rounded, color: Color(0xFF38BDF8), size: 16),
+                      SizedBox(width: 4),
+                      Text('Nguồn', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Horizontal Category Tabs
+        _buildCategoryPills(),
+        _buildGroupPills(groups),
+
+        // Grid
+        Expanded(
+          child: filteredChannels.isEmpty
+              ? Center(
+                  child: Text(
+                    'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
+                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  ),
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.all(12),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: 0.92,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                  ),
+                  itemCount: filteredChannels.length,
+                  itemBuilder: (context, index) {
+                    final channel = filteredChannels[index];
+                    return _buildChannelCard(channel, filteredChannels);
+                  },
+                ),
+        ),
+      ],
     );
   }
 
