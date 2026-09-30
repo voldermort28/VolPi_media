@@ -213,6 +213,49 @@ function saveConfig(cfg) {
 }
 
 /**
+ * Automatically converts FLV streams to native HLS (.m3u8) endpoints.
+ * Apple AVPlayer (iOS/macOS) and Hls.js do not support .flv and fail with error -12939.
+ */
+function convertFlvToHls(url) {
+  if (!url || typeof url !== 'string') return url;
+  let u = url.trim();
+
+  // 1. cdnflv.xbdbotv.live/live/{ID}.flv -> https://cdnhls.xbdbotv.live/live/{ID}/index.m3u8
+  if (u.includes('cdnflv.xbdbotv.live/live/')) {
+    return u.replace('cdnflv.xbdbotv.live/live/', 'cdnhls.xbdbotv.live/live/').replace(/\.flv(\?|$)/i, '/index.m3u8$1');
+  }
+
+  // 2. flv.lauthaitv.cc/live/{ID}.flv -> https://hls.lauthaitv.cc/live/{ID}/index.m3u8
+  if (u.includes('flv.lauthaitv.cc/live/')) {
+    return u.replace('flv.lauthaitv.cc/live/', 'hls.lauthaitv.cc/live/').replace(/\.flv(\?|$)/i, '/index.m3u8$1');
+  }
+
+  // 3. live2.zundrixmediapipeline.com, live05.meung.app, live2.zktsva.app
+  if (u.includes('zundrixmediapipeline.com') || u.includes('meung.app') || u.includes('zktsva.app')) {
+    return u.replace(/\.flv(\?|$)/i, '.m3u8$1');
+  }
+
+  // 4. live2.domaincdn.cc/livecdn/channel-(\d+).flv -> https://live2.zundrixmediapipeline.com/live/channel$1.m3u8
+  const mDomain = u.match(/domaincdn\.cc\/livecdn\/channel-?(\d+)\.flv/i);
+  if (mDomain) {
+    return `https://live2.zundrixmediapipeline.com/live/channel${mDomain[1]}.m3u8`;
+  }
+
+  // 5. live2.pro2cdnlive.com/live/channel-?(\d+).flv -> https://live2.zundrixmediapipeline.com/live/channel$1.m3u8
+  const mPro2 = u.match(/pro2cdnlive\.com\/live\/channel-?(\d+)\.flv/i);
+  if (mPro2) {
+    return `https://live2.zundrixmediapipeline.com/live/channel${mPro2[1]}.m3u8`;
+  }
+
+  // 6. General fallback: if URL has .flv, swap with .m3u8
+  if (u.includes('.flv')) {
+    return u.replace(/\.flv(\?|$)/i, '.m3u8$1');
+  }
+
+  return u;
+}
+
+/**
  * Robust M3U / Extended M3U Parser
  * Parses #EXTINF attributes: tvg-id, tvg-name, tvg-logo, group-title, http-user-agent, http-referrer
  */
@@ -324,7 +367,14 @@ function parseM3U(content) {
           }
         }
 
-        const channelName = curMeta?.name || `Kênh #${channels.length + 1}`;
+        // Convert FLV to HLS for Apple AVPlayer / Hls.js compatibility
+        const originalUrl = streamUrl;
+        streamUrl = convertFlvToHls(streamUrl);
+        let channelName = curMeta?.name || `Kênh #${channels.length + 1}`;
+        if (streamUrl !== originalUrl || originalUrl.toLowerCase().includes('.flv')) {
+          channelName = channelName.replace(/\[flv\]/gi, '[HLS]').replace(/\(flv\)/gi, '(HLS)');
+        }
+
         const rawGroup = curMeta?.group || 'Kênh Chung';
         const normalizedGroup = normalizeGroupName(rawGroup, channelName);
 
@@ -890,11 +940,12 @@ async function handleStreamProxy(req, res) {
     return res.sendStatus(200);
   }
 
-  const targetUrl = req.query.url;
-  if (!targetUrl || (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://'))) {
+  const rawTarget = req.query.url;
+  if (!rawTarget || (!rawTarget.startsWith('http://') && !rawTarget.startsWith('https://'))) {
     return res.status(400).send('Invalid or missing stream URL parameter');
   }
 
+  const targetUrl = convertFlvToHls(rawTarget);
   const referer = req.query.ref || '';
   const userAgent = req.query.ua || '';
 
@@ -979,6 +1030,7 @@ async function handleStreamProxy(req, res) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        res.setHeader('Content-Length', Buffer.byteLength(rewritten));
         return res.status(upstreamRes.status).send(rewritten);
       } else {
         res.setHeader('Content-Type', contentType || 'text/plain');
@@ -988,18 +1040,52 @@ async function handleStreamProxy(req, res) {
 
     // Binary stream chunk (.ts, AAC, audio/video)
     res.setHeader('Content-Type', contentType || 'video/MP2T');
+    res.setHeader('Accept-Ranges', upstreamRes.headers['accept-ranges'] || 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    // Handle Range request probe from Apple AVPlayer (resolves error -12939)
+    const rangeHeader = req.headers['range'];
+    if (rangeHeader && upstreamRes.status === 200) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
+      if (match) {
+        const start = parseInt(match[1], 10) || 0;
+        const end = match[2] ? parseInt(match[2], 10) : null;
+
+        // If client requested a small range probe (e.g. bytes=0-1 or range <= 64KB)
+        if (end !== null && (end - start) < 65536) {
+          const neededBytes = end + 1;
+          const chunks = [];
+          let received = 0;
+
+          try {
+            for await (const chunk of upstreamRes.data) {
+              chunks.push(chunk);
+              received += chunk.length;
+              if (received >= neededBytes) break;
+            }
+            const fullBuf = Buffer.concat(chunks);
+            const slice = fullBuf.subarray(start, Math.min(end + 1, fullBuf.length));
+            const total = upstreamRes.headers['content-length'] || '*';
+
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${start}-${start + slice.length - 1}/${total}`);
+            res.setHeader('Content-Length', slice.length);
+            return res.end(slice);
+          } catch (probeErr) {
+            console.error('[Stream Proxy Range Probe Error]:', probeErr.message);
+          }
+        }
+      }
+    }
+
     if (upstreamRes.headers['content-length']) {
       res.setHeader('Content-Length', upstreamRes.headers['content-length']);
     }
     if (upstreamRes.headers['content-range']) {
       res.setHeader('Content-Range', upstreamRes.headers['content-range']);
     }
-    if (upstreamRes.headers['accept-ranges']) {
-      res.setHeader('Accept-Ranges', upstreamRes.headers['accept-ranges']);
-    }
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.status(upstreamRes.status);
 
+    res.status(upstreamRes.status);
     upstreamRes.data.on('error', (err) => {
       console.error('[Stream Proxy Stream Error]:', err.message);
       if (!res.headersSent) res.status(502).end();

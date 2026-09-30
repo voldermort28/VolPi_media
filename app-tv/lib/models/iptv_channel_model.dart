@@ -88,30 +88,60 @@ class IptvChannelModel {
     };
   }
 
+  /// Automatically converts FLV streams to native HLS (.m3u8) endpoints.
+  /// Apple AVPlayer (iOS/macOS) does not support .flv and fails with error -12939.
+  static String convertFlvToHls(String rawUrl) {
+    if (rawUrl.isEmpty) return rawUrl;
+    var u = rawUrl.trim();
+    if (u.contains('cdnflv.xbdbotv.live/live/')) {
+      return u.replaceAll('cdnflv.xbdbotv.live/live/', 'cdnhls.xbdbotv.live/live/').replaceAll(RegExp(r'\.flv(\?|$)', caseSensitive: false), r'/index.m3u8$1');
+    }
+    if (u.contains('flv.lauthaitv.cc/live/')) {
+      return u.replaceAll('flv.lauthaitv.cc/live/', 'hls.lauthaitv.cc/live/').replaceAll(RegExp(r'\.flv(\?|$)', caseSensitive: false), r'/index.m3u8$1');
+    }
+    if (u.contains('zundrixmediapipeline.com') || u.contains('meung.app') || u.contains('zktsva.app')) {
+      return u.replaceAll(RegExp(r'\.flv(\?|$)', caseSensitive: false), r'.m3u8$1');
+    }
+    final mDomain = RegExp(r'domaincdn\.cc/livecdn/channel-?(\d+)\.flv', caseSensitive: false).firstMatch(u);
+    if (mDomain != null) {
+      return 'https://live2.zundrixmediapipeline.com/live/channel${mDomain.group(1)}.m3u8';
+    }
+    final mPro2 = RegExp(r'pro2cdnlive\.com/live/channel-?(\d+)\.flv', caseSensitive: false).firstMatch(u);
+    if (mPro2 != null) {
+      return 'https://live2.zundrixmediapipeline.com/live/channel${mPro2.group(1)}.m3u8';
+    }
+    if (u.contains('.flv')) {
+      return u.replaceAll(RegExp(r'\.flv(\?|$)', caseSensitive: false), r'.m3u8$1');
+    }
+    return u;
+  }
+
   /// Resolves the actual playback stream URL.
   /// If the stream specifies custom Referer headers, routes through the VPS proxy to bypass CDN 403 Forbidden.
   String getPlaybackUrl({String? baseUrl}) {
     final bool hasReferer = headers.containsKey('Referer') || headers.containsKey('referer');
     if (hasReferer && proxyUrl.isNotEmpty) {
       if (proxyUrl.startsWith('http://') || proxyUrl.startsWith('https://')) {
-        return proxyUrl;
+        return convertFlvToHls(proxyUrl);
       }
       if (baseUrl != null && baseUrl.isNotEmpty) {
         final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
         final cleanProxy = proxyUrl.startsWith('/') ? proxyUrl : '/$proxyUrl';
-        return '$cleanBase$cleanProxy';
+        return convertFlvToHls('$cleanBase$cleanProxy');
       }
     }
-    return url;
+    return convertFlvToHls(url);
   }
 
   /// Converts this channel to a StreamChannel for VideoPlayerScreen
   StreamChannel toStreamChannel({String? baseUrl}) {
+    final finalUrl = getPlaybackUrl(baseUrl: baseUrl);
+    final isProxied = finalUrl.contains('/api/iptv/stream-proxy');
     return StreamChannel(
       name: group,
-      title: name,
-      url: getPlaybackUrl(baseUrl: baseUrl),
-      headers: headers,
+      title: name.replaceAll(RegExp(r'\[flv\]', caseSensitive: false), '[HLS]').replaceAll(RegExp(r'\(flv\)', caseSensitive: false), '(HLS)'),
+      url: finalUrl,
+      headers: isProxied ? const {} : headers,
     );
   }
 }
