@@ -269,9 +269,13 @@ jobs:
 
           # Configure release build settings for CI runner
           mkdir -p macos/Flutter
+          mkdir -p macos/Runner/Configs
           echo "CODE_SIGNING_ALLOWED=NO" >> macos/Flutter/Release.xcconfig
           echo "CODE_SIGNING_REQUIRED=NO" >> macos/Flutter/Release.xcconfig
           echo "CODE_SIGN_IDENTITY=-" >> macos/Flutter/Release.xcconfig
+          echo "CODE_SIGNING_ALLOWED=NO" >> macos/Runner/Configs/Release.xcconfig
+          echo "CODE_SIGNING_REQUIRED=NO" >> macos/Runner/Configs/Release.xcconfig
+          echo "CODE_SIGN_IDENTITY=-" >> macos/Runner/Configs/Release.xcconfig
 
       - name: Get Dependencies
         working-directory: app-tv
@@ -280,9 +284,10 @@ jobs:
       - name: Build macOS App (Release)
         working-directory: app-tv
         run: |
+          sed -i '' 's/ENABLE_USER_SCRIPT_SANDBOXING = YES;/ENABLE_USER_SCRIPT_SANDBOXING = NO;/g' macos/Runner.xcodeproj/project.pbxproj || true
           sed -i '' 's/CODE_SIGN_IDENTITY = "Apple Development";/CODE_SIGN_IDENTITY = "-";/g' macos/Runner.xcodeproj/project.pbxproj || true
-          sed -i '' 's/buildSettings = {/buildSettings = {\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "-";\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;/g' macos/Runner.xcodeproj/project.pbxproj || true
-          flutter build macos --release
+          sed -i '' 's/buildSettings = {/buildSettings = {\n\t\t\t\tDEVELOPMENT_TEAM = "ABCDE12345";\n\t\t\t\tCODE_SIGN_STYLE = Manual;\n\t\t\t\tCODE_SIGN_IDENTITY = "-";\n\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n\t\t\t\tCODE_SIGNING_REQUIRED = NO;/g' macos/Runner.xcodeproj/project.pbxproj || true
+          flutter build macos --release || (echo "Retrying flutter build macos with verbose logs..." && flutter build macos --release -v)
 
       - name: Extract Release Tag
         working-directory: app-tv

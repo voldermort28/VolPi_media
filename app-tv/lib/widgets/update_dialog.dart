@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/update_model.dart';
 import '../services/update_service.dart';
 import 'tv_focusable_card.dart';
