@@ -15,11 +15,32 @@ class IptvScreen extends StatefulWidget {
   State<IptvScreen> createState() => _IptvScreenState();
 }
 
+class IptvCategoryItem {
+  final String id;
+  final String title;
+  final IconData icon;
+
+  const IptvCategoryItem({
+    required this.id,
+    required this.title,
+    required this.icon,
+  });
+}
+
+const List<IptvCategoryItem> kIptvCategories = [
+  IptvCategoryItem(id: 'FOOTBALL', title: 'Bóng đá', icon: Icons.sports_soccer_rounded),
+  IptvCategoryItem(id: 'OTHER_SPORTS', title: 'Thể thao khác', icon: Icons.sports_volleyball_rounded),
+  IptvCategoryItem(id: 'FIXED_TV', title: 'Truyền hình', icon: Icons.tv_rounded),
+  IptvCategoryItem(id: 'PINNED', title: 'Đã ghim', icon: Icons.star_rounded),
+  IptvCategoryItem(id: 'ALL', title: 'Tất cả', icon: Icons.public_rounded),
+];
+
 class _IptvScreenState extends State<IptvScreen> {
   List<IptvChannelModel> _allChannels = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
+  String _selectedCategory = 'FOOTBALL'; // Mặc định bóng đá lên đầu
   String _selectedSourceId = 'ALL';
   String _selectedGroup = 'ALL';
   String _searchQuery = '';
@@ -58,6 +79,10 @@ class _IptvScreenState extends State<IptvScreen> {
           _allChannels = channels;
           _isLoading = false;
           _isRefreshing = false;
+          final hasFootball = _allChannels.any((c) => c.category == 'FOOTBALL');
+          if (!hasFootball && _selectedCategory == 'FOOTBALL') {
+            _selectedCategory = 'ALL';
+          }
         });
       }
     } catch (e) {
@@ -93,37 +118,66 @@ class _IptvScreenState extends State<IptvScreen> {
     return sources;
   }
 
+  int _getCategoryCount(String categoryId) {
+    return _allChannels.where((c) {
+      if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) return false;
+      if (categoryId == 'PINNED') return c.isPinned;
+      if (categoryId == 'ALL') return true;
+      return c.category == categoryId;
+    }).length;
+  }
+
+  String _getCategoryTitle(String categoryId) {
+    for (final item in kIptvCategories) {
+      if (item.id == categoryId) return item.title;
+    }
+    return 'Bóng đá';
+  }
+
   List<String> _getAvailableGroups() {
     final Set<String> groups = {};
     for (final c in _allChannels) {
-      if (_selectedSourceId == 'ALL' || c.sourceId == _selectedSourceId) {
-        if (c.group.isNotEmpty) {
-          groups.add(c.group);
-        }
+      if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) continue;
+
+      if (_selectedCategory == 'PINNED') {
+        if (!c.isPinned) continue;
+      } else if (_selectedCategory != 'ALL') {
+        if (c.category != _selectedCategory) continue;
+      }
+
+      if (c.group.isNotEmpty) {
+        groups.add(c.group);
       }
     }
     final sorted = groups.toList()..sort();
-    return ['ALL', '⭐ Yêu Thích', ...sorted];
+    return ['ALL', if (_selectedCategory != 'PINNED') '⭐ Yêu Thích', ...sorted];
   }
 
   List<IptvChannelModel> _getFilteredChannels() {
-    return _allChannels.where((c) {
+    final list = _allChannels.where((c) {
       // 1. Source / Playlist filter
       if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) {
         return false;
       }
 
-      // 2. Group filter
+      // 2. Category filter
+      if (_selectedCategory == 'PINNED') {
+        if (!c.isPinned) return false;
+      } else if (_selectedCategory != 'ALL') {
+        if (c.category != _selectedCategory) return false;
+      }
+
+      // 3. Group filter
       if (_selectedGroup == '⭐ Yêu Thích') {
         if (!c.isPinned) return false;
       } else if (_selectedGroup != 'ALL') {
         if (c.group != _selectedGroup) return false;
       }
 
-      // 3. Search query filter
+      // 4. Search query filter
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
-        final nameMatch = c.name.toLowerCase().contains(q);
+        final nameMatch = c.name.toLowerCase().contains(q) || c.cleanTitle.toLowerCase().contains(q);
         final groupMatch = c.group.toLowerCase().contains(q);
         final sourceMatch = c.sourceName.toLowerCase().contains(q);
         if (!nameMatch && !groupMatch && !sourceMatch) return false;
@@ -131,6 +185,38 @@ class _IptvScreenState extends State<IptvScreen> {
 
       return true;
     }).toList();
+
+    // 5. Smart chronological & status sorting
+    list.sort((a, b) {
+      // Live matches first
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+
+      // Pinned channels next
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+
+      // In ALL tab, group by Football -> Other sports -> TV
+      if (_selectedCategory == 'ALL') {
+        const catWeight = {'FOOTBALL': 1, 'OTHER_SPORTS': 2, 'FIXED_TV': 3};
+        final wA = catWeight[a.category] ?? 3;
+        final wB = catWeight[b.category] ?? 3;
+        if (wA != wB) return wA.compareTo(wB);
+      }
+
+      // Chronological match timestamp
+      if (a.matchTimestamp > 0 && b.matchTimestamp > 0) {
+        if (a.matchTimestamp != b.matchTimestamp) return a.matchTimestamp.compareTo(b.matchTimestamp);
+      } else if (a.matchTimestamp > 0 && b.matchTimestamp == 0) {
+        return -1;
+      } else if (a.matchTimestamp == 0 && b.matchTimestamp > 0) {
+        return 1;
+      }
+
+      return a.name.compareTo(b.name);
+    });
+
+    return list;
   }
 
   void _showSourceSelectionDialog(List<IptvSourceModel> sources) {
@@ -543,55 +629,11 @@ class _IptvScreenState extends State<IptvScreen> {
                 ),
               ),
 
-              // Group Filter Pills
-              Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: groups.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, index) {
-                    final group = groups[index];
-                    final isSelected = _selectedGroup == group;
-                    final isFav = group == '⭐ Yêu Thích';
+              // 1. Sport & Category Filter Pills (Bóng đá default first)
+              _buildCategoryPills(),
 
-                    return TvFocusableCard(
-                      onTap: () {
-                        setState(() {
-                          _selectedGroup = group;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? (isFav ? const Color(0xFFD97706) : const Color(0xFF0284C7))
-                              : const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: isSelected
-                                ? (isFav ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8))
-                                : const Color(0xFF334155),
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            group == 'ALL' ? 'Tất Cả' : group,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
-                              fontSize: 12,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              // 2. Sub-group Filter Pills (only when multiple groups exist)
+              _buildGroupPills(groups),
 
               // Channels Grid
               Expanded(
@@ -605,7 +647,7 @@ class _IptvScreenState extends State<IptvScreen> {
                             Text(
                               _searchQuery.isNotEmpty
                                   ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
-                                  : 'Không có kênh nào trong mục này.',
+                                  : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
                               style: const TextStyle(color: Colors.white60, fontSize: 13),
                             ),
                           ],
@@ -630,6 +672,160 @@ class _IptvScreenState extends State<IptvScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCategoryPills() {
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: kIptvCategories.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final cat = kIptvCategories[index];
+          final isSelected = _selectedCategory == cat.id;
+          final count = _getCategoryCount(cat.id);
+
+          Color activeColor = const Color(0xFF0284C7);
+          Color activeBorder = const Color(0xFF38BDF8);
+          Color countBadgeBg = const Color(0xFF075985);
+
+          if (cat.id == 'FOOTBALL') {
+            activeColor = const Color(0xFF059669);
+            activeBorder = const Color(0xFF34D399);
+            countBadgeBg = const Color(0xFF064E3B);
+          } else if (cat.id == 'OTHER_SPORTS') {
+            activeColor = const Color(0xFF7C3AED);
+            activeBorder = const Color(0xFFA78BFA);
+            countBadgeBg = const Color(0xFF4C1D95);
+          } else if (cat.id == 'PINNED') {
+            activeColor = const Color(0xFFD97706);
+            activeBorder = const Color(0xFFF59E0B);
+            countBadgeBg = const Color(0xFF78350F);
+          } else if (cat.id == 'ALL') {
+            activeColor = const Color(0xFF334155);
+            activeBorder = const Color(0xFF64748B);
+            countBadgeBg = const Color(0xFF1E293B);
+          }
+
+          return TvFocusableCard(
+            onTap: () {
+              setState(() {
+                _selectedCategory = cat.id;
+                _selectedGroup = 'ALL';
+              });
+            },
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? activeColor : const Color(0xFF161E2E),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? activeBorder : const Color(0xFF1E293B),
+                  width: isSelected ? 1.4 : 1.0,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    cat.icon,
+                    size: 16,
+                    color: isSelected ? Colors.white : Colors.white60,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    cat.title,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: isSelected ? countBadgeBg : const Color(0xFF0F172A),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? activeBorder.withOpacity(0.4) : const Color(0xFF334155),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white54,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGroupPills(List<String> groups) {
+    if (groups.length <= 2) return const SizedBox.shrink();
+
+    return Container(
+      height: 40,
+      padding: const EdgeInsets.only(bottom: 6),
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: groups.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final group = groups[index];
+          final isSelected = _selectedGroup == group;
+          final isFav = group == '⭐ Yêu Thích';
+
+          return TvFocusableCard(
+            onTap: () {
+              setState(() {
+                _selectedGroup = group;
+              });
+            },
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? (isFav ? const Color(0xFFD97706) : const Color(0xFF0284C7))
+                    : const Color(0xFF1E293B).withOpacity(0.6),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isSelected
+                      ? (isFav ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8))
+                      : const Color(0xFF334155),
+                  width: isSelected ? 1.2 : 0.8,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  group == 'ALL' ? 'Tất cả nhóm' : group,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : Colors.white60,
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
