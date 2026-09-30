@@ -28,4 +28,5 @@ Thumbs.db
 
 # IPTV runtime files
 iptv_config.json
+auth_config.json
 uploads/

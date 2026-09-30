@@ -14,6 +14,7 @@ const vlxxScraper = require("./scrapers/vlxx");
 const xoilacScraper = require("./scrapers/xoilac");
 const yumeiScraper = require("./scrapers/yumei");
 const iptvService = require("./services/iptvService");
+const authService = require("./services/authService");
 
 const app = express();
 const PORT = process.env.PORT || 7000;
@@ -32,8 +33,75 @@ app.use((req, res, next) => {
   next();
 });
 
-// Static assets for Web Frontend
-app.use(express.static(path.join(__dirname, "public")));
+// -------------------------------------------------------------
+// AUTHENTICATION & PROTECTED PAGE ROUTING
+// -------------------------------------------------------------
+
+// Serve Login Page
+app.get(["/login", "/login.html"], (req, res) => {
+  const token = authService.extractToken(req);
+  if (token && authService.validateSession(token)) {
+    const redirect = req.query.redirect || "/";
+    return res.redirect(redirect);
+  }
+  return res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// Serve Dedicated IPTV Portal Page (Protected)
+app.get(["/iptv", "/iptv.html"], authService.requireAuth, (req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "iptv.html"));
+});
+
+// Serve Main Web Dashboard (Protected)
+app.get(["/", "/index.html"], authService.requireAuth, (req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Auth API Endpoints
+app.post("/api/login", (req, res) => {
+  const { username, password, rememberMe } = req.body || {};
+  const result = authService.login(username, password, rememberMe !== false);
+  if (result.success) {
+    res.cookie("volpi_session", result.token, {
+      maxAge: (result.maxAgeSeconds || 86400) * 1000,
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+    });
+    return res.json(result);
+  }
+  return res.status(401).json(result);
+});
+
+app.post("/api/logout", (req, res) => {
+  const token = authService.extractToken(req);
+  authService.logout(token);
+  res.clearCookie("volpi_session", { path: "/" });
+  return res.json({ success: true });
+});
+
+app.get("/api/auth-status", (req, res) => {
+  const token = authService.extractToken(req);
+  const session = authService.validateSession(token);
+  if (session) {
+    return res.json({ authenticated: true, username: session.username });
+  }
+  return res.json({ authenticated: false });
+});
+
+app.post("/api/change-password", authService.requireAuth, (req, res) => {
+  const { username, currentPassword, newPassword } = req.body || {};
+  const user = req.user ? req.user.username : (username || "admin");
+  const result = authService.changePassword(user, currentPassword, newPassword);
+  if (result.success) {
+    res.clearCookie("volpi_session", { path: "/" });
+    return res.json(result);
+  }
+  return res.status(400).json(result);
+});
+
+// Static assets for Web Frontend (index: false prevents bypassing auth guard)
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
 
 // OTA App Version & Update Endpoints
 const OTA_DEPLOY_TOKEN = process.env.OTA_DEPLOY_TOKEN || "volpi_ota_deploy_secret_9988";
@@ -388,7 +456,7 @@ app.get("/api/iptv/sources", async (req, res) => {
   }
 });
 
-app.post("/api/iptv/sources/add", (req, res) => {
+app.post("/api/iptv/sources/add", authService.requireAuth, (req, res) => {
   try {
     const result = iptvService.addPlaylist(req.body);
     res.json(result);
@@ -397,7 +465,7 @@ app.post("/api/iptv/sources/add", (req, res) => {
   }
 });
 
-app.post("/api/iptv/sources/delete", (req, res) => {
+app.post("/api/iptv/sources/delete", authService.requireAuth, (req, res) => {
   try {
     const { id } = req.body;
     const result = iptvService.deletePlaylist(id);
@@ -407,7 +475,7 @@ app.post("/api/iptv/sources/delete", (req, res) => {
   }
 });
 
-app.post("/api/iptv/sources/toggle", (req, res) => {
+app.post("/api/iptv/sources/toggle", authService.requireAuth, (req, res) => {
   try {
     const { id, enabled } = req.body;
     const result = iptvService.togglePlaylist(id, enabled);
@@ -421,7 +489,7 @@ app.get("/api/iptv/config", (req, res) => {
   res.json(iptvService.loadConfig());
 });
 
-app.post("/api/iptv/set-source", (req, res) => {
+app.post("/api/iptv/set-source", authService.requireAuth, (req, res) => {
   try {
     const { type, url } = req.body;
     const cfg = iptvService.setSource(type, url);
@@ -431,7 +499,7 @@ app.post("/api/iptv/set-source", (req, res) => {
   }
 });
 
-app.post("/api/iptv/upload-content", (req, res) => {
+app.post("/api/iptv/upload-content", authService.requireAuth, (req, res) => {
   try {
     const { content, filename } = req.body;
     if (!content) return res.status(400).json({ success: false, error: "Nội dung file trống" });
@@ -442,7 +510,7 @@ app.post("/api/iptv/upload-content", (req, res) => {
   }
 });
 
-app.post("/api/iptv/settings", (req, res) => {
+app.post("/api/iptv/settings", authService.requireAuth, (req, res) => {
   try {
     const { hiddenChannelIds, pinnedChannelIds } = req.body;
     const cfg = iptvService.updateChannelSettings({ hiddenChannelIds, pinnedChannelIds });
@@ -452,7 +520,7 @@ app.post("/api/iptv/settings", (req, res) => {
   }
 });
 
-app.post("/api/iptv/refresh", async (req, res) => {
+app.post("/api/iptv/refresh", authService.requireAuth, async (req, res) => {
   try {
     iptvService.clearCache();
     const forAdmin = req.query.admin === "true";
@@ -468,7 +536,7 @@ app.get("/api/config", (req, res) => {
   res.json(config.getConfig());
 });
 
-app.post("/api/config", (req, res) => {
+app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
     const { xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl } = req.body;
     const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl });
@@ -487,7 +555,7 @@ app.post("/api/config", (req, res) => {
   }
 });
 
-app.post("/api/test-domain", async (req, res) => {
+app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
   try {
     const { type, url } = req.body;
     if (!url) return res.status(400).json({ success: false, error: "Vui lòng cung cấp URL" });
