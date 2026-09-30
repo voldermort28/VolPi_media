@@ -439,7 +439,8 @@ app.get("/api/iptv/channels", async (req, res) => {
     const forAdmin = req.query.admin === "true";
     const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
     const sourceId = req.query.sourceId || req.query.source || "";
-    const data = await iptvService.getChannels({ forceRefresh, forAdmin, sourceId });
+    const category = req.query.category || req.query.type || "";
+    const data = await iptvService.getChannels({ forceRefresh, forAdmin, sourceId, category });
     res.json(data);
   } catch (err) {
     console.error("Error fetching IPTV channels:", err.message);

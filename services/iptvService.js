@@ -377,6 +377,137 @@ function normalizeGroupName(group, name) {
 }
 
 /**
+ * Parses match time & live status from channel name
+ * Example: "🟢 23:00 30/09 ⚽ Malta U21 vs Germany U21"
+ */
+function parseMatchTime(name) {
+  if (!name || typeof name !== 'string') {
+    return { isLive: false, matchTime: '', matchTimestamp: 0 };
+  }
+
+  const isLive = name.includes('🟢') || name.toLowerCase().includes('đang đá') || name.toLowerCase().includes('trực tiếp');
+
+  // Match: HH:mm DD/MM (or DD-MM, DD.MM)
+  const m = name.match(/(\d{1,2}):(\d{2})\s+(\d{1,2})[\/\.-](\d{1,2})/);
+  if (!m) {
+    const mTime = name.match(/(\d{1,2}):(\d{2})/);
+    if (mTime) {
+      const now = new Date();
+      const hour = parseInt(mTime[1], 10);
+      const min = parseInt(mTime[2], 10);
+      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min);
+      const pad = (n) => String(n).padStart(2, '0');
+      return {
+        isLive,
+        matchTime: `${pad(hour)}:${pad(min)}`,
+        matchTimestamp: d.getTime(),
+      };
+    }
+    return { isLive, matchTime: '', matchTimestamp: isLive ? Date.now() : 0 };
+  }
+
+  const hour = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const day = parseInt(m[3], 10);
+  const month = parseInt(m[4], 10) - 1; // 0-based
+
+  const now = new Date();
+  let year = now.getFullYear();
+  if (now.getMonth() === 11 && month === 0) {
+    year += 1;
+  }
+
+  const dateObj = new Date(year, month, day, hour, min);
+  const pad = (n) => String(n).padStart(2, '0');
+  const matchTime = `${pad(hour)}:${pad(min)} ${pad(day)}/${pad(month + 1)}`;
+
+  return {
+    isLive,
+    matchTime,
+    matchTimestamp: dateObj.getTime(),
+  };
+}
+
+/**
+ * Classifies channel into:
+ * - 'OTHER_SPORTS': Volleyball, Basketball, Tennis, Badminton, Boxing, F1, Billiards...
+ * - 'FOOTBALL': Football matches with time & vs pattern or soccer ball emoji
+ * - 'FIXED_TV': Traditional 24/7 channels (VTV, HTV, HBO, K+, Cartoon...)
+ */
+function classifyChannel(name, group = '') {
+  const n = (name || '').toLowerCase();
+  const g = (group || '').toLowerCase();
+
+  // 1. Detect Other Sports
+  const isOtherSport = name.includes('🏐') || n.includes('bóng chuyền') || n.includes('volleyball') ||
+                       name.includes('🏀') || n.includes('bóng rổ') || n.includes('basketball') || n.includes('nba') ||
+                       name.includes('🎾') || name.includes('🥎') || n.includes('tennis') || n.includes('quần vợt') ||
+                       name.includes('🏸') || n.includes('cầu lông') || n.includes('badminton') ||
+                       name.includes('🏓') || n.includes('bóng bàn') || n.includes('table tennis') ||
+                       name.includes('🥊') || name.includes('🥋') || n.includes('boxing') || n.includes('mma') || n.includes('ufc') || n.includes('võ') ||
+                       name.includes('🏎️') || name.includes('🏎') || n.includes('f1') || n.includes('đua xe') || n.includes('racing') ||
+                       name.includes('🎱') || n.includes('billiards') || n.includes('bi-a') || n.includes('snooker') ||
+                       name.includes('⚾') || n.includes('bóng chày') || name.includes('baseball') ||
+                       name.includes('🏉') || n.includes('rugby') || name.includes('bóng bầu dục') ||
+                       name.includes('⛳') || n.includes('golf') ||
+                       name.includes('🏒') || n.includes('hockey') || n.includes('khúc côn cầu') ||
+                       g.includes('tennis') || g.includes('bóng rổ') || g.includes('bóng chuyền') || g.includes('cầu lông') || g.includes('bóng bàn');
+
+  if (isOtherSport) return 'OTHER_SPORTS';
+
+  // 2. Detect Football
+  const hasTimePattern = /\d{1,2}:\d{2}\s+\d{1,2}[\/\.-]\d{1,2}/.test(name) || /\d{1,2}:\d{2}/.test(name);
+  const hasVs = n.includes(' vs ') || n.includes(' v ') || n.includes(' u21 ') || n.includes(' u23 ') || n.includes(' u19 ');
+  const isFootball = name.includes('⚽') ||
+                     (hasTimePattern && hasVs) ||
+                     g.includes('vua sân cỏ') || g.includes('khán đài') || g.includes('xôi lạc') || g.includes('sút bóng') || g.includes('cola tv') || g.includes('giờ vàng');
+
+  if (isFootball && hasTimePattern) return 'FOOTBALL';
+  if (name.includes('⚽')) return 'FOOTBALL';
+
+  // 3. Fallback: Fixed 24/7 TV Channel
+  return 'FIXED_TV';
+}
+
+/**
+ * Smart Channel Comparator:
+ * 1. Pinned channels (isPinned)
+ * 2. Live matches (🟢 LIVE)
+ * 3. Categories: FOOTBALL (1) -> OTHER_SPORTS (2) -> FIXED_TV (3)
+ * 4. Chronological order for sports/matches
+ * 5. Vietnamese alphabet tie-breaker for Fixed TV
+ */
+function compareChannels(a, b) {
+  // 1. Live match priority: 🟢 LIVE right now on top!
+  if (a.isLive && !b.isLive) return -1;
+  if (!a.isLive && b.isLive) return 1;
+
+  // 2. Pinned priority (e.g. pinned live match first, or pinned channels)
+  if (a.isPinned && !b.isPinned) return -1;
+  if (!a.isPinned && b.isPinned) return 1;
+
+  // 3. Category grouping
+  const catWeight = { FOOTBALL: 1, OTHER_SPORTS: 2, FIXED_TV: 3 };
+  const wA = catWeight[a.category] || 3;
+  const wB = catWeight[b.category] || 3;
+  if (wA !== wB) return wA - wB;
+
+  // 4. Chronological timeline for matches
+  if (a.matchTimestamp && b.matchTimestamp) {
+    if (a.matchTimestamp !== b.matchTimestamp) {
+      return a.matchTimestamp - b.matchTimestamp;
+    }
+  } else if (a.matchTimestamp && !b.matchTimestamp) {
+    return -1;
+  } else if (!a.matchTimestamp && b.matchTimestamp) {
+    return 1;
+  }
+
+  // 5. Traditional channels alphabetical
+  return (a.name || '').localeCompare(b.name || '', 'vi');
+}
+
+/**
  * Fetch and parse raw M3U from active sources
  */
 async function fetchRawChannels(config) {
@@ -454,7 +585,7 @@ async function fetchRawChannels(config) {
  * forAdmin: true returns all channels with isHidden & isPinned attributes.
  * forAdmin: false (client apps) filters out hidden channels and sorts pinned to the top.
  */
-async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = '' } = {}) {
+async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = '', category = '' } = {}) {
   const config = loadConfig();
   const now = Date.now();
 
@@ -471,10 +602,18 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     const rawSuffix = c.id.includes('_') ? c.id.split('_').slice(1).join('_') : c.id;
     const isPinned = pinnedSet.has(c.id) || pinnedSet.has(rawSuffix) || pinnedSet.has(c.url) || pinnedSet.has(c.name);
     const isHidden = hiddenSet.has(c.id) || hiddenSet.has(rawSuffix) || hiddenSet.has(c.url) || hiddenSet.has(c.name);
+
+    const cat = classifyChannel(c.name, c.group);
+    const timeInfo = parseMatchTime(c.name);
+
     return {
       ...c,
       sourceId: c.sourceId || 'pl-default',
       sourceName: c.sourceName || 'Chung',
+      category: cat,
+      isLive: timeInfo.isLive,
+      matchTime: timeInfo.matchTime,
+      matchTimestamp: timeInfo.matchTimestamp,
       isPinned,
       isHidden,
     };
@@ -489,6 +628,15 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     });
   }
 
+  // Calculate category statistics
+  const categoryStats = {
+    ALL: 0,
+    FOOTBALL: 0,
+    OTHER_SPORTS: 0,
+    FIXED_TV: 0,
+    PINNED: 0,
+  };
+
   enriched.forEach((c) => {
     if (!c.isHidden) {
       const allItem = sourceStats.get('ALL');
@@ -496,16 +644,26 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       if (sourceStats.has(c.sourceId)) {
         sourceStats.get(c.sourceId).count++;
       }
+
+      categoryStats.ALL++;
+      if (c.category === 'FOOTBALL') categoryStats.FOOTBALL++;
+      else if (c.category === 'OTHER_SPORTS') categoryStats.OTHER_SPORTS++;
+      else categoryStats.FIXED_TV++;
+
+      if (c.isPinned) categoryStats.PINNED++;
     }
   });
+
   const sources = Array.from(sourceStats.values());
 
   if (forAdmin) {
+    const sortedAdminChannels = [...enriched].sort(compareChannels);
     return {
       config,
       sources,
+      categoryStats,
       totalCount: enriched.length,
-      channels: enriched,
+      channels: sortedAdminChannels,
     };
   }
 
@@ -515,12 +673,17 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     visible = visible.filter((c) => c.sourceId === sourceId);
   }
 
-  // Sort: Pinned first (0), then by Name
-  visible.sort((a, b) => {
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    return a.name.localeCompare(b.name, 'vi');
-  });
+  // Filter by category if requested
+  if (category && category !== 'ALL') {
+    if (category === 'PINNED') {
+      visible = visible.filter((c) => c.isPinned);
+    } else {
+      visible = visible.filter((c) => c.category === category);
+    }
+  }
+
+  // Sort with smart chronological and priority comparator
+  visible.sort(compareChannels);
 
   return visible;
 }
@@ -913,6 +1076,9 @@ module.exports = {
   saveConfig,
   parseM3U,
   handleStreamProxy,
+  parseMatchTime,
+  classifyChannel,
+  compareChannels,
   DEFAULT_SOURCE_URL,
 };
 

@@ -21,6 +21,25 @@ function clearCache() {
   resolvedBaseUrl = null;
 }
 
+function parseXoilacTime(timeStr) {
+  if (!timeStr) return { isLive: false, ts: 0 };
+  const isLive = timeStr.includes('Đang diễn ra') || timeStr.includes('Trực tiếp') || timeStr.includes('LIVE') || timeStr.includes('hiệp') || timeStr.includes("'");
+  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*[-/]\s*(\d{1,2})[\./-](\d{1,2})/);
+  if (!m) return { isLive, ts: isLive ? Date.now() : 0 };
+
+  const hour = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const day = parseInt(m[3], 10);
+  const month = parseInt(m[4], 10) - 1;
+
+  const now = new Date();
+  let year = now.getFullYear();
+  if (now.getMonth() === 11 && month === 0) year += 1;
+
+  const d = new Date(year, month, day, hour, min);
+  return { isLive, ts: d.getTime() };
+}
+
 function getTeamPriority(match) {
   const q = `${match.homeTeam} ${match.awayTeam} ${match.title} ${match.slug}`.toLowerCase();
   
@@ -210,14 +229,29 @@ async function getLiveMatches() {
       const timeStr = time ? `[${time}] ` : '';
       matchObj.title = `${prefix}${timeStr}${fullTitle} (${league})`;
 
+      const timeParsed = parseXoilacTime(time);
+      matchObj.isLive = timeParsed.isLive;
+      matchObj.matchTimestamp = timeParsed.ts;
+
       matches.push(matchObj);
     });
 
-    // Sort: MU (#1) -> Big Teams (#2) -> Others (#3)
+    // Sort:
+    // 1. Level priority (MU #1 -> Big Teams #2 -> Others #3)
+    // 2. Live matches first (isLive)
+    // 3. Chronological timeline (earlier matches first)
     matches.sort((a, b) => {
       const pA = a.priority ? a.priority.level : 3;
       const pB = b.priority ? b.priority.level : 3;
-      return pA - pB;
+      if (pA !== pB) return pA - pB;
+
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+
+      if (a.matchTimestamp && b.matchTimestamp) {
+        return a.matchTimestamp - b.matchTimestamp;
+      }
+      return 0;
     });
 
     cachedMatches = matches;

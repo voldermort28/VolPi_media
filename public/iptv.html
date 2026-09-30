@@ -211,6 +211,30 @@
         </div>
       </div>
 
+      <!-- Category Tabs (Smart Classification: Football, Other Sports, Pinned, Fixed TV) -->
+      <div id="iptv-category-tabs" class="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-800/80">
+        <button type="button" onclick="setCategoryFilter('ALL')" id="cat-btn-ALL" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 flex items-center gap-1.5">
+          <span>🌐 Tất Cả</span>
+          <span id="cat-count-ALL" class="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-700 text-white">0</span>
+        </button>
+        <button type="button" onclick="setCategoryFilter('FOOTBALL')" id="cat-btn-FOOTBALL" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-1.5">
+          <span>⚽ Bóng Đá Hôm Nay</span>
+          <span id="cat-count-FOOTBALL" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">0</span>
+        </button>
+        <button type="button" onclick="setCategoryFilter('OTHER_SPORTS')" id="cat-btn-OTHER_SPORTS" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-1.5">
+          <span>🏐 Thể Thao Khác</span>
+          <span id="cat-count-OTHER_SPORTS" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">0</span>
+        </button>
+        <button type="button" onclick="setCategoryFilter('PINNED')" id="cat-btn-PINNED" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-1.5">
+          <span>⭐ Kênh Đã Ghim</span>
+          <span id="cat-count-PINNED" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">0</span>
+        </button>
+        <button type="button" onclick="setCategoryFilter('FIXED_TV')" id="cat-btn-FIXED_TV" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-1.5">
+          <span>📺 Kênh Truyền Hình (VTV, HTV...)</span>
+          <span id="cat-count-FIXED_TV" class="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400">0</span>
+        </button>
+      </div>
+
       <!-- Group Filter Tabs -->
       <div id="iptv-group-tabs" class="flex flex-wrap gap-2 pt-1">
         <!-- Dynamically populated group pills -->
@@ -326,6 +350,8 @@
     // IPTV State
     let iptvChannels = [];
     let iptvConfig = {};
+    let iptvCategoryStats = {};
+    let activeCategoryFilter = 'ALL';
     let activeGroupFilter = 'ALL';
     let activeSourceFilter = 'ALL';
     let searchQuery = '';
@@ -347,12 +373,14 @@
         
         iptvChannels = data.channels || [];
         iptvConfig = data.config || {};
+        iptvCategoryStats = data.categoryStats || {};
         
         pinnedChannelIds = new Set(iptvConfig.pinnedChannelIds || []);
         hiddenChannelIds = new Set(iptvConfig.hiddenChannelIds || []);
 
         renderIptvPlaylists();
         renderIptvSourceFilter();
+        renderCategoryTabs(iptvCategoryStats);
         renderIptvGroupTabs();
         renderIptvTable();
       } catch (err) {
@@ -434,6 +462,49 @@
       `).join('');
     }
 
+    function renderCategoryTabs(stats) {
+      if (!stats) stats = {};
+      const catAll = document.getElementById('cat-count-ALL');
+      const catFb = document.getElementById('cat-count-FOOTBALL');
+      const catOs = document.getElementById('cat-count-OTHER_SPORTS');
+      const catPin = document.getElementById('cat-count-PINNED');
+      const catTv = document.getElementById('cat-count-FIXED_TV');
+
+      if (catAll) catAll.textContent = stats.ALL || iptvChannels.length;
+      if (catFb) catFb.textContent = stats.FOOTBALL || 0;
+      if (catOs) catOs.textContent = stats.OTHER_SPORTS || 0;
+      if (catPin) catPin.textContent = stats.PINNED || pinnedChannelIds.size;
+      if (catTv) catTv.textContent = stats.FIXED_TV || 0;
+
+      updateCategoryTabStyles();
+    }
+
+    function updateCategoryTabStyles() {
+      const cats = ['ALL', 'FOOTBALL', 'OTHER_SPORTS', 'PINNED', 'FIXED_TV'];
+      cats.forEach(cat => {
+        const btn = document.getElementById('cat-btn-' + cat);
+        const countBadge = document.getElementById('cat-count-' + cat);
+        if (!btn) return;
+
+        const isActive = activeCategoryFilter === cat;
+        if (isActive) {
+          btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-emerald-500 text-white shadow-lg shadow-emerald-500/25 flex items-center gap-1.5';
+          if (countBadge) countBadge.className = 'text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-700 text-white';
+        } else {
+          btn.className = 'px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-1.5';
+          if (countBadge) countBadge.className = 'text-[10px] px-1.5 py-0.2 rounded-full bg-slate-900 text-slate-400';
+        }
+      });
+    }
+
+    function setCategoryFilter(cat) {
+      activeCategoryFilter = cat;
+      activeGroupFilter = 'ALL';
+      updateCategoryTabStyles();
+      renderIptvGroupTabs();
+      renderIptvTable();
+    }
+
     function renderIptvGroupTabs() {
       const tabsContainer = document.getElementById('iptv-group-tabs');
       if (!tabsContainer) return;
@@ -443,7 +514,15 @@
       groups.set('PINNED', 0);
 
       iptvChannels.forEach(c => {
+        // Source filter
         if (activeSourceFilter !== 'ALL' && c.sourceId !== activeSourceFilter) return;
+
+        // Category filter
+        if (activeCategoryFilter === 'PINNED') {
+          if (!pinnedChannelIds.has(c.id)) return;
+        } else if (activeCategoryFilter !== 'ALL') {
+          if (c.category !== activeCategoryFilter) return;
+        }
 
         groups.set('ALL', (groups.get('ALL') || 0) + 1);
         if (pinnedChannelIds.has(c.id)) {
@@ -493,6 +572,14 @@
       let filtered = iptvChannels.filter(c => {
         if (activeSourceFilter !== 'ALL' && c.sourceId !== activeSourceFilter) return false;
 
+        // Category filter
+        if (activeCategoryFilter === 'PINNED') {
+          if (!pinnedChannelIds.has(c.id)) return false;
+        } else if (activeCategoryFilter !== 'ALL') {
+          if (c.category !== activeCategoryFilter) return false;
+        }
+
+        // Group filter
         if (activeGroupFilter === 'PINNED') {
           if (!pinnedChannelIds.has(c.id)) return false;
         } else if (activeGroupFilter !== 'ALL') {
@@ -511,9 +598,47 @@
       });
 
       filtered.sort((a, b) => {
+        // If in Football or Other Sports tab:
+        if (activeCategoryFilter === 'FOOTBALL' || activeCategoryFilter === 'OTHER_SPORTS') {
+          // 1. Live match first
+          if (a.isLive && !b.isLive) return -1;
+          if (!a.isLive && b.isLive) return 1;
+          // 2. Pinned next
+          const aPin = pinnedChannelIds.has(a.id) ? 1 : 0;
+          const bPin = pinnedChannelIds.has(b.id) ? 1 : 0;
+          if (aPin !== bPin) return bPin - aPin;
+          // 3. Chronological match timestamp
+          if (a.matchTimestamp && b.matchTimestamp) {
+            if (a.matchTimestamp !== b.matchTimestamp) return a.matchTimestamp - b.matchTimestamp;
+          } else if (a.matchTimestamp && !b.matchTimestamp) {
+            return -1;
+          } else if (!a.matchTimestamp && b.matchTimestamp) {
+            return 1;
+          }
+          return (a.name || '').localeCompare(b.name || '', 'vi');
+        }
+
+        // Default sorting:
+        // 1. Live match first
+        if (a.isLive && !b.isLive) return -1;
+        if (!a.isLive && b.isLive) return 1;
+        // 2. Pinned channels
         const aPinned = pinnedChannelIds.has(a.id) ? 1 : 0;
         const bPinned = pinnedChannelIds.has(b.id) ? 1 : 0;
         if (aPinned !== bPinned) return bPinned - aPinned;
+        // 3. Category grouping
+        const catWeight = { FOOTBALL: 1, OTHER_SPORTS: 2, FIXED_TV: 3 };
+        const wA = catWeight[a.category] || 3;
+        const wB = catWeight[b.category] || 3;
+        if (wA !== wB) return wA - wB;
+        // 4. Chronological match timestamp
+        if (a.matchTimestamp && b.matchTimestamp) {
+          if (a.matchTimestamp !== b.matchTimestamp) return a.matchTimestamp - b.matchTimestamp;
+        } else if (a.matchTimestamp && !b.matchTimestamp) {
+          return -1;
+        } else if (!a.matchTimestamp && b.matchTimestamp) {
+          return 1;
+        }
         return (a.name || '').localeCompare(b.name || '', 'vi');
       });
 
@@ -547,8 +672,26 @@
                 <span class="text-[11px] font-bold text-slate-500">TV</span>
               `}
             </td>
-            <td class="py-2.5 px-4 font-bold text-white max-w-[200px] truncate" title="${c.name}">
-              ${c.name}
+            <td class="py-2.5 px-4 font-bold text-white max-w-[280px]" title="${c.name}">
+              <div class="flex flex-wrap items-center gap-1.5">
+                ${c.isLive ? `
+                  <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    LIVE
+                  </span>
+                ` : ''}
+                ${c.matchTime ? `
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">
+                    ⏰ ${c.matchTime}
+                  </span>
+                ` : ''}
+                ${c.category === 'OTHER_SPORTS' ? `
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/25">
+                    Thể thao
+                  </span>
+                ` : ''}
+                <span class="truncate block max-w-full">${c.name}</span>
+              </div>
             </td>
             <td class="py-2.5 px-4">
               <span class="text-[11px] px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-300 border border-slate-700">
@@ -574,7 +717,7 @@
               </button>
             </td>
             <td class="py-2.5 px-4 text-center">
-              <button type="button" onclick="previewChannel('${c.url}', '${c.name}', '${c.proxyUrl || ''}', '${hasReferer ? (c.headers.Referer || c.headers.referer) : ''}')" class="px-2.5 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition mx-auto cursor-pointer shadow shadow-emerald-600/20">
+              <button type="button" onclick="previewChannel('${c.url}', '${c.name.replace(/'/g, "\\'")}', '${c.proxyUrl || ''}', '${hasReferer ? (c.headers.Referer || c.headers.referer) : ''}')" class="px-2.5 py-1 rounded-lg bg-emerald-600/90 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1 transition mx-auto cursor-pointer shadow shadow-emerald-600/20">
                 <i data-lucide="play" class="w-3 h-3"></i>
                 <span>Xem</span>
               </button>
@@ -589,12 +732,16 @@
     function togglePinChannel(id, isPinned) {
       if (isPinned) pinnedChannelIds.add(id);
       else pinnedChannelIds.delete(id);
+      const catPin = document.getElementById('cat-count-PINNED');
+      if (catPin) catPin.textContent = pinnedChannelIds.size;
+      renderIptvGroupTabs();
       renderIptvTable();
     }
 
     function toggleHideChannel(id, isHidden) {
       if (isHidden) hiddenChannelIds.add(id);
       else hiddenChannelIds.delete(id);
+      renderIptvGroupTabs();
       renderIptvTable();
     }
 
