@@ -75,9 +75,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
       }
     } else {
       // macOS / Desktop platforms
-      final targetUrl = widget.updateInfo.releaseUrl.isNotEmpty
-          ? widget.updateInfo.releaseUrl
-          : 'https://stremio.laboon.vn/download';
+      final targetUrl = widget.updateInfo.macosUrl.isNotEmpty
+          ? widget.updateInfo.macosUrl
+          : (widget.updateInfo.releaseUrl.isNotEmpty
+              ? widget.updateInfo.releaseUrl
+              : 'https://stremio.laboon.vn/download');
       final uri = Uri.parse(targetUrl);
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);

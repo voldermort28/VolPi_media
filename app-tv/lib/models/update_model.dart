@@ -4,6 +4,8 @@ class UpdateInfo {
   final String changelog;
   final String apkUrl;
   final String ipaUrl;
+  final String macosUrl;
+  final String releaseUrl;
   final bool hasUpdate;
   final String currentVersion;
 
@@ -13,6 +15,8 @@ class UpdateInfo {
     required this.changelog,
     required this.apkUrl,
     required this.ipaUrl,
+    this.macosUrl = '',
+    this.releaseUrl = '',
     required this.hasUpdate,
     required this.currentVersion,
   });
@@ -24,6 +28,8 @@ class UpdateInfo {
 
     String apk = (json['apkUrl'] ?? '').toString();
     String ipa = (json['ipaUrl'] ?? '').toString();
+    String macos = (json['macosUrl'] ?? '').toString();
+    String release = (json['html_url'] ?? 'https://stremio.laboon.vn/download').toString();
 
     // If GitHub release response, search in assets
     if (json['assets'] != null && json['assets'] is List) {
@@ -34,6 +40,8 @@ class UpdateInfo {
           apk = url;
         } else if (name.endsWith('.ipa') && (ipa.isEmpty || name.contains('ios'))) {
           ipa = url;
+        } else if (name.endsWith('.zip') && (macos.isEmpty || name.contains('macos'))) {
+          macos = url;
         }
       }
     }
@@ -46,6 +54,8 @@ class UpdateInfo {
       changelog: notes.isNotEmpty ? notes : 'Bản cập nhật tối ưu hóa hiệu năng, cập nhật tính năng mới và vá lỗi.',
       apkUrl: apk,
       ipaUrl: ipa,
+      macosUrl: macos,
+      releaseUrl: release,
       hasUpdate: hasNew,
       currentVersion: currentVer,
     );
