@@ -172,8 +172,8 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  List<MatchModel> get _favoriteMatches => _matches.where((m) => m.isFavorite).toList();
-  List<MatchModel> get _otherMatches => _matches.where((m) => !m.isFavorite).toList();
+  List<MatchModel> get _majorMatches => _matches.where((m) => m.isFamous || m.isVietnam || m.isFavorite).toList();
+  List<MatchModel> get _otherMatches => _matches.where((m) => !m.isFamous && !m.isVietnam && !m.isFavorite).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -281,32 +281,41 @@ class _FootballScreenState extends State<FootballScreen> {
                             crossAxisCount = 2;
                           }
 
-                          final favs = _favoriteMatches;
+                          final major = _majorMatches;
                           final others = _otherMatches;
 
                           return CustomScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             cacheExtent: 150,
                             slivers: [
-                              if (favs.isNotEmpty) ...[
+                              // Khu vực 1: Tâm Điểm & Giải Đấu Hàng Đầu
+                              if (major.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
-                                    title: '⭐ Đội Bóng Yêu Thích & Tâm Điểm',
-                                    count: favs.length.toString(),
+                                    title: '⭐ Tâm Điểm & Giải Đấu Hàng Đầu',
+                                    count: major.length.toString(),
                                     color: const Color(0xFFF59E0B),
-                                    subtitle: 'Việt Nam • Man Utd • Man City • Arsenal • Chelsea • Real • Barca...',
+                                    subtitle: 'Việt Nam • Ngoại Hạng Anh • Cúp C1 • La Liga • Serie A • Bundesliga...',
                                   ),
                                 ),
-                                _buildMatchGrid(favs, crossAxisCount),
+                                _buildMatchGrid(major, crossAxisCount),
+                              ],
+
+                              // Khu vực 2: Các Trận Đấu & Giải Đấu Khác (giải cỏ, giải phụ...)
+                              if (others.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
-                                    title: '⚽ Tất Cả Trận Đấu Hôm Nay',
+                                    title: '🌐 Các Trận Đấu & Giải Đấu Khác',
                                     count: others.length.toString(),
                                     color: const Color(0xFF38BDF8),
+                                    subtitle: 'Các giải đấu phụ, giải cỏ và hạng dưới hôm nay',
                                   ),
                                 ),
                                 _buildMatchGrid(others, crossAxisCount),
-                              ] else ...[
+                              ],
+
+                              // Fallback nếu không chia được mục nào
+                              if (major.isEmpty && others.isEmpty && _matches.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
                                     title: '⚽ Tất Cả Trận Đấu Hôm Nay',
@@ -316,6 +325,7 @@ class _FootballScreenState extends State<FootballScreen> {
                                 ),
                                 _buildMatchGrid(_matches, crossAxisCount),
                               ],
+
                               const SliverToBoxAdapter(
                                 child: SizedBox(height: 24),
                               ),
@@ -418,6 +428,10 @@ class _FootballScreenState extends State<FootballScreen> {
       cardBg = const Color(0xFF422006).withOpacity(0.7);
       borderColor = const Color(0xFFB45309);
       focusBorder = const Color(0xFFF59E0B);
+    } else if (match.isFamous) {
+      cardBg = const Color(0xFF0C2444).withOpacity(0.6);
+      borderColor = const Color(0xFF0284C7);
+      focusBorder = const Color(0xFF38BDF8);
     } else if (match.isHot) {
       cardBg = const Color(0xFF312E81).withOpacity(0.5);
       borderColor = const Color(0xFF4F46E5);
@@ -426,11 +440,13 @@ class _FootballScreenState extends State<FootballScreen> {
 
     Widget footerWidget;
     if (match.isVietnam) {
-      footerWidget = const Text('⭐ ĐỘI TUYỂN VIỆT NAM ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = const Text('⭐ BÓNG ĐÁ VIỆT NAM ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
     } else if (match.isMuFavorite) {
       footerWidget = const Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
     } else if (match.isFavorite && match.favoriteBadgeText.isNotEmpty) {
       footerWidget = Text('⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐', style: const TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isFamous) {
+      footerWidget = Text('🔥 ${match.league.toUpperCase()} 🔥', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis);
     } else if (match.isHot) {
       footerWidget = const Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
     } else {

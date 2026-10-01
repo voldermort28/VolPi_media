@@ -57,11 +57,22 @@ class ApiService {
   }
 
   void _sortMatches(List<MatchModel> matches) {
-    // Sort: Việt Nam & MU #1, Favorite Clubs & Hot #2, Others #3
+    // Sort:
+    // 1. Level priority: Việt Nam & MU (score 0) -> Famous Leagues & Top Clubs (score 1) -> Others (score 2)
+    // 2. Live matches first (isLive)
+    // 3. Chronological timeline (earlier matches first)
     matches.sort((a, b) {
-      int scoreA = (a.isVietnam || a.isMuFavorite) ? 0 : (a.isFavorite ? 1 : 2);
-      int scoreB = (b.isVietnam || b.isMuFavorite) ? 0 : (b.isFavorite ? 1 : 2);
-      return scoreA.compareTo(scoreB);
+      int scoreA = (a.isVietnam || a.isMuFavorite) ? 0 : ((a.isFamous || a.isFavorite) ? 1 : 2);
+      int scoreB = (b.isVietnam || b.isMuFavorite) ? 0 : ((b.isFamous || b.isFavorite) ? 1 : 2);
+      if (scoreA != scoreB) return scoreA.compareTo(scoreB);
+
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
+
+      if (a.matchTimestamp > 0 && b.matchTimestamp > 0) {
+        return a.matchTimestamp.compareTo(b.matchTimestamp);
+      }
+      return 0;
     });
   }
 

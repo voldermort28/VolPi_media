@@ -13,6 +13,7 @@ class MatchModel {
   final bool isVietnam;
   final bool isMuFavorite;
   final bool isFavorite;
+  final bool isFamous;
   final bool isHot;
   final String favoriteBadgeText;
   final bool isLive;
@@ -33,6 +34,7 @@ class MatchModel {
     this.isVietnam = false,
     this.isMuFavorite = false,
     this.isFavorite = false,
+    this.isFamous = false,
     this.isHot = false,
     this.favoriteBadgeText = '',
     this.isLive = false,
@@ -70,15 +72,49 @@ class MatchModel {
     if (home.isEmpty) home = 'Đội nhà';
     if (away.isEmpty) away = 'Đội khách';
 
-    final String allText = '$rawTitle $desc $home $away'.toLowerCase();
+    final String allText = '$rawTitle $desc $league $home $away'.toLowerCase();
 
-    // Check Vietnam
-    final bool isVn = rawTitle.contains('⭐ [VIỆT NAM]') ||
+    // Check Vietnam Football & Vietnamese Clubs
+    final bool isVn = json['isVietnam'] == true ||
+        rawTitle.contains('⭐ [VIỆT NAM]') ||
+        rawTitle.contains('BÓNG ĐÁ VIỆT NAM') ||
+        rawTitle.contains('ĐỘI TUYỂN VIỆT NAM') ||
         allText.contains('việt nam') ||
         allText.contains('viet nam') ||
         allText.contains('vietnam') ||
         allText.contains('u23 việt nam') ||
-        allText.contains('đt việt nam');
+        allText.contains('u22 việt nam') ||
+        allText.contains('u19 việt nam') ||
+        allText.contains('u21 việt nam') ||
+        allText.contains('đt việt nam') ||
+        allText.contains('v-league') ||
+        allText.contains('vleague') ||
+        allText.contains('v.league') ||
+        allText.contains('cúp quốc gia') ||
+        allText.contains('hạng nhất quốc gia') ||
+        allText.contains('nam định') ||
+        allText.contains('hà nội fc') ||
+        allText.contains('clb hà nội') ||
+        allText.contains('công an hà nội') ||
+        allText.contains('cahn') ||
+        allText.contains('thể công') ||
+        allText.contains('viettel') ||
+        allText.contains('hagl') ||
+        allText.contains('hoàng anh gia lai') ||
+        allText.contains('sông lam nghệ an') ||
+        allText.contains('slna') ||
+        allText.contains('thanh hóa') ||
+        allText.contains('bình định') ||
+        allText.contains('hải phòng') ||
+        allText.contains('bình dương') ||
+        allText.contains('becamex') ||
+        allText.contains('tp.hồ chí minh') ||
+        allText.contains('tp hcm') ||
+        allText.contains('đà nẵng') ||
+        allText.contains('quảng nam') ||
+        allText.contains('hà tĩnh') ||
+        allText.contains('khánh hòa') ||
+        allText.contains('pvf');
 
     // Check Manchester United
     final bool isMu = rawTitle.contains('⭐ [MU') ||
@@ -95,25 +131,33 @@ class MatchModel {
       {'keys': ['arsenal'], 'label': 'ARSENAL'},
       {'keys': ['chelsea'], 'label': 'CHELSEA'},
       {'keys': ['tottenham', 'spurs'], 'label': 'TOTTENHAM'},
+      {'keys': ['aston villa'], 'label': 'ASTON VILLA'},
+      {'keys': ['newcastle'], 'label': 'NEWCASTLE'},
       {'keys': ['brighton'], 'label': 'BRIGHTON'},
       {'keys': ['brentford'], 'label': 'BRENTFORD'},
       {'keys': ['real madrid'], 'label': 'REAL MADRID'},
       {'keys': ['barcelona', 'barca'], 'label': 'BARCELONA'},
+      {'keys': ['atletico madrid', 'atletico'], 'label': 'ATLETICO'},
       {'keys': ['bayern munich', 'bayern'], 'label': 'BAYERN MUNICH'},
+      {'keys': ['dortmund', 'bvb'], 'label': 'DORTMUND'},
+      {'keys': ['leverkusen', 'bayer leverkusen'], 'label': 'LEVERKUSEN'},
       {'keys': ['paris saint-germain', 'psg', 'paris sg'], 'label': 'PSG'},
       {'keys': ['juventus', 'juve'], 'label': 'JUVENTUS'},
       {'keys': ['inter milan', 'inter'], 'label': 'INTER MILAN'},
       {'keys': ['ac milan', 'milan'], 'label': 'AC MILAN'},
-      {'keys': ['dortmund', 'bvb'], 'label': 'DORTMUND'},
-      {'keys': ['atletico madrid', 'atletico'], 'label': 'ATLETICO'},
-      {'keys': ['leverkusen', 'bayer leverkusen'], 'label': 'LEVERKUSEN'},
+      {'keys': ['as roma', 'roma'], 'label': 'ROMA'},
+      {'keys': ['napoli'], 'label': 'NAPOLI'},
+      {'keys': ['al nassr', 'al-nassr'], 'label': 'AL NASSR'},
+      {'keys': ['al hilal', 'al-hilal'], 'label': 'AL HILAL'},
+      {'keys': ['al ittihad', 'al-ittihad'], 'label': 'AL ITTIHAD'},
+      {'keys': ['inter miami'], 'label': 'INTER MIAMI'},
     ];
 
     bool matchFavorite = isVn || isMu;
     String badgeText = '';
 
     if (isVn) {
-      badgeText = 'ĐỘI TUYỂN VIỆT NAM';
+      badgeText = 'BÓNG ĐÁ VIỆT NAM';
     } else if (isMu) {
       badgeText = 'MANCHESTER UNITED';
     } else {
@@ -136,7 +180,39 @@ class MatchModel {
       }
     }
 
+    // Check Major / Famous Worldwide Leagues
+    final List<String> majorLeagueKeywords = [
+      'premier league', 'ngoại hạng anh', 'epl', 'fa cup', 'cúp fa', 'carabao', 'efl cup',
+      'champions league', 'cúp c1', 'uefa champions', 'ucl',
+      'europa league', 'cúp c2', 'uefa europa', 'uel',
+      'conference league', 'cúp c3', 'uefa conference', 'uecl',
+      'siêu cúp châu âu', 'super cup',
+      'la liga', 'vđqg tây ban nha', 'copa del rey', 'cúp nhà vua', 'supercopa',
+      'serie a', 'vđqg ý', 'coppa italia', 'cúp ý', 'supercoppa italiana',
+      'bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup',
+      'ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp',
+      'world cup', 'vòng loại world cup', 'euro', 'vòng loại euro', 'nations league',
+      'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
+      'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
+      'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
+    ];
+
+    bool isMajorLeague = false;
+    for (final lk in majorLeagueKeywords) {
+      if (allText.contains(lk)) {
+        isMajorLeague = true;
+        break;
+      }
+    }
+
+    final bool isFamousMatch = json['isFamous'] == true ||
+        isVn ||
+        isMu ||
+        matchFavorite ||
+        isMajorLeague;
+
     final bool isHotMatch = matchFavorite ||
+        isFamousMatch ||
         rawTitle.contains('🔥') ||
         rawTitle.toLowerCase().contains('tâm điểm');
 
@@ -165,6 +241,7 @@ class MatchModel {
       isVietnam: isVn,
       isMuFavorite: isMu,
       isFavorite: matchFavorite,
+      isFamous: isFamousMatch,
       isHot: isHotMatch,
       favoriteBadgeText: badgeText,
       isLive: live,

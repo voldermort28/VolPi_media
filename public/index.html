@@ -685,12 +685,15 @@
         let html = '';
         for (let i = 0; i < Math.min(matches.length, 15); i++) {
           const m = matches[i];
-          const isMu = m.priority && m.priority.level === 1;
-          const isBig = m.priority && m.priority.level === 2;
-          const borderClass = isMu ? 'border-rose-500/60 bg-rose-950/20' : (isBig ? 'border-amber-500/50 bg-amber-950/20' : 'border-slate-800 bg-slate-900/60');
+          const isVn = m.isVietnam || (m.priority && m.priority.badgeText && m.priority.badgeText.includes('VIỆT NAM'));
+          const isMu = !isVn && (m.priority && m.priority.level === 1);
+          const isBig = m.isFamous || (m.priority && m.priority.level === 2);
+          const borderClass = isVn ? 'border-red-500/60 bg-red-950/20' : (isMu ? 'border-rose-500/60 bg-rose-950/20' : (isBig ? 'border-amber-500/50 bg-amber-950/20' : 'border-slate-800 bg-slate-900/60'));
           
           let badgeHtml = '';
-          if (isMu) {
+          if (isVn) {
+            badgeHtml = '<span class="text-[10px] px-2 py-0.5 rounded bg-red-600 text-white font-black tracking-wide">⭐ BÓNG ĐÁ VIỆT NAM</span>';
+          } else if (isMu) {
             badgeHtml = '<span class="text-[10px] px-2 py-0.5 rounded bg-rose-600 text-white font-black tracking-wide">⭐ MU FAVORITE</span>';
           } else if (isBig) {
             badgeHtml = '<span class="text-[10px] px-2 py-0.5 rounded bg-amber-600 text-white font-black tracking-wide">🔥 TÂM ĐIỂM</span>';

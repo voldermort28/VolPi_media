@@ -70,28 +70,33 @@ function parseXoilacTime(timeStr, statusText = '') {
 }
 
 function getTeamPriority(match) {
-  const q = `${match.homeTeam} ${match.awayTeam} ${match.title} ${match.slug}`.toLowerCase();
+  const q = ` ${match.homeTeam} ${match.awayTeam} ${match.title} ${match.slug} ${match.league || ''} `.toLowerCase();
   
-  // 1. Việt Nam & Manchester United (Level 1 - Supreme Favorites #1)
-  if (
-    q.includes('việt nam') ||
-    q.includes('viet nam') ||
-    q.includes('vietnam') ||
-    q.includes('u23 việt nam') ||
-    q.includes('u22 việt nam') ||
-    q.includes('u19 việt nam') ||
-    q.includes('đt việt nam')
-  ) {
+  // 1. Việt Nam Football (Level 1 - Supreme Highlight)
+  const vnKeywords = [
+    'việt nam', 'viet nam', 'vietnam', 'u23 việt nam', 'u22 việt nam', 'u19 việt nam', 'u21 việt nam',
+    'đt việt nam', 'đội tuyển việt nam', 'đt nữ việt nam',
+    'v-league', 'vleague', 'v.league', 'v league', 'cúp quốc gia', 'hạng nhất quốc gia',
+    'nam định', 'hà nội fc', 'clb hà nội', 'công an hà nội', 'cahn',
+    'thể công', 'viettel', 'hagl', 'hoàng anh gia lai', 'sông lam nghệ an', 'slna',
+    'thanh hóa', 'bình định', 'hải phòng', 'bình dương', 'becamex', 'tp.hồ chí minh', 'tp hcm',
+    'đà nẵng', 'quảng nam', 'hà tĩnh', 'hồng lĩnh hà tĩnh', 'khánh hòa', 'pvf'
+  ];
+
+  if (vnKeywords.some((k) => q.includes(k))) {
     return {
       level: 1,
+      isFamous: true,
+      isVietnam: true,
       tag: '⭐ [VIỆT NAM]',
-      badgeText: '⭐ ĐỘI TUYỂN VIỆT NAM ⭐',
+      badgeText: '⭐ BÓNG ĐÁ VIỆT NAM ⭐',
       color: '#dc2626',
       badgeBg: '#7f1d1d',
       textColor: '#fde047',
     };
   }
 
+  // 1b. Manchester United (Level 1 - Supreme User Favorite)
   if (
     q.includes('manchester united') ||
     q.includes('manchester utd') ||
@@ -104,6 +109,8 @@ function getTeamPriority(match) {
   ) {
     return {
       level: 1,
+      isFamous: true,
+      isVietnam: false,
       tag: '⭐ [MU FAVORITE]',
       badgeText: '⭐ MANCHESTER UNITED ⭐',
       color: '#e11d48',
@@ -112,31 +119,44 @@ function getTeamPriority(match) {
     };
   }
 
-  // 2. Highlighted Big Teams & User Favorites (Level 2)
+  // 2a. Highlighted Big Teams & User Favorites (Level 2)
   const bigTeams = [
-    { names: ['manchester city', 'man city', 'mancity', ' man city'], label: 'Man City' },
+    { names: ['manchester city', 'man city', 'mancity', ' mc '], label: 'Man City' },
     { names: ['liverpool'], label: 'Liverpool' },
     { names: ['arsenal'], label: 'Arsenal' },
     { names: ['chelsea'], label: 'Chelsea' },
     { names: ['tottenham', 'spurs'], label: 'Tottenham' },
+    { names: ['aston villa'], label: 'Aston Villa' },
+    { names: ['newcastle'], label: 'Newcastle' },
     { names: ['brighton'], label: 'Brighton' },
     { names: ['brentford'], label: 'Brentford' },
     { names: ['real madrid'], label: 'Real Madrid' },
     { names: ['barcelona', 'barca'], label: 'Barcelona' },
+    { names: ['atletico madrid', 'atletico'], label: 'Atletico Madrid' },
     { names: ['bayern munich', 'bayern'], label: 'Bayern Munich' },
+    { names: ['dortmund', 'bvb'], label: 'Dortmund' },
+    { names: ['leverkusen', 'bayer leverkusen'], label: 'Leverkusen' },
     { names: ['paris saint-germain', 'psg', 'paris sg'], label: 'PSG' },
     { names: ['juventus', 'juve'], label: 'Juventus' },
     { names: ['inter milan'], label: 'Inter Milan' },
     { names: ['ac milan'], label: 'AC Milan' },
-    { names: ['dortmund', 'bvb'], label: 'Dortmund' },
-    { names: ['atletico madrid', 'atletico'], label: 'Atletico Madrid' },
-    { names: ['leverkusen', 'bayer leverkusen'], label: 'Leverkusen' },
+    { names: ['as roma', ' roma '], label: 'AS Roma' },
+    { names: ['napoli'], label: 'Napoli' },
+    { names: ['al nassr', 'al-nassr'], label: 'Al Nassr' },
+    { names: ['al hilal', 'al-hilal'], label: 'Al Hilal' },
+    { names: ['al ittihad', 'al-ittihad'], label: 'Al Ittihad' },
+    { names: ['inter miami'], label: 'Inter Miami' },
+    { names: ['benfica'], label: 'Benfica' },
+    { names: ['porto'], label: 'Porto' },
+    { names: ['sporting lisbon', 'sporting cp'], label: 'Sporting CP' },
   ];
 
   for (const team of bigTeams) {
     if (team.names.some((n) => q.includes(n))) {
       return {
         level: 2,
+        isFamous: true,
+        isVietnam: false,
         tag: '🔥 [TÂM ĐIỂM]',
         badgeText: `🔥 TÂM ĐIỂM: ${team.label.toUpperCase()} 🔥`,
         color: '#f59e0b',
@@ -146,9 +166,46 @@ function getTeamPriority(match) {
     }
   }
 
-  // 3. Normal match (Level 3)
+  // 2b. Major & Famous Leagues Worldwide (Level 2)
+  const majorLeagues = [
+    { names: ['premier league', 'ngoại hạng anh', 'epl', 'fa cup', 'cúp fa', 'carabao', 'efl cup', 'cúp liên đoàn anh'], label: 'Ngoại Hạng Anh' },
+    { names: ['champions league', 'cúp c1', 'uefa champions', 'ucl'], label: 'UEFA Champions League' },
+    { names: ['europa league', 'cúp c2', 'uefa europa', 'uel'], label: 'UEFA Europa League' },
+    { names: ['conference league', 'cúp c3', 'uefa conference', 'uecl'], label: 'UEFA Conference League' },
+    { names: ['siêu cúp châu âu', 'uefa super cup'], label: 'UEFA Super Cup' },
+    { names: ['la liga', 'vđqg tây ban nha', 'copa del rey', 'cúp nhà vua', 'supercopa'], label: 'La Liga' },
+    { names: ['serie a', 'vđqg ý', 'coppa italia', 'cúp ý', 'supercoppa italiana'], label: 'Serie A' },
+    { names: ['bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup'], label: 'Bundesliga' },
+    { names: ['ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp'], label: 'Ligue 1' },
+    { names: ['world cup', 'vòng loại world cup', 'world cup qualifiers'], label: 'World Cup' },
+    { names: ['euro', 'vòng loại euro', 'uefa euro'], label: 'UEFA Euro' },
+    { names: ['nations league', 'uefa nations'], label: 'UEFA Nations League' },
+    { names: ['copa america'], label: 'Copa America' },
+    { names: ['asian cup', 'afc asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á', 'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic'], label: 'Giải Châu Á / ĐNÁ' },
+    { names: ['saudi pro league', 'saudi league', 'vđqg ả rập xê út', 'roshn'], label: 'Saudi Pro League' },
+    { names: ['mls', 'major league soccer', 'nhà nghề mỹ'], label: 'Major League Soccer' },
+  ];
+
+  for (const lg of majorLeagues) {
+    if (lg.names.some((n) => q.includes(n))) {
+      return {
+        level: 2,
+        isFamous: true,
+        isVietnam: false,
+        tag: '🔥 [TÂM ĐIỂM]',
+        badgeText: `🔥 ${lg.label.toUpperCase()} 🔥`,
+        color: '#0284c7',
+        badgeBg: '#0369a1',
+        textColor: '#e0f2fe',
+      };
+    }
+  }
+
+  // 3. Normal / Obscure / Minor league match (Level 3 - Khu vực 2)
   return {
     level: 3,
+    isFamous: false,
+    isVietnam: false,
     tag: '',
     badgeText: '',
     color: '#334155',
@@ -305,6 +362,8 @@ async function getLiveMatches() {
 
       const priority = getTeamPriority(matchObj);
       matchObj.priority = priority;
+      matchObj.isFamous = !!priority.isFamous;
+      matchObj.isVietnam = !!priority.isVietnam;
 
       const fullTitle = `${homeTeam} vs ${awayTeam}`;
       const prefix = priority.tag ? `${priority.tag} ` : '';

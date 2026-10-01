@@ -1,10 +1,10 @@
 {
-  "version": "1.0.17",
-  "build": 18,
-  "tag_name": "v1.0.17",
-  "changelog": "• Lọc sạch triệt để các trận đấu đã kết thúc cho cả tab Xôi Lạc và tab IPTV, bảo vệ giữ nguyên các trận bị hoãn thời tiết / hiệp phụ / luân lưu.\n• Thêm thanh chỉnh âm lượng & nút Mute trong Video Player cho macOS (hỗ trợ phím tắt M, Up/Down, cuộn chuột và thanh trượt).\n• Hiển thị nhãn TRỰC TIẾP đỏ nhấp nháy cho các trận đang diễn ra.",
+  "version": "1.0.18",
+  "build": 19,
+  "tag_name": "v1.0.18",
+  "changelog": "• Phân loại 2 khu vực trận đấu theo Phương án 1:\n  - Khu vực 1: Tâm điểm & Giải đấu hàng đầu (Bóng đá Việt Nam, V-League, ĐTQG, Cúp C1, Ngoại Hạng Anh, La Liga, Serie A, Bundesliga, Top Clubs...).\n  - Khu vực 2: Các trận đấu & Giải đấu khác (giữ trọn vẹn các giải phụ, giải cỏ, giải trẻ để người dùng dễ dàng tìm lại ở cuối danh sách).\n• Tối ưu hiển thị badge và card cho các giải đấu lớn.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-01T22:05:00Z"
+  "published_at": "2026-10-02T02:30:00Z"
 }
