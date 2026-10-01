@@ -123,6 +123,8 @@ class _AnimeScreenState extends State<AnimeScreen> {
 
                         return GridView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          addAutomaticKeepAlives: false,
+                          cacheExtent: 150,
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
                             crossAxisSpacing: 12,

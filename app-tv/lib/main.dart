@@ -6,6 +6,10 @@ import 'layout/adaptive_layout.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Low-RAM TV & Device Optimization: limit image cache to prevent GC thrashing & lag
+  PaintingBinding.instance.imageCache.maximumSize = 120;
+  PaintingBinding.instance.imageCache.maximumSizeBytes = 25 << 20; // 25 MB
+
   // Allow all orientations (TV landscape, Phone portrait/landscape, iPad both)
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.landscapeLeft,

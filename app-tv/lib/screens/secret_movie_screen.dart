@@ -384,6 +384,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
                             return CustomScrollView(
                               controller: _scrollController,
+                              cacheExtent: 150,
                               slivers: [
                                 SliverPadding(
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -412,6 +413,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                         return _buildMovieCard(movie);
                                       },
                                       childCount: _movies.length,
+                                      addAutomaticKeepAlives: false,
                                     ),
                                   ),
                                 ),

@@ -56,50 +56,52 @@ class _TvFocusableCardState extends State<TvFocusableCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _focusNode,
-      autofocus: widget.autoFocus,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          if (event.logicalKey == LogicalKeyboardKey.select ||
-              event.logicalKey == LogicalKeyboardKey.enter ||
-              event.logicalKey == LogicalKeyboardKey.gameButtonA) {
-            widget.onTap();
-            return KeyEventResult.handled;
+    return RepaintBoundary(
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: widget.autoFocus,
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            if (event.logicalKey == LogicalKeyboardKey.select ||
+                event.logicalKey == LogicalKeyboardKey.enter ||
+                event.logicalKey == LogicalKeyboardKey.gameButtonA) {
+              widget.onTap();
+              return KeyEventResult.handled;
+            }
           }
-        }
-        return KeyEventResult.ignored;
-      },
-      child: GestureDetector(
-        onTap: () {
-          _focusNode.requestFocus();
-          widget.onTap();
+          return KeyEventResult.ignored;
         },
-        child: AnimatedScale(
-          scale: _isFocused ? widget.scale : 1.0,
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            decoration: BoxDecoration(
-              borderRadius: widget.borderRadius,
-              border: Border.all(
-                color: _isFocused ? widget.focusBorderColor : Colors.transparent,
-                width: _isFocused ? 3.0 : 0.0,
+        child: GestureDetector(
+          onTap: () {
+            _focusNode.requestFocus();
+            widget.onTap();
+          },
+          child: AnimatedScale(
+            scale: _isFocused ? widget.scale : 1.0,
+            duration: const Duration(milliseconds: 160),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              decoration: BoxDecoration(
+                borderRadius: widget.borderRadius,
+                border: Border.all(
+                  color: _isFocused ? widget.focusBorderColor : Colors.transparent,
+                  width: 2.5,
+                ),
+                boxShadow: _isFocused
+                    ? [
+                        BoxShadow(
+                          color: widget.focusBorderColor.withOpacity(0.55),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
               ),
-              boxShadow: _isFocused
-                  ? [
-                      BoxShadow(
-                        color: widget.focusBorderColor.withOpacity(0.5),
-                        blurRadius: 16,
-                        spreadRadius: 2,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: ClipRRect(
-              borderRadius: widget.borderRadius,
-              child: widget.child,
+              child: ClipRRect(
+                borderRadius: widget.borderRadius,
+                child: widget.child,
+              ),
             ),
           ),
         ),

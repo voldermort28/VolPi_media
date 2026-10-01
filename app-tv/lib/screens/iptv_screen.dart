@@ -877,6 +877,8 @@ class _IptvScreenState extends State<IptvScreen> {
                 )
               : GridView.builder(
                   padding: const EdgeInsets.all(16),
+                  addAutomaticKeepAlives: false,
+                  cacheExtent: 150,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
                     childAspectRatio: 0.92,
@@ -947,6 +949,8 @@ class _IptvScreenState extends State<IptvScreen> {
                 )
               : GridView.builder(
                   padding: const EdgeInsets.all(12),
+                  addAutomaticKeepAlives: false,
+                  cacheExtent: 150,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: crossAxisCount,
                     childAspectRatio: 0.92,

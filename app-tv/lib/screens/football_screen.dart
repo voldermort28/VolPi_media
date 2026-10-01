@@ -286,6 +286,7 @@ class _FootballScreenState extends State<FootballScreen> {
 
                           return CustomScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
+                            cacheExtent: 150,
                             slivers: [
                               if (favs.isNotEmpty) ...[
                                 SliverToBoxAdapter(
@@ -393,6 +394,8 @@ class _FootballScreenState extends State<FootballScreen> {
         delegate: SliverChildBuilderDelegate(
           (context, idx) => _buildMatchCard(matches[idx]),
           childCount: matches.length,
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: true,
         ),
       ),
     );

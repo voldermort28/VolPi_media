@@ -107,7 +107,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _videoListener() {
-    if (mounted && _isInitialized) {
+    if (!mounted || !_isInitialized) return;
+    // Performance optimization for low-end hardware:
+    // Only rebuild UI if controls or channel overlay are currently visible.
+    // When watching video (controls hidden), avoid rebuilding the entire screen 10 times per second!
+    if (_showControls || _showChannelList) {
       setState(() {});
     }
   }
