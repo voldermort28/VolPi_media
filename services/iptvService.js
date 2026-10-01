@@ -567,12 +567,90 @@ function classifyChannel(name, group = '') {
 }
 
 /**
+ * Classifies Football match priority:
+ * 1. Việt Nam Football & Manchester United (Priority 1)
+ * 2. Major Leagues & Top Clubs (Priority 2)
+ * 3. Other matches / Obscure leagues (Priority 3)
+ */
+function classifyFootballPriority(name, group = '') {
+  const q = ` ${name} ${group} `.toLowerCase();
+
+  // 1. Việt Nam Football
+  const vnKeywords = [
+    'việt nam', 'viet nam', 'vietnam', 'u23 việt nam', 'u22 việt nam', 'u19 việt nam', 'u21 việt nam',
+    'đt việt nam', 'đội tuyển việt nam', 'đt nữ việt nam',
+    'v-league', 'vleague', 'v.league', 'v league', 'cúp quốc gia', 'hạng nhất quốc gia',
+    'nam định', 'hà nội fc', 'clb hà nội', 'công an hà nội', 'cahn',
+    'thể công', 'viettel', 'hagl', 'hoàng anh gia lai', 'sông lam nghệ an', 'slna',
+    'thanh hóa', 'bình định', 'hải phòng', 'bình dương', 'becamex', 'tp.hồ chí minh', 'tp hcm',
+    'đà nẵng', 'quảng nam', 'hà tĩnh', 'khánh hòa', 'pvf'
+  ];
+  if (vnKeywords.some((k) => q.includes(k))) {
+    return { priorityLevel: 1, isVietnam: true, isFamous: true };
+  }
+
+  // 1b. Manchester United
+  if (
+    q.includes('manchester united') ||
+    q.includes('manchester utd') ||
+    q.includes('man united') ||
+    q.includes('man utd') ||
+    q.includes('man u ') ||
+    q.includes(' mu ') ||
+    q.endsWith(' mu') ||
+    q.startsWith('mu ')
+  ) {
+    return { priorityLevel: 1, isVietnam: false, isFamous: true };
+  }
+
+  // 2a. Big Teams & Top Clubs
+  const bigTeams = [
+    'manchester city', 'man city', 'mancity', ' mc ',
+    'liverpool', 'arsenal', 'chelsea', 'tottenham', 'spurs',
+    'aston villa', 'newcastle', 'brighton', 'brentford',
+    'real madrid', 'barcelona', 'barca', 'atletico madrid', 'atletico',
+    'bayern munich', 'bayern', 'dortmund', 'bvb', 'leverkusen',
+    'paris saint-germain', 'psg', 'paris sg',
+    'juventus', 'juve', 'inter milan', 'ac milan', 'as roma', ' roma ', 'napoli',
+    'al nassr', 'al-nassr', 'al hilal', 'al-hilal', 'al ittihad', 'al-ittihad',
+    'inter miami', 'benfica', 'porto', 'sporting lisbon', 'sporting cp'
+  ];
+  if (bigTeams.some((t) => q.includes(t))) {
+    return { priorityLevel: 2, isVietnam: false, isFamous: true };
+  }
+
+  // 2b. Major & Famous Leagues
+  const majorLeagues = [
+    'premier league', 'ngoại hạng anh', 'epl', 'fa cup', 'cúp fa', 'carabao', 'efl cup',
+    'champions league', 'cúp c1', 'uefa champions', 'ucl',
+    'europa league', 'cúp c2', 'uefa europa', 'uel',
+    'conference league', 'cúp c3', 'uefa conference', 'uecl',
+    'siêu cúp châu âu', 'super cup',
+    'la liga', 'vđqg tây ban nha', 'copa del rey', 'cúp nhà vua', 'supercopa',
+    'serie a', 'vđqg ý', 'coppa italia', 'cúp ý', 'supercoppa italiana',
+    'bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup',
+    'ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp',
+    'world cup', 'vòng loại world cup', 'euro', 'vòng loại euro', 'nations league',
+    'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
+    'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
+    'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
+  ];
+  if (majorLeagues.some((l) => q.includes(l))) {
+    return { priorityLevel: 2, isVietnam: false, isFamous: true };
+  }
+
+  // 3. Other matches / Obscure leagues
+  return { priorityLevel: 3, isVietnam: false, isFamous: false };
+}
+
+/**
  * Smart Channel Comparator:
  * 1. Pinned channels (isPinned)
- * 2. Live matches (🟢 LIVE)
- * 3. Categories: FOOTBALL (1) -> OTHER_SPORTS (2) -> FIXED_TV (3)
- * 4. Chronological order for sports/matches
- * 5. Vietnamese alphabet tie-breaker for Fixed TV
+ * 2. Categories: FOOTBALL (1) -> OTHER_SPORTS (2) -> FIXED_TV (3)
+ * 3. For FOOTBALL: Major / Famous / VN (Priority 1 & 2) before Other matches (Priority 3)
+ * 4. Live matches (🟢 LIVE) first
+ * 5. Chronological order for sports/matches
+ * 6. Vietnamese alphabet tie-breaker for Fixed TV
  */
 function compareChannels(a, b) {
   // 1. Pinned priority (e.g. pinned live match first, or pinned channels)
@@ -585,11 +663,18 @@ function compareChannels(a, b) {
   const wB = catWeight[b.category] || 3;
   if (wA !== wB) return wA - wB;
 
-  // 3. Within the same category: Live match priority (🟢 LIVE) first
+  // 3. For FOOTBALL: Sort Area 1 (Famous/VN, priorityLevel 1 & 2) before Area 2 (Other, priorityLevel 3)
+  if (a.category === 'FOOTBALL' && b.category === 'FOOTBALL') {
+    const pA = a.priorityLevel || 3;
+    const pB = b.priorityLevel || 3;
+    if (pA !== pB) return pA - pB;
+  }
+
+  // 4. Within the same category & priority: Live match priority (🟢 LIVE) first
   if (a.isLive && !b.isLive) return -1;
   if (!a.isLive && b.isLive) return 1;
 
-  // 4. Chronological timeline for matches
+  // 5. Chronological timeline for matches
   if (a.matchTimestamp && b.matchTimestamp) {
     if (a.matchTimestamp !== b.matchTimestamp) {
       return a.matchTimestamp - b.matchTimestamp;
@@ -600,7 +685,7 @@ function compareChannels(a, b) {
     return 1;
   }
 
-  // 5. Traditional channels alphabetical
+  // 6. Traditional channels alphabetical
   return (a.name || '').localeCompare(b.name || '', 'vi');
 }
 
@@ -728,6 +813,10 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       }
     }
 
+    const footballPriority = (cat === 'FOOTBALL')
+      ? classifyFootballPriority(c.name, c.group)
+      : { priorityLevel: 3, isVietnam: false, isFamous: false };
+
     return {
       ...c,
       cleanTitle,
@@ -737,6 +826,9 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       isLive: timeInfo.isLive,
       matchTime: timeInfo.matchTime,
       matchTimestamp: timeInfo.matchTimestamp,
+      priorityLevel: footballPriority.priorityLevel,
+      isFamous: footballPriority.isFamous,
+      isVietnam: footballPriority.isVietnam,
       isPinned,
       isHidden: isHidden || isExpired,
       isExpired,

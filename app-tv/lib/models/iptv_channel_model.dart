@@ -37,6 +37,9 @@ class IptvChannelModel {
   final String matchTime;
   final int matchTimestamp;
   final String category;
+  final int priorityLevel;
+  final bool isFamous;
+  final bool isVietnam;
 
   const IptvChannelModel({
     required this.id,
@@ -55,6 +58,9 @@ class IptvChannelModel {
     this.matchTime = '',
     this.matchTimestamp = 0,
     this.category = 'FIXED_TV',
+    this.priorityLevel = 3,
+    this.isFamous = false,
+    this.isVietnam = false,
   });
 
   static String extractCleanTitle(String rawName) {
@@ -108,6 +114,9 @@ class IptvChannelModel {
       matchTime: parsedMatchTime.isNotEmpty ? parsedMatchTime : extractMatchTime(rawName),
       matchTimestamp: json['matchTimestamp'] is int ? json['matchTimestamp'] : (int.tryParse(json['matchTimestamp']?.toString() ?? '0') ?? 0),
       category: json['category']?.toString() ?? 'FIXED_TV',
+      priorityLevel: json['priorityLevel'] is int ? json['priorityLevel'] : (int.tryParse(json['priorityLevel']?.toString() ?? '3') ?? 3),
+      isFamous: json['isFamous'] == true,
+      isVietnam: json['isVietnam'] == true,
     );
   }
 
@@ -129,6 +138,9 @@ class IptvChannelModel {
       'matchTime': matchTime,
       'matchTimestamp': matchTimestamp,
       'category': category,
+      'priorityLevel': priorityLevel,
+      'isFamous': isFamous,
+      'isVietnam': isVietnam,
     };
   }
 

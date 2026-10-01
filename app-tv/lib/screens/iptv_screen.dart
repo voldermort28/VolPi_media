@@ -200,7 +200,14 @@ class _IptvScreenState extends State<IptvScreen> {
         if (wA != wB) return wA.compareTo(wB);
       }
 
-      // 3. Within the category, Live matches first
+      // 3. For FOOTBALL: Area 1 (Famous/VN, priorityLevel 1 & 2) before Area 2 (Others, priorityLevel 3)
+      if (a.category == 'FOOTBALL' && b.category == 'FOOTBALL') {
+        if (a.priorityLevel != b.priorityLevel) {
+          return a.priorityLevel.compareTo(b.priorityLevel);
+        }
+      }
+
+      // 4. Within the category, Live matches first
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
 
@@ -875,22 +882,7 @@ class _IptvScreenState extends State<IptvScreen> {
                     ],
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  addAutomaticKeepAlives: false,
-                  cacheExtent: 150,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: 0.92,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                  ),
-                  itemCount: filteredChannels.length,
-                  itemBuilder: (context, index) {
-                    final channel = filteredChannels[index];
-                    return _buildChannelCard(channel, filteredChannels);
-                  },
-                ),
+              : _buildTieredChannelGrid(filteredChannels, crossAxisCount),
         ),
       ],
     );
@@ -947,22 +939,7 @@ class _IptvScreenState extends State<IptvScreen> {
                     style: const TextStyle(color: Colors.white60, fontSize: 13),
                   ),
                 )
-              : GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  addAutomaticKeepAlives: false,
-                  cacheExtent: 150,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: 0.92,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                  itemCount: filteredChannels.length,
-                  itemBuilder: (context, index) {
-                    final channel = filteredChannels[index];
-                    return _buildChannelCard(channel, filteredChannels);
-                  },
-                ),
+              : _buildTieredChannelGrid(filteredChannels, crossAxisCount),
         ),
       ],
     );
@@ -1122,6 +1099,144 @@ class _IptvScreenState extends State<IptvScreen> {
     );
   }
 
+  /// Builds a channel grid that splits FOOTBALL into Area 1 (Famous/VN) and Area 2 (Other)
+  Widget _buildTieredChannelGrid(List<IptvChannelModel> channels, int crossAxisCount) {
+    final bool isFootballTab = _selectedCategory == 'FOOTBALL';
+
+    // For non-FOOTBALL tabs, render a simple flat grid
+    if (!isFootballTab) {
+      return GridView.builder(
+        padding: const EdgeInsets.all(12),
+        addAutomaticKeepAlives: false,
+        cacheExtent: 150,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          childAspectRatio: 0.92,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+        ),
+        itemCount: channels.length,
+        itemBuilder: (context, index) {
+          return _buildChannelCard(channels[index], channels);
+        },
+      );
+    }
+
+    // FOOTBALL tab: Split into Area 1 and Area 2
+    final area1 = channels.where((c) => c.priorityLevel <= 2).toList();
+    final area2 = channels.where((c) => c.priorityLevel > 2).toList();
+
+    return CustomScrollView(
+      cacheExtent: 150,
+      slivers: [
+        // Area 1: Famous / VN matches
+        if (area1.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  const Text('⭐', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tâm Điểm & Giải Đấu Hàng Đầu',
+                    style: TextStyle(
+                      color: Colors.amber.shade300,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${area1.length}',
+                      style: TextStyle(color: Colors.amber.shade300, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                childAspectRatio: 0.92,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _buildChannelCard(area1[index], channels),
+                childCount: area1.length,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        ],
+
+        // Area 2: Other matches
+        if (area2.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  const Text('🌐', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Các Trận Đấu & Giải Đấu Khác',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '${area2.length}',
+                      style: const TextStyle(color: Colors.white38, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                childAspectRatio: 0.92,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _buildChannelCard(area2[index], channels),
+                childCount: area2.length,
+                addAutomaticKeepAlives: false,
+              ),
+            ),
+          ),
+        ],
+
+        // Bottom padding
+        const SliverPadding(padding: EdgeInsets.only(bottom: 16)),
+      ],
+    );
+  }
+
   Widget _buildChannelCard(IptvChannelModel channel, List<IptvChannelModel> currentList) {
     return TvFocusableCard(
       onTap: () => _playChannel(channel, currentList),
@@ -1130,11 +1245,19 @@ class _IptvScreenState extends State<IptvScreen> {
         decoration: BoxDecoration(
           color: channel.isPinned
               ? const Color(0xFF1E293B).withOpacity(0.9)
-              : const Color(0xFF161E2E),
+              : (channel.isFamous || channel.isVietnam)
+                  ? const Color(0xFF0F1A33)
+                  : const Color(0xFF161E2E),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: channel.isPinned ? const Color(0xFFF59E0B).withOpacity(0.6) : const Color(0xFF1E293B),
-            width: channel.isPinned ? 1.5 : 1.0,
+            color: channel.isPinned
+                ? const Color(0xFFF59E0B).withOpacity(0.6)
+                : (channel.isVietnam)
+                    ? const Color(0xFFEF4444).withOpacity(0.4)
+                    : (channel.isFamous)
+                        ? const Color(0xFF3B82F6).withOpacity(0.3)
+                        : const Color(0xFF1E293B),
+            width: channel.isPinned ? 1.5 : (channel.isFamous || channel.isVietnam) ? 1.2 : 1.0,
           ),
         ),
         padding: const EdgeInsets.all(12),
