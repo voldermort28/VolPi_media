@@ -1,10 +1,10 @@
 {
-  "version": "1.0.14",
-  "build": 15,
-  "tag_name": "v1.0.14",
-  "changelog": "• Bổ sung bản cài đặt Native Desktop cho macOS (MacBook, Mac mini, iMac) hỗ trợ điều hướng phím & chuột.\n• Giao diện Sidebar hiện đại: Gom nhóm danh mục Thể Thao (Bóng đá, Môn khác), Kênh cố định và Nguồn phát bên trái.\n• Hiển thị thời gian và tên 2 đội bóng trên dòng riêng biệt rõ ràng, không bị che khuất.\n• Tối ưu luồng phát HLS tương thích chuẩn Apple AVPlayer trên iOS và macOS.",
+  "version": "1.0.15",
+  "build": 16,
+  "tag_name": "v1.0.15",
+  "changelog": "• Cố định Release Keystore vĩnh viễn: Sửa dứt điểm lỗi 'Ứng dụng chưa được cài đặt' khi cập nhật OTA tự động trong app Android.\n• Bổ sung bản cài đặt Native Desktop cho macOS (MacBook, Mac mini, iMac) hỗ trợ điều hướng phím & chuột.\n• Giao diện Sidebar hiện đại: Gom nhóm danh mục Thể Thao (Bóng đá, Môn khác), Kênh cố định và Nguồn phát bên trái.\n• Hiển thị thời gian và tên 2 đội bóng trên dòng riêng biệt rõ ràng, không bị che khuất.\n• Tối ưu luồng phát HLS tương thích chuẩn Apple AVPlayer trên iOS và macOS.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-01T01:15:00Z"
+  "published_at": "2026-10-01T22:05:00Z"
 }

@@ -70,12 +70,48 @@ jobs:
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml || true
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
+          cp android/volpi_release.keystore /tmp/volpi_release.keystore || true
+          cp android/key.properties /tmp/key.properties || true
           flutter create . --platforms=android --org=com.volpi --project-name=volpi_media
           mkdir -p android/app/src/main
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
+          cp /tmp/volpi_release.keystore android/volpi_release.keystore || true
+          cp /tmp/volpi_release.keystore android/app/volpi_release.keystore || true
+          cp /tmp/key.properties android/key.properties || true
+          cp /tmp/key.properties android/app/key.properties || true
+
           sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/build.gradle || true
           sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/settings.gradle || true
+
+          # Apply permanent release signing configuration for consistent APK signatures across CI runs
+          cat << 'EOF' > android/app/signing.gradle
+          android {
+              signingConfigs {
+                  release {
+                      storeFile file("${project.rootDir}/volpi_release.keystore")
+                      storePassword "volpimedia2026"
+                      keyAlias "volpi_key"
+                      keyPassword "volpimedia2026"
+                  }
+                  debug {
+                      storeFile file("${project.rootDir}/volpi_release.keystore")
+                      storePassword "volpimedia2026"
+                      keyAlias "volpi_key"
+                      keyPassword "volpimedia2026"
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+                  debug {
+                      signingConfig signingConfigs.debug
+                  }
+              }
+          }
+          EOF
+          echo "apply from: 'signing.gradle'" >> android/app/build.gradle
 
       - name: Get Dependencies
         working-directory: app-tv

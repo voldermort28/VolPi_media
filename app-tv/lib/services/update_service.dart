@@ -93,6 +93,11 @@ class UpdateService {
         client.close();
       }
 
+      if (totalBytes > 0 && receivedBytes < totalBytes) {
+        debugPrint('Download APK incomplete: $receivedBytes of $totalBytes');
+        return false;
+      }
+
       // Launch native Android installer
       final result = await OpenFilex.open(
         filePath,
