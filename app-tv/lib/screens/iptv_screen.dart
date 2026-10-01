@@ -188,21 +188,21 @@ class _IptvScreenState extends State<IptvScreen> {
 
     // 5. Smart chronological & status sorting
     list.sort((a, b) {
-      // Live matches first
-      if (a.isLive && !b.isLive) return -1;
-      if (!a.isLive && b.isLive) return 1;
-
-      // Pinned channels next
+      // 1. Pinned channels first
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
 
-      // In ALL tab, group by Football -> Other sports -> TV
+      // 2. In ALL tab, FOOTBALL (1) ALWAYS first, then OTHER_SPORTS (2), then FIXED_TV (3)
       if (_selectedCategory == 'ALL') {
         const catWeight = {'FOOTBALL': 1, 'OTHER_SPORTS': 2, 'FIXED_TV': 3};
         final wA = catWeight[a.category] ?? 3;
         final wB = catWeight[b.category] ?? 3;
         if (wA != wB) return wA.compareTo(wB);
       }
+
+      // 3. Within the category, Live matches first
+      if (a.isLive && !b.isLive) return -1;
+      if (!a.isLive && b.isLive) return 1;
 
       // Chronological match timestamp
       if (a.matchTimestamp > 0 && b.matchTimestamp > 0) {

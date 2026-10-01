@@ -575,19 +575,19 @@ function classifyChannel(name, group = '') {
  * 5. Vietnamese alphabet tie-breaker for Fixed TV
  */
 function compareChannels(a, b) {
-  // 1. Live match priority: 🟢 LIVE right now on top!
-  if (a.isLive && !b.isLive) return -1;
-  if (!a.isLive && b.isLive) return 1;
-
-  // 2. Pinned priority (e.g. pinned live match first, or pinned channels)
+  // 1. Pinned priority (e.g. pinned live match first, or pinned channels)
   if (a.isPinned && !b.isPinned) return -1;
   if (!a.isPinned && b.isPinned) return 1;
 
-  // 3. Category grouping
+  // 2. Strict Category Priority: FOOTBALL (1) ALWAYS first, then OTHER_SPORTS (2), then FIXED_TV (3)
   const catWeight = { FOOTBALL: 1, OTHER_SPORTS: 2, FIXED_TV: 3 };
   const wA = catWeight[a.category] || 3;
   const wB = catWeight[b.category] || 3;
   if (wA !== wB) return wA - wB;
+
+  // 3. Within the same category: Live match priority (🟢 LIVE) first
+  if (a.isLive && !b.isLive) return -1;
+  if (!a.isLive && b.isLive) return 1;
 
   // 4. Chronological timeline for matches
   if (a.matchTimestamp && b.matchTimestamp) {
