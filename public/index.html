@@ -699,7 +699,7 @@
           html += '<div class="rounded-xl p-4 border ' + borderClass + ' glass-card space-y-3 flex flex-col justify-between">' +
             '<div class="flex items-center justify-between text-xs">' +
               '<span class="text-sky-400 font-bold truncate max-w-[170px]">' + (m.league || 'Bóng đá') + '</span>' +
-              '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/25">⏰ ' + (m.time || '') + '</span>' +
+              '<span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-bold ' + (m.isLive ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' : 'bg-sky-500/15 text-sky-300 border border-sky-500/25') + '">' + (m.isLive ? '🔴 TRỰC TIẾP' : '⏰ ' + (m.time || '')) + '</span>' +
             '</div>' +
             '<div class="space-y-1.5 py-1">' +
               '<div class="flex items-center justify-between gap-2">' +

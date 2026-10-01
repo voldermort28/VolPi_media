@@ -21,11 +21,32 @@ function clearCache() {
   resolvedBaseUrl = null;
 }
 
-function parseXoilacTime(timeStr) {
-  if (!timeStr) return { isLive: false, ts: 0 };
-  const isLive = timeStr.includes('Đang diễn ra') || timeStr.includes('Trực tiếp') || timeStr.includes('LIVE') || timeStr.includes('hiệp') || timeStr.includes("'");
-  const m = timeStr.match(/(\d{1,2}):(\d{2})\s*[-/]\s*(\d{1,2})[\./-](\d{1,2})/);
-  if (!m) return { isLive, ts: isLive ? Date.now() : 0 };
+function parseXoilacTime(timeStr, statusText = '') {
+  if (!timeStr && !statusText) return { isLive: false, isFinished: false, ts: 0 };
+
+  const combined = `${timeStr || ''} ${statusText || ''}`.toLowerCase();
+
+  const isFinished = combined.includes('hết giờ') ||
+                     combined.includes('kết thúc') ||
+                     combined.includes('ft') ||
+                     combined.includes('finished');
+
+  const isLive = !isFinished && (
+    combined.includes('đang diễn ra') ||
+    combined.includes('trực tiếp') ||
+    combined.includes('live') ||
+    combined.includes('hiệp') ||
+    combined.includes("'") ||
+    combined.includes('phút') ||
+    combined.includes('bù giờ') ||
+    combined.includes('hoãn') ||
+    combined.includes('delay') ||
+    combined.includes('pen') ||
+    combined.includes('11m')
+  );
+
+  const m = (timeStr || '').match(/(\d{1,2}):(\d{2})\s*[-/]\s*(\d{1,2})[\./-](\d{1,2})/);
+  if (!m) return { isLive, isFinished, ts: isLive ? Date.now() : 0 };
 
   const hour = parseInt(m[1], 10);
   const min = parseInt(m[2], 10);
@@ -36,8 +57,16 @@ function parseXoilacTime(timeStr) {
   let year = now.getFullYear();
   if (now.getMonth() === 11 && month === 0) year += 1;
 
-  const d = new Date(year, month, day, hour, min);
-  return { isLive, ts: d.getTime() };
+  // IMPORTANT: Xoilac times are ALWAYS in Vietnam timezone (GMT+7).
+  // Parse into UTC timestamp correctly regardless of server system timezone:
+  const mm = String(month + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  const hh = String(hour).padStart(2, '0');
+  const ii = String(min).padStart(2, '0');
+  const isoStr = `${year}-${mm}-${dd}T${hh}:${ii}:00+07:00`;
+  const ts = new Date(isoStr).getTime();
+
+  return { isLive, isFinished, ts };
 }
 
 function getTeamPriority(match) {
@@ -205,8 +234,61 @@ async function getLiveMatches() {
         }
       }
 
+      const statusText = $card.find('.grid-match__status, .match-status, .badge, .time-status, .live-badge').text().trim();
       const matchSlug = href.replace('/truc-tiep/', '').replace(/\/$/, '');
       if (!matchSlug || matches.some((m) => m.slug === matchSlug)) return;
+
+      // STRICT FILTER 1: Non-football keywords in league, teams, slug
+      const allSportText = `${league} ${homeTeam} ${awayTeam} ${matchSlug} ${title}`.toLowerCase();
+      const nonFootballPatterns = [
+        'esport', 'dota', 'blast slam', 'stake ranked', 'winline', 'fox legacy',
+        'cs:go', 'cs2', 'counter-strike', 'league of legends', 'emea masters',
+        'valorant', 'pubg', 'arena of valor', 'tốc chiến', 'liên quân', 'pro league',
+        'bóng rổ', 'basketball', 'nba', 'cba', 'vba',
+        'tennis', 'quần vợt', 'atp', 'wta',
+        'badminton', 'cầu lông', 'bwf',
+        'volleyball', 'bóng chuyền', 'vnl',
+        'bóng bàn', 'table tennis', 'ittf',
+        'boxing', 'mma', 'ufc', 'one championship',
+        'billiards', 'bi-a', 'snooker', 'pool 9',
+        'f1', 'formula', 'đua xe', 'motogp',
+        'baseball', 'bóng chày', 'mlb',
+        'rugby', 'bóng bầu dục', 'nfl'
+      ];
+      if (nonFootballPatterns.some((p) => allSportText.includes(p))) return;
+
+      // Check date in slug (e.g. luc-1000-ngay-26-09-2026): drop stale matches from days ago
+      const slugDateMatch = matchSlug.match(/ngay-(\d{1,2})-(\d{1,2})-(\d{4})/);
+      if (slugDateMatch) {
+        const sDay = parseInt(slugDateMatch[1], 10);
+        const sMonth = parseInt(slugDateMatch[2], 10) - 1;
+        const sYear = parseInt(slugDateMatch[3], 10);
+        const slugDate = new Date(sYear, sMonth, sDay);
+        const now = new Date();
+        const diffDays = (now - slugDate) / (1000 * 60 * 60 * 24);
+        if (diffDays > 1.5) return;
+      }
+
+      const timeParsed = parseXoilacTime(time, statusText);
+
+      // STRICT FILTER 2: Expired / Ended match filtering with Weather / Delay protection
+      if (timeParsed.isFinished) return;
+
+      if (timeParsed.ts > 0) {
+        const now = Date.now();
+        const elapsedMin = (now - timeParsed.ts) / (60 * 1000);
+        if (elapsedMin > 0) {
+          // If match started > 150m ago (2.5 hours):
+          // Keep if isLive (weather delay, extra time, penalty shootout, etc.)
+          if (elapsedMin > 150 && !timeParsed.isLive) {
+            return;
+          }
+          // Over 270m (4.5 hours) is the upper limit for any match even with extreme delays
+          if (elapsedMin > 270) {
+            return;
+          }
+        }
+      }
 
       const matchObj = {
         id: `xoilac:${matchSlug}`,
@@ -229,7 +311,6 @@ async function getLiveMatches() {
       const timeStr = time ? `[${time}] ` : '';
       matchObj.title = `${prefix}${timeStr}${fullTitle} (${league})`;
 
-      const timeParsed = parseXoilacTime(time);
       matchObj.isLive = timeParsed.isLive;
       matchObj.matchTimestamp = timeParsed.ts;
 

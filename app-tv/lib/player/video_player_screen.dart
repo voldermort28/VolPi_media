@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -62,6 +65,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _commitSeekTimer;
   String? _hudSpeedBadge;
 
+  // Volume Control (Specially tailored for macOS & Desktop)
+  double _volume = 1.0;
+  bool _isMuted = false;
+  double _preMuteVolume = 1.0;
+
+  bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
   @override
   void initState() {
     super.initState();
@@ -109,11 +119,56 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _videoListener() {
     if (!mounted || !_isInitialized) return;
     // Performance optimization for low-end hardware:
-    // Only rebuild UI if controls or channel overlay are currently visible.
+    // Only rebuild UI if controls are currently visible.
     // When watching video (controls hidden), avoid rebuilding the entire screen 10 times per second!
-    if (_showControls || _showChannelList) {
+    if (_showControls) {
       setState(() {});
     }
+  }
+
+  void _setVolume(double newVol) {
+    final clamped = newVol.clamp(0.0, 1.0);
+    setState(() {
+      _volume = clamped;
+      _isMuted = clamped == 0.0;
+    });
+    if (_isInitialized) {
+      _controller.setVolume(_isMuted ? 0.0 : _volume);
+    }
+    _showVolumeHud(clamped);
+    _showControlsBriefly();
+  }
+
+  void _toggleMute() {
+    if (_isMuted) {
+      _setVolume(_preMuteVolume > 0.0 ? _preMuteVolume : 1.0);
+    } else {
+      _preMuteVolume = _volume > 0.0 ? _volume : 1.0;
+      _setVolume(0.0);
+    }
+  }
+
+  void _changeVolumeBy(double delta) {
+    final target = (_isMuted ? 0.0 : _volume) + delta;
+    _setVolume(target);
+  }
+
+  void _showVolumeHud(double vol) {
+    _hudFadeTimer?.cancel();
+    setState(() {
+      _hudIcon = vol == 0.0 ? 'VOLUME_MUTE' : (vol < 0.5 ? 'VOLUME_LOW' : 'VOLUME_HIGH');
+      _hudText = vol == 0.0 ? 'Tắt tiếng' : '${(vol * 100).round()}%';
+      _hudSpeedBadge = 'Âm lượng';
+    });
+    _hudFadeTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+          _hudSpeedBadge = null;
+        });
+      }
+    });
   }
 
   void _switchChannel(StreamChannel channel) {
@@ -473,6 +528,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
             return KeyEventResult.handled;
           }
+
+          // Volume Shortcuts for macOS & Desktop (Key M for mute, Up/Down or +/- for volume)
+          if (_isMacOrDesktop) {
+            if (key == LogicalKeyboardKey.keyM) {
+              _toggleMute();
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.arrowUp ||
+                key == LogicalKeyboardKey.equal ||
+                key == LogicalKeyboardKey.numpadAdd) {
+              _changeVolumeBy(0.05);
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.arrowDown ||
+                key == LogicalKeyboardKey.minus ||
+                key == LogicalKeyboardKey.numpadSubtract) {
+              _changeVolumeBy(-0.05);
+              return KeyEventResult.handled;
+            }
+          }
+
           final bool isUp = key == LogicalKeyboardKey.arrowUp ||
               key == LogicalKeyboardKey.channelUp ||
               key == LogicalKeyboardKey.pageUp;
@@ -523,7 +599,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: GestureDetector(
+        body: Listener(
+          onPointerSignal: (pointerSignal) {
+            if (_isMacOrDesktop && pointerSignal is PointerScrollEvent) {
+              if (pointerSignal.scrollDelta.dy < 0) {
+                _changeVolumeBy(0.05);
+              } else if (pointerSignal.scrollDelta.dy > 0) {
+                _changeVolumeBy(-0.05);
+              }
+            }
+          },
+          child: GestureDetector(
           onTap: _toggleControls,
           onHorizontalDragStart: _onHorizontalDragStart,
           onHorizontalDragUpdate: _onHorizontalDragUpdate,
@@ -682,7 +768,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             Icon(
                               _hudIcon == 'CHANNEL'
                                   ? Icons.live_tv_rounded
-                                  : (_hudIcon == 'FORWARD' ? Icons.fast_forward_rounded : Icons.fast_rewind_rounded),
+                                  : (_hudIcon == 'FORWARD'
+                                      ? Icons.fast_forward_rounded
+                                      : (_hudIcon == 'REWIND'
+                                          ? Icons.fast_rewind_rounded
+                                          : (_hudIcon == 'VOLUME_MUTE'
+                                              ? Icons.volume_off_rounded
+                                              : (_hudIcon == 'VOLUME_LOW'
+                                                  ? Icons.volume_down_rounded
+                                                  : Icons.volume_up_rounded)))),
                               color: const Color(0xFF38BDF8),
                               size: 44,
                             ),
@@ -711,7 +805,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (_hudIcon != 'CHANNEL') ...[
+                        if (_hudIcon != 'CHANNEL' && !_hudIcon!.startsWith('VOLUME')) ...[
                           const SizedBox(height: 4),
                           Text(
                             '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
@@ -791,6 +885,63 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       ],
                                     ),
                                   ),
+                                if (_isMacOrDesktop) ...[
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white24, width: 0.8),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TvFocusableCard(
+                                          onTap: _toggleMute,
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            child: Icon(
+                                              _isMuted || _volume == 0.0
+                                                  ? Icons.volume_off_rounded
+                                                  : (_volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                                              color: _isMuted ? Colors.redAccent : Colors.white,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(
+                                          width: 75,
+                                          child: SliderTheme(
+                                            data: SliderTheme.of(context).copyWith(
+                                              activeTrackColor: const Color(0xFF38BDF8),
+                                              inactiveTrackColor: Colors.white24,
+                                              thumbColor: const Color(0xFF38BDF8),
+                                              overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                              trackHeight: 3.0,
+                                            ),
+                                            child: Slider(
+                                              value: _isMuted ? 0.0 : _volume,
+                                              min: 0.0,
+                                              max: 1.0,
+                                              onChanged: (val) {
+                                                _startHideControlsTimer();
+                                                _setVolume(val);
+                                              },
+                                            ),
+                                          ),
+                                        ),
+                                        Text(
+                                          _isMuted ? '0%' : '${(_volume * 100).round()}%',
+                                          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
+                                        ),
+                                        const SizedBox(width: 4),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -931,6 +1082,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

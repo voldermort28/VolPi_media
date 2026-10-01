@@ -15,6 +15,8 @@ class MatchModel {
   final bool isFavorite;
   final bool isHot;
   final String favoriteBadgeText;
+  final bool isLive;
+  final int matchTimestamp;
 
   MatchModel({
     required this.id,
@@ -33,6 +35,8 @@ class MatchModel {
     this.isFavorite = false,
     this.isHot = false,
     this.favoriteBadgeText = '',
+    this.isLive = false,
+    this.matchTimestamp = 0,
   });
 
   factory MatchModel.fromJson(Map<String, dynamic> json) {
@@ -136,6 +140,16 @@ class MatchModel {
         rawTitle.contains('🔥') ||
         rawTitle.toLowerCase().contains('tâm điểm');
 
+    final bool live = json['isLive'] == true ||
+        rawTitle.contains('🟢') ||
+        rawTitle.contains('🔴') ||
+        time.toLowerCase().contains('đang diễn ra') ||
+        time.toLowerCase().contains('trực tiếp');
+
+    final int ts = json['matchTimestamp'] is int
+        ? json['matchTimestamp']
+        : (int.tryParse(json['matchTimestamp']?.toString() ?? '') ?? 0);
+
     return MatchModel(
       id: id,
       slug: slug,
@@ -153,6 +167,8 @@ class MatchModel {
       isFavorite: matchFavorite,
       isHot: isHotMatch,
       favoriteBadgeText: badgeText,
+      isLive: live,
+      matchTimestamp: ts,
     );
   }
 }

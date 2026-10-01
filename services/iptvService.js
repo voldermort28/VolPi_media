@@ -433,10 +433,28 @@ function normalizeGroupName(group, name) {
  */
 function parseMatchTime(name) {
   if (!name || typeof name !== 'string') {
-    return { isLive: false, matchTime: '', matchTimestamp: 0 };
+    return { isLive: false, isFinished: false, matchTime: '', matchTimestamp: 0 };
   }
 
-  const isLive = name.includes('🟢') || name.toLowerCase().includes('đang đá') || name.toLowerCase().includes('trực tiếp');
+  const lower = name.toLowerCase();
+  const isFinished = lower.includes('hết giờ') ||
+                     lower.includes('kết thúc') ||
+                     lower.includes('ft') ||
+                     lower.includes('finished');
+
+  const isLive = !isFinished && (
+    name.includes('🟢') ||
+    name.includes('🔴') ||
+    lower.includes('đang đá') ||
+    lower.includes('trực tiếp') ||
+    lower.includes('live') ||
+    lower.includes('hiệp') ||
+    lower.includes("'") ||
+    lower.includes('hoãn') ||
+    lower.includes('delay') ||
+    lower.includes('pen') ||
+    lower.includes('11m')
+  );
 
   // Match: HH:mm DD/MM (or DD-MM, DD.MM)
   const m = name.match(/(\d{1,2}):(\d{2})\s+(\d{1,2})[\/\.-](\d{1,2})/);
@@ -446,36 +464,45 @@ function parseMatchTime(name) {
       const now = new Date();
       const hour = parseInt(mTime[1], 10);
       const min = parseInt(mTime[2], 10);
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, min);
+      const day = now.getDate();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+
       const pad = (n) => String(n).padStart(2, '0');
+      const isoStr = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(min)}:00+07:00`;
+      const matchTimestamp = new Date(isoStr).getTime();
+
       return {
         isLive,
+        isFinished,
         matchTime: `${pad(hour)}:${pad(min)}`,
-        matchTimestamp: d.getTime(),
+        matchTimestamp,
       };
     }
-    return { isLive, matchTime: '', matchTimestamp: isLive ? Date.now() : 0 };
+    return { isLive, isFinished, matchTime: '', matchTimestamp: isLive ? Date.now() : 0 };
   }
 
   const hour = parseInt(m[1], 10);
   const min = parseInt(m[2], 10);
   const day = parseInt(m[3], 10);
-  const month = parseInt(m[4], 10) - 1; // 0-based
+  const month = parseInt(m[4], 10);
 
   const now = new Date();
   let year = now.getFullYear();
-  if (now.getMonth() === 11 && month === 0) {
+  if (now.getMonth() === 11 && month === 1) {
     year += 1;
   }
 
-  const dateObj = new Date(year, month, day, hour, min);
   const pad = (n) => String(n).padStart(2, '0');
-  const matchTime = `${pad(hour)}:${pad(min)} ${pad(day)}/${pad(month + 1)}`;
+  const isoStr = `${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(min)}:00+07:00`;
+  const matchTimestamp = new Date(isoStr).getTime();
+  const matchTime = `${pad(hour)}:${pad(min)} ${pad(day)}/${pad(month)}`;
 
   return {
     isLive,
+    isFinished,
     matchTime,
-    matchTimestamp: dateObj.getTime(),
+    matchTimestamp,
   };
 }
 
@@ -677,6 +704,30 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     const timeInfo = parseMatchTime(c.name);
     const cleanTitle = extractCleanTitle(c.name);
 
+    // Expired match filter for Sports channels (Football & Other Sports)
+    // 1. Traditional 24/7 channels (FIXED_TV) NEVER expire
+    // 2. If explicitly finished ("Hết giờ", "FT", "Kết thúc") -> expired
+    // 3. If sports match with matchTimestamp > 0:
+    //    - If elapsed <= 150m (2.5h): standard match window -> KEEP
+    //    - If elapsed 150m - 240m (2.5h - 4h): KEEP IF isLive == true (weather delay, extra time, penalty shootout)
+    //    - If elapsed > 270m (4.5h): definitely expired M3U item -> FILTER OUT
+    let isExpired = false;
+    if (cat === 'FOOTBALL' || cat === 'OTHER_SPORTS') {
+      if (timeInfo.isFinished) {
+        isExpired = true;
+      } else if (timeInfo.matchTimestamp > 0) {
+        const elapsedMin = (now - timeInfo.matchTimestamp) / (60 * 1000);
+        if (elapsedMin > 0) {
+          if (elapsedMin > 150 && !timeInfo.isLive) {
+            isExpired = true;
+          }
+          if (elapsedMin > 270) {
+            isExpired = true;
+          }
+        }
+      }
+    }
+
     return {
       ...c,
       cleanTitle,
@@ -687,7 +738,8 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       matchTime: timeInfo.matchTime,
       matchTimestamp: timeInfo.matchTimestamp,
       isPinned,
-      isHidden,
+      isHidden: isHidden || isExpired,
+      isExpired,
     };
   });
 

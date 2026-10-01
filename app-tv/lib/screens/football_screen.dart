@@ -466,18 +466,29 @@ class _FootballScreenState extends State<FootballScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF0284C7).withOpacity(0.2),
+                    color: match.isLive ? Colors.redAccent.withOpacity(0.2) : const Color(0xFF0284C7).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.3), width: 0.8),
+                    border: Border.all(
+                      color: match.isLive ? Colors.redAccent.withOpacity(0.6) : const Color(0xFF38BDF8).withOpacity(0.3),
+                      width: 0.8,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.access_time_rounded, color: Color(0xFF38BDF8), size: 10),
+                      Icon(
+                        match.isLive ? Icons.fiber_manual_record : Icons.access_time_rounded,
+                        color: match.isLive ? Colors.redAccent : const Color(0xFF38BDF8),
+                        size: 10,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        match.time,
-                        style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
+                        match.isLive ? 'TRỰC TIẾP' : match.time,
+                        style: TextStyle(
+                          color: match.isLive ? Colors.redAccent : const Color(0xFF38BDF8),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
