@@ -1,10 +1,10 @@
 {
-  "version": "1.0.19",
-  "build": 20,
-  "tag_name": "v1.0.19",
-  "changelog": "• Khắc phục triệt để lỗi mất dấu highlight con trỏ (D-pad Focus) khi điều hướng bằng remote trên Android TV.\n• Tự động cuộn theo con trỏ (Scrollable.ensureVisible) giúp vị trí đang chọn luôn hiển thị rõ ràng trên màn hình TV.\n• Kích hoạt AutomaticKeepAlive giúp phần tử đang focus không bị hủy khi cuộn danh sách.\n• Loại bỏ BoxShadow blur nặng nề, rút ngắn thời gian animation xuống 120ms giúp phản hồi phím remote cực nhạy và mượt mà, không giật lag trên TV Box yếu.",
+  "version": "1.0.20",
+  "build": 21,
+  "tag_name": "v1.0.20",
+  "changelog": "• Khắc phục triệt để hiện tượng mất con trỏ/highlight trên Android TV do Z-axis layer: chuyển đường viền focus sang foregroundDecoration luôn nổi lên trên cùng, không bị nền hoặc ảnh đè che khuất.\n• Cố định kích thước ô kênh IPTV (mainAxisExtent: 175) tránh co giãn méo mó trên TV và chống tràn viền.\n• Khắc phục mất dấu focus khi di chuyển lên ô Tìm kiếm (Search bar) trong tab IPTV.\n• Loại bỏ co phóng kích thước (scale = 1.0) khi focus, giúp các thẻ liền kề không che lấp viền nhau và loại bỏ hoàn toàn giật lag GPU trên TV Box yếu.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-02T16:00:00Z"
+  "published_at": "2026-10-02T18:15:00Z"
 }

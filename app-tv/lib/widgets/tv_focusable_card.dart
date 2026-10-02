@@ -14,7 +14,7 @@ class TvFocusableCard extends StatefulWidget {
     super.key,
     required this.child,
     required this.onTap,
-    this.scale = 1.06,
+    this.scale = 1.0,
     this.focusBorderColor = const Color(0xFF38BDF8), // Electric Sky Blue
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.focusNode,
@@ -30,7 +30,7 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
   bool _isFocused = false;
 
   @override
-  bool get wantKeepAlive => _isFocused;
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -53,7 +53,6 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
           if (mounted && _focusNode.hasFocus) {
             Scrollable.ensureVisible(
               context,
-              alignment: 0.35, // Position slightly above center for optimal TV view
               duration: const Duration(milliseconds: 120),
               curve: Curves.easeOutQuad,
             );
@@ -102,12 +101,15 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
             curve: Curves.easeOutCubic,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 120),
-              decoration: BoxDecoration(
+              foregroundDecoration: BoxDecoration(
                 borderRadius: widget.borderRadius,
                 border: Border.all(
                   color: _isFocused ? widget.focusBorderColor : Colors.transparent,
-                  width: _isFocused ? 3.0 : 1.0,
+                  width: _isFocused ? 3.5 : 0.0,
                 ),
+                color: _isFocused
+                    ? widget.focusBorderColor.withOpacity(0.08)
+                    : Colors.transparent,
               ),
               child: ClipRRect(
                 borderRadius: widget.borderRadius,

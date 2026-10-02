@@ -45,15 +45,25 @@ class _IptvScreenState extends State<IptvScreen> {
   String _selectedGroup = 'ALL';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _isSearchFocused = false;
 
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.addListener(() {
+      if (mounted) {
+        setState(() {
+          _isSearchFocused = _searchFocusNode.hasFocus;
+        });
+      }
+    });
     _loadChannels(forceRefresh: false);
   }
 
   @override
   void dispose() {
+    _searchFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -777,21 +787,31 @@ class _IptvScreenState extends State<IptvScreen> {
 
               // Search bar
               SizedBox(
-                width: 220,
+                width: 240,
                 height: 38,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161E2E),
+                    color: _isSearchFocused
+                        ? const Color(0xFF0284C7).withOpacity(0.18)
+                        : const Color(0xFF161E2E),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFF334155)),
+                    border: Border.all(
+                      color: _isSearchFocused ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                      width: _isSearchFocused ? 2.5 : 1.0,
+                    ),
                   ),
                   child: TextField(
+                    focusNode: _searchFocusNode,
                     controller: _searchController,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm kênh...',
                       hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 16),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        color: _isSearchFocused ? const Color(0xFF38BDF8) : Colors.white54,
+                        size: 16,
+                      ),
                       suffixIcon: _searchQuery.isNotEmpty
                           ? IconButton(
                               icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
@@ -1106,14 +1126,15 @@ class _IptvScreenState extends State<IptvScreen> {
     // For non-FOOTBALL tabs, render a simple flat grid
     if (!isFootballTab) {
       return GridView.builder(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         addAutomaticKeepAlives: true,
+        addRepaintBoundaries: true,
         cacheExtent: 350,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          childAspectRatio: 0.92,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
+          mainAxisExtent: 175,
+          crossAxisSpacing: 14,
+          mainAxisSpacing: 14,
         ),
         itemCount: channels.length,
         itemBuilder: (context, index) {
@@ -1163,18 +1184,19 @@ class _IptvScreenState extends State<IptvScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                childAspectRatio: 0.92,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                mainAxisExtent: 175,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(area1[index], channels),
                 childCount: area1.length,
                 addAutomaticKeepAlives: true,
+                addRepaintBoundaries: true,
               ),
             ),
           ),
@@ -1214,18 +1236,19 @@ class _IptvScreenState extends State<IptvScreen> {
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             sliver: SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
-                childAspectRatio: 0.92,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
+                mainAxisExtent: 175,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(area2[index], channels),
                 childCount: area2.length,
                 addAutomaticKeepAlives: true,
+                addRepaintBoundaries: true,
               ),
             ),
           ),
@@ -1238,8 +1261,16 @@ class _IptvScreenState extends State<IptvScreen> {
   }
 
   Widget _buildChannelCard(IptvChannelModel channel, List<IptvChannelModel> currentList) {
+    Color focusBorder = const Color(0xFF38BDF8);
+    if (channel.isVietnam) {
+      focusBorder = const Color(0xFFFDE047);
+    } else if (channel.isPinned) {
+      focusBorder = const Color(0xFFF59E0B);
+    }
+
     return TvFocusableCard(
       onTap: () => _playChannel(channel, currentList),
+      focusBorderColor: focusBorder,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         decoration: BoxDecoration(
@@ -1251,13 +1282,13 @@ class _IptvScreenState extends State<IptvScreen> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: channel.isPinned
-                ? const Color(0xFFF59E0B).withOpacity(0.6)
+                ? const Color(0xFFF59E0B).withOpacity(0.5)
                 : (channel.isVietnam)
-                    ? const Color(0xFFEF4444).withOpacity(0.4)
+                    ? const Color(0xFFEF4444).withOpacity(0.35)
                     : (channel.isFamous)
-                        ? const Color(0xFF3B82F6).withOpacity(0.3)
+                        ? const Color(0xFF3B82F6).withOpacity(0.25)
                         : const Color(0xFF1E293B),
-            width: channel.isPinned ? 1.5 : (channel.isFamous || channel.isVietnam) ? 1.2 : 1.0,
+            width: 1.0,
           ),
         ),
         padding: const EdgeInsets.all(12),
