@@ -1150,7 +1150,7 @@ class _IptvScreenState extends State<IptvScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withValues(alpha: 0.15),
+                      color: Colors.amber.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -1201,7 +1201,7 @@ class _IptvScreenState extends State<IptvScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
+                      color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
