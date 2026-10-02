@@ -458,15 +458,11 @@ class _IptvScreenState extends State<IptvScreen> {
               ? Row(
                   children: [
                     // LEFT SIDEBAR (Category, Source, Groups)
-                    FocusTraversalGroup(
-                      child: _buildLeftSidebar(sources, groups),
-                    ),
+                    _buildLeftSidebar(sources, groups),
 
                     // RIGHT MAIN CONTENT (Header & Full Height Channel Grid)
                     Expanded(
-                      child: FocusTraversalGroup(
-                        child: _buildMainContent(filteredChannels, crossAxisCount, isLargeScreen),
-                      ),
+                      child: _buildMainContent(filteredChannels, crossAxisCount, isLargeScreen),
                     ),
                   ],
                 )

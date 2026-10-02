@@ -1,10 +1,10 @@
 {
-  "version": "1.0.21",
-  "build": 22,
-  "tag_name": "v1.0.21",
-  "changelog": "• Khắc phục triệt để lỗi xung đột focus giữa các tab trong IndexedStack: cô lập hoàn toàn FocusScope và ExcludeFocus cho từng tab (Bóng đá, Anime, IPTV), loại bỏ lỗi con trỏ nhảy ngầm sang tab Bóng đá khi đang ở tab Anime hoặc IPTV.\n• Sửa lỗi mất con trỏ và không chọn được phim trong tab Anime & Phim; tích hợp bộ nhớ đệm cache danh mục giúp chuyển thể loại tức thì không giật lag.\n• Sửa lỗi kẹt con trỏ ở Sidebar trong tab IPTV; phân nhóm FocusTraversalGroup giúp di chuyển mượt mà giữa Sidebar và Lưới kênh bên phải.\n• Loại bỏ tình trạng bấm nhầm kích hoạt phát trận đấu bóng đá ngầm khi đang ở các màn hình khác.",
+  "version": "1.0.22",
+  "build": 23,
+  "tag_name": "v1.0.22",
+  "changelog": "• Khắc phục hoàn toàn lỗi không thể bấm phím Lên để chọn các tab trên cùng (Bóng đá, Anime, IPTV): gỡ bỏ rào cản FocusScope chặn trên IndexedStack, cho phép con trỏ tự do di chuyển lên thanh điều hướng Top Bar.\n• Giữ nguyên cơ chế ExcludeFocus giúp cách ly hoàn toàn các tab đang ẩn, không lo bị nhảy ngầm hay phát nhầm trận đấu bóng đá.\n• Tối ưu chuyển hướng tự nhiên 2D giữa các khu vực trên toàn bộ ứng dụng.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-02T18:35:00Z"
+  "published_at": "2026-10-02T18:48:00Z"
 }

@@ -87,83 +87,79 @@ class _AnimeScreenState extends State<AnimeScreen> {
     return Column(
       children: [
         // Category Selector Row (Remote Navigable)
-        FocusTraversalGroup(
-          child: Container(
-            height: 44,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: _categories.length,
-              itemBuilder: (context, idx) {
-                final cat = _categories[idx];
-                final bool isSelected = idx == _selectedCategoryIndex;
+        Container(
+          height: 44,
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _categories.length,
+            itemBuilder: (context, idx) {
+              final cat = _categories[idx];
+              final bool isSelected = idx == _selectedCategoryIndex;
 
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: TvFocusableCard(
-                    onTap: () => _loadCategory(idx),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                      alignment: Alignment.center,
-                      child: Text(
-                        cat['name']!,
-                        style: TextStyle(
-                          color: isSelected ? Colors.white : Colors.white70,
-                          fontSize: 13,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        ),
+              return Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: TvFocusableCard(
+                  onTap: () => _loadCategory(idx),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                    alignment: Alignment.center,
+                    child: Text(
+                      cat['name']!,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                       ),
                     ),
                   ),
-                );
-              },
-            ),
+                ),
+              );
+            },
           ),
         ),
 
         // Grid Content Area
         Expanded(
-          child: FocusTraversalGroup(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
-                : _items.isEmpty
-                    ? const Center(child: Text('Không có nội dung trong danh mục này.', style: TextStyle(color: Colors.white54)))
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          int crossAxisCount = 2;
-                          if (constraints.maxWidth > 1200) {
-                            crossAxisCount = 6;
-                          } else if (constraints.maxWidth > 900) {
-                            crossAxisCount = 5;
-                          } else if (constraints.maxWidth > 650) {
-                            crossAxisCount = 4;
-                          } else if (constraints.maxWidth > 450) {
-                            crossAxisCount = 3;
-                          }
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
+              : _items.isEmpty
+                  ? const Center(child: Text('Không có nội dung trong danh mục này.', style: TextStyle(color: Colors.white54)))
+                  : LayoutBuilder(
+                      builder: (context, constraints) {
+                        int crossAxisCount = 2;
+                        if (constraints.maxWidth > 1200) {
+                          crossAxisCount = 6;
+                        } else if (constraints.maxWidth > 900) {
+                          crossAxisCount = 5;
+                        } else if (constraints.maxWidth > 650) {
+                          crossAxisCount = 4;
+                        } else if (constraints.maxWidth > 450) {
+                          crossAxisCount = 3;
+                        }
 
-                          return GridView.builder(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            addAutomaticKeepAlives: true,
-                            addRepaintBoundaries: true,
-                            cacheExtent: 350,
-                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 12,
-                              mainAxisSpacing: 16,
-                              childAspectRatio: 0.68,
-                            ),
-                            itemCount: _items.length,
-                            itemBuilder: (context, idx) {
-                              final anime = _items[idx];
-                              return _buildAnimeCard(anime);
-                            },
-                          );
-                        },
-                      ),
-          ),
+                        return GridView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          addAutomaticKeepAlives: true,
+                          addRepaintBoundaries: true,
+                          cacheExtent: 350,
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 16,
+                            childAspectRatio: 0.68,
+                          ),
+                          itemCount: _items.length,
+                          itemBuilder: (context, idx) {
+                            final anime = _items[idx];
+                            return _buildAnimeCard(anime);
+                          },
+                        );
+                      },
+                    ),
         ),
       ],
     );
