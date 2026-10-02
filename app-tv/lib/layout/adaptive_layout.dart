@@ -98,73 +98,75 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         child: Column(
           children: [
             // Top App Bar for TV & Large Screens
-            Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5)),
-              ),
-              child: Row(
-                children: [
-                  // App Logo & Name
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF38BDF8)]),
-                          borderRadius: BorderRadius.circular(10),
+            FocusTraversalGroup(
+              child: Container(
+                height: 64,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFF1E293B), width: 1.5)),
+                ),
+                child: Row(
+                  children: [
+                    // App Logo & Name
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF38BDF8)]),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
                         ),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        'VolPi Media',
-                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                      ),
-                    ],
-                  ),
+                        const SizedBox(width: 10),
+                        const Text(
+                          'VolPi Media',
+                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
 
-                  const SizedBox(width: 40),
+                    const SizedBox(width: 40),
 
-                  // TV Nav Tabs
-                  _buildTvNavTab(index: 0, label: 'Bóng Đá Trực Tiếp', icon: Icons.sports_soccer_rounded),
-                  const SizedBox(width: 12),
-                  _buildTvNavTab(index: 1, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
-                  const SizedBox(width: 12),
-                  _buildTvNavTab(index: 2, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
+                    // TV Nav Tabs
+                    _buildTvNavTab(index: 0, label: 'Bóng Đá Trực Tiếp', icon: Icons.sports_soccer_rounded),
+                    const SizedBox(width: 12),
+                    _buildTvNavTab(index: 1, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
+                    const SizedBox(width: 12),
+                    _buildTvNavTab(index: 2, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
 
-                  const Spacer(),
+                    const Spacer(),
 
-                  // OTA Update Check Button
-                  SizedBox(
-                    height: 38,
-                    child: TvFocusableCard(
-                      onTap: () => _checkOtaUpdate(silent: false),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        color: const Color(0xFF1E293B),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 16),
-                            SizedBox(width: 6),
-                            Text(
-                              'Cập nhật',
-                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
-                            ),
-                          ],
+                    // OTA Update Check Button
+                    SizedBox(
+                      height: 38,
+                      child: TvFocusableCard(
+                        onTap: () => _checkOtaUpdate(silent: false),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          color: const Color(0xFF1E293B),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 16),
+                              SizedBox(width: 6),
+                              Text(
+                                'Cập nhật',
+                                style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  const SizedBox(width: 14),
+                    const SizedBox(width: 14),
 
-                  // Profile Button with Passcode 3105
-                  ProfileButton(onUnlocked: _onProfileUnlocked),
-                ],
+                    // Profile Button with Passcode 3105
+                    ProfileButton(onUnlocked: _onProfileUnlocked),
+                  ],
+                ),
               ),
             ),
 
@@ -173,9 +175,24 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
               child: IndexedStack(
                 index: _currentTabIndex,
                 children: [
-                  FootballScreen(apiService: widget.apiService),
-                  AnimeScreen(apiService: widget.apiService),
-                  IptvScreen(apiService: widget.apiService),
+                  FocusScope(
+                    child: ExcludeFocus(
+                      excluding: _currentTabIndex != 0,
+                      child: FootballScreen(apiService: widget.apiService),
+                    ),
+                  ),
+                  FocusScope(
+                    child: ExcludeFocus(
+                      excluding: _currentTabIndex != 1,
+                      child: AnimeScreen(apiService: widget.apiService),
+                    ),
+                  ),
+                  FocusScope(
+                    child: ExcludeFocus(
+                      excluding: _currentTabIndex != 2,
+                      child: IptvScreen(apiService: widget.apiService),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -260,9 +277,24 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
       body: IndexedStack(
         index: _currentTabIndex,
         children: [
-          FootballScreen(apiService: widget.apiService),
-          AnimeScreen(apiService: widget.apiService),
-          IptvScreen(apiService: widget.apiService),
+          FocusScope(
+            child: ExcludeFocus(
+              excluding: _currentTabIndex != 0,
+              child: FootballScreen(apiService: widget.apiService),
+            ),
+          ),
+          FocusScope(
+            child: ExcludeFocus(
+              excluding: _currentTabIndex != 1,
+              child: AnimeScreen(apiService: widget.apiService),
+            ),
+          ),
+          FocusScope(
+            child: ExcludeFocus(
+              excluding: _currentTabIndex != 2,
+              child: IptvScreen(apiService: widget.apiService),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(

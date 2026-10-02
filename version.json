@@ -1,10 +1,10 @@
 {
-  "version": "1.0.20",
-  "build": 21,
-  "tag_name": "v1.0.20",
-  "changelog": "• Khắc phục triệt để hiện tượng mất con trỏ/highlight trên Android TV do Z-axis layer: chuyển đường viền focus sang foregroundDecoration luôn nổi lên trên cùng, không bị nền hoặc ảnh đè che khuất.\n• Cố định kích thước ô kênh IPTV (mainAxisExtent: 175) tránh co giãn méo mó trên TV và chống tràn viền.\n• Khắc phục mất dấu focus khi di chuyển lên ô Tìm kiếm (Search bar) trong tab IPTV.\n• Loại bỏ co phóng kích thước (scale = 1.0) khi focus, giúp các thẻ liền kề không che lấp viền nhau và loại bỏ hoàn toàn giật lag GPU trên TV Box yếu.",
+  "version": "1.0.21",
+  "build": 22,
+  "tag_name": "v1.0.21",
+  "changelog": "• Khắc phục triệt để lỗi xung đột focus giữa các tab trong IndexedStack: cô lập hoàn toàn FocusScope và ExcludeFocus cho từng tab (Bóng đá, Anime, IPTV), loại bỏ lỗi con trỏ nhảy ngầm sang tab Bóng đá khi đang ở tab Anime hoặc IPTV.\n• Sửa lỗi mất con trỏ và không chọn được phim trong tab Anime & Phim; tích hợp bộ nhớ đệm cache danh mục giúp chuyển thể loại tức thì không giật lag.\n• Sửa lỗi kẹt con trỏ ở Sidebar trong tab IPTV; phân nhóm FocusTraversalGroup giúp di chuyển mượt mà giữa Sidebar và Lưới kênh bên phải.\n• Loại bỏ tình trạng bấm nhầm kích hoạt phát trận đấu bóng đá ngầm khi đang ở các màn hình khác.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-02T18:15:00Z"
+  "published_at": "2026-10-02T18:35:00Z"
 }
