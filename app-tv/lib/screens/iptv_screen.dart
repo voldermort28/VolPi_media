@@ -1107,8 +1107,8 @@ class _IptvScreenState extends State<IptvScreen> {
     if (!isFootballTab) {
       return GridView.builder(
         padding: const EdgeInsets.all(12),
-        addAutomaticKeepAlives: false,
-        cacheExtent: 150,
+        addAutomaticKeepAlives: true,
+        cacheExtent: 350,
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
           childAspectRatio: 0.92,
@@ -1127,7 +1127,7 @@ class _IptvScreenState extends State<IptvScreen> {
     final area2 = channels.where((c) => c.priorityLevel > 2).toList();
 
     return CustomScrollView(
-      cacheExtent: 150,
+      cacheExtent: 350,
       slivers: [
         // Area 1: Famous / VN matches
         if (area1.isNotEmpty) ...[
@@ -1174,7 +1174,7 @@ class _IptvScreenState extends State<IptvScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(area1[index], channels),
                 childCount: area1.length,
-                addAutomaticKeepAlives: false,
+                addAutomaticKeepAlives: true,
               ),
             ),
           ),
@@ -1225,7 +1225,7 @@ class _IptvScreenState extends State<IptvScreen> {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(area2[index], channels),
                 childCount: area2.length,
-                addAutomaticKeepAlives: false,
+                addAutomaticKeepAlives: true,
               ),
             ),
           ),

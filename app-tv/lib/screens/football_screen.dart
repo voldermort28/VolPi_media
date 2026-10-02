@@ -286,7 +286,7 @@ class _FootballScreenState extends State<FootballScreen> {
 
                           return CustomScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
-                            cacheExtent: 150,
+                            cacheExtent: 350,
                             slivers: [
                               // Khu vực 1: Tâm Điểm & Giải Đấu Hàng Đầu
                               if (major.isNotEmpty) ...[
@@ -404,7 +404,7 @@ class _FootballScreenState extends State<FootballScreen> {
         delegate: SliverChildBuilderDelegate(
           (context, idx) => _buildMatchCard(matches[idx]),
           childCount: matches.length,
-          addAutomaticKeepAlives: false,
+          addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
         ),
       ),

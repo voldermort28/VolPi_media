@@ -291,8 +291,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                         ),
                                       )
                                     : GridView.builder(
-                                        cacheExtent: 100,
-                                        addAutomaticKeepAlives: false,
+                                        cacheExtent: 250,
+                                        addAutomaticKeepAlives: true,
                                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                                           maxCrossAxisExtent: 110,
                                           crossAxisSpacing: 10,

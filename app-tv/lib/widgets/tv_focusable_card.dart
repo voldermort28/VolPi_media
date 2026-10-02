@@ -25,9 +25,12 @@ class TvFocusableCard extends StatefulWidget {
   State<TvFocusableCard> createState() => _TvFocusableCardState();
 }
 
-class _TvFocusableCardState extends State<TvFocusableCard> {
+class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAliveClientMixin {
   late FocusNode _focusNode;
   bool _isFocused = false;
+
+  @override
+  bool get wantKeepAlive => _isFocused;
 
   @override
   void initState() {
@@ -38,9 +41,25 @@ class _TvFocusableCardState extends State<TvFocusableCard> {
 
   void _handleFocusChange() {
     if (mounted) {
+      final hasFocus = _focusNode.hasFocus;
       setState(() {
-        _isFocused = _focusNode.hasFocus;
+        _isFocused = hasFocus;
       });
+      updateKeepAlive();
+
+      if (hasFocus) {
+        // Auto scroll viewport so the focused item is fully visible on TV screen
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _focusNode.hasFocus) {
+            Scrollable.ensureVisible(
+              context,
+              alignment: 0.35, // Position slightly above center for optimal TV view
+              duration: const Duration(milliseconds: 120),
+              curve: Curves.easeOutQuad,
+            );
+          }
+        });
+      }
     }
   }
 
@@ -56,6 +75,7 @@ class _TvFocusableCardState extends State<TvFocusableCard> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return RepaintBoundary(
       child: Focus(
         focusNode: _focusNode,
@@ -78,25 +98,16 @@ class _TvFocusableCardState extends State<TvFocusableCard> {
           },
           child: AnimatedScale(
             scale: _isFocused ? widget.scale : 1.0,
-            duration: const Duration(milliseconds: 160),
+            duration: const Duration(milliseconds: 120),
             curve: Curves.easeOutCubic,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
+              duration: const Duration(milliseconds: 120),
               decoration: BoxDecoration(
                 borderRadius: widget.borderRadius,
                 border: Border.all(
                   color: _isFocused ? widget.focusBorderColor : Colors.transparent,
-                  width: 2.5,
+                  width: _isFocused ? 3.0 : 1.0,
                 ),
-                boxShadow: _isFocused
-                    ? [
-                        BoxShadow(
-                          color: widget.focusBorderColor.withOpacity(0.55),
-                          blurRadius: 8,
-                          spreadRadius: 1,
-                        ),
-                      ]
-                    : null,
               ),
               child: ClipRRect(
                 borderRadius: widget.borderRadius,
