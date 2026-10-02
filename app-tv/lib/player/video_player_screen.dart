@@ -8,6 +8,109 @@ import 'package:video_player/video_player.dart';
 import '../models/match_model.dart';
 import '../widgets/tv_focusable_card.dart';
 
+class PlayerErrorInfo {
+  final String title;
+  final String message;
+  final String? suggestion;
+  final bool isSourceError;
+  final IconData icon;
+  final String rawError;
+
+  const PlayerErrorInfo({
+    required this.title,
+    required this.message,
+    this.suggestion,
+    required this.isSourceError,
+    required this.icon,
+    required this.rawError,
+  });
+
+  factory PlayerErrorInfo.fromException(dynamic error) {
+    final raw = error.toString();
+    final lower = raw.toLowerCase();
+
+    // 1. Source Error / Network / HTTP issues
+    if (lower.contains('source error') ||
+        lower.contains('type_source') ||
+        lower.contains('i0.n') ||
+        lower.contains('httpdatasource') ||
+        lower.contains('unrecognizedinputformatexception') ||
+        lower.contains('behindlivewindowexception') ||
+        lower.contains('response code: 403') ||
+        lower.contains('response code: 404')) {
+      if (lower.contains('403') || lower.contains('forbidden')) {
+        return PlayerErrorInfo(
+          title: 'Nguồn phát từ chối truy cập (HTTP 403)',
+          message: 'Link stream đã hết hạn token bảo mật hoặc máy chủ giới hạn truy cập.',
+          suggestion: 'Vui lòng chọn luồng BLV khác hoặc server dự phòng bên dưới.',
+          isSourceError: true,
+          icon: Icons.lock_outline_rounded,
+          rawError: raw,
+        );
+      }
+      if (lower.contains('404') || lower.contains('not found')) {
+        return PlayerErrorInfo(
+          title: 'Kênh chưa phát sóng (HTTP 404)',
+          message: 'Kênh này hiện chưa mở tín hiệu hoặc BLV chưa bắt đầu buổi tiếp sóng.',
+          suggestion: 'Vui lòng chọn kênh BLV khác hoặc quay lại khi trận đấu bắt đầu.',
+          isSourceError: true,
+          icon: Icons.live_tv_rounded,
+          rawError: raw,
+        );
+      }
+      return PlayerErrorInfo(
+        title: 'Nguồn phát gián đoạn (Source Error)',
+        message: 'Nguồn phát này hiện đang ngoại tuyến, hết hạn link hoặc bị nhà mạng chặn đường truyền.',
+        suggestion: 'Hệ thống sẽ thử luồng dự phòng hoặc bạn có thể chọn kênh BLV khác bên dưới.',
+        isSourceError: true,
+        icon: Icons.wifi_off_rounded,
+        rawError: raw,
+      );
+    }
+
+    // 2. Decoder / MediaCodec / Unsupported format
+    if (lower.contains('decoder') ||
+        lower.contains('mediacodec') ||
+        lower.contains('type_renderer') ||
+        lower.contains('audio/ac3') ||
+        lower.contains('unsupported format')) {
+      return PlayerErrorInfo(
+        title: 'Lỗi giải mã thiết bị (Decoder Error)',
+        message: 'Bộ giải mã phần cứng của TV không hỗ trợ định dạng video/âm thanh của luồng này.',
+        suggestion: 'Vui lòng chọn kênh phát khác với định dạng tiêu chuẩn (H.264 / AAC).',
+        isSourceError: false,
+        icon: Icons.developer_board_off_rounded,
+        rawError: raw,
+      );
+    }
+
+    // 3. Network connection / Socket timeout
+    if (lower.contains('socketexception') ||
+        lower.contains('timeout') ||
+        lower.contains('connection refused') ||
+        lower.contains('network is unreachable')) {
+      return PlayerErrorInfo(
+        title: 'Lỗi kết nối mạng',
+        message: 'Không thể kết nối đến máy chủ phát video. Vui lòng kiểm tra lại Wifi/mạng TV.',
+        suggestion: 'Bấm "Thử lại" hoặc kiểm tra lại đường truyền Wifi/LAN.',
+        isSourceError: true,
+        icon: Icons.signal_wifi_bad_rounded,
+        rawError: raw,
+      );
+    }
+
+    // Default error
+    return PlayerErrorInfo(
+      title: 'Không thể phát luồng này',
+      message: 'Đã xảy ra sự cố khi tải nội dung video từ máy chủ.',
+      suggestion: 'Vui lòng bấm "Thử lại" hoặc chuyển sang kênh/máy chủ khác.',
+      isSourceError: true,
+      icon: Icons.error_outline_rounded,
+      rawError: raw,
+    );
+  }
+}
+
 class VideoPlayerScreen extends StatefulWidget {
   final String streamUrl;
   final String title;
@@ -15,6 +118,7 @@ class VideoPlayerScreen extends StatefulWidget {
   final Map<String, String> headers;
   final List<StreamChannel>? availableChannels;
   final bool isLive;
+  final bool enableAutoFallback;
 
   const VideoPlayerScreen({
     super.key,
@@ -24,6 +128,7 @@ class VideoPlayerScreen extends StatefulWidget {
     this.headers = const {},
     this.availableChannels,
     this.isLive = false,
+    this.enableAutoFallback = true,
   });
 
   @override
@@ -31,10 +136,20 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
   bool _isInitialized = false;
   bool _hasError = false;
   String _errorMessage = '';
+  PlayerErrorInfo? _currentErrorInfo;
+  final Set<String> _failedStreamUrls = {};
+  bool _showTechnicalDetails = false;
+
+  // Auto-fallback mechanism
+  bool _isAutoSwitching = false;
+  StreamChannel? _autoSwitchTarget;
+  int _autoSwitchCountdown = 2;
+  Timer? _autoSwitchTimer;
+
   bool _showControls = true;
   Timer? _hideControlsTimer;
   late String _currentStreamUrl;
@@ -84,40 +199,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Future<void> _initPlayer() async {
+    _autoSwitchTimer?.cancel();
     setState(() {
       _isInitialized = false;
       _hasError = false;
+      _isAutoSwitching = false;
     });
 
     try {
-      _controller = VideoPlayerController.networkUrl(
+      final newController = VideoPlayerController.networkUrl(
         Uri.parse(_currentStreamUrl),
         httpHeaders: _currentHeaders,
       );
 
-      await _controller.initialize();
-      _controller.play();
+      _controller = newController;
 
-      _controller.addListener(_videoListener);
+      await newController.initialize();
 
-      if (mounted) {
-        setState(() {
-          _isInitialized = true;
-        });
-        _startHideControlsTimer();
+      if (!mounted || _controller != newController) {
+        newController.dispose();
+        return;
       }
+
+      newController.play();
+      newController.addListener(_videoListener);
+
+      setState(() {
+        _isInitialized = true;
+      });
+      _startHideControlsTimer();
     } catch (e) {
       if (mounted) {
-        setState(() {
-          _hasError = true;
-          _errorMessage = 'Không thể phát luồng này: ${e.toString()}';
-        });
+        _handleError(e);
       }
     }
   }
 
   void _videoListener() {
     if (!mounted || !_isInitialized) return;
+    if (_controller != null && _controller!.value.hasError) {
+      final err = _controller!.value.errorDescription ?? 'Source error: Gián đoạn luồng phát';
+      _handleError(err);
+      return;
+    }
     // Performance optimization for low-end hardware:
     // Only rebuild UI if controls are currently visible.
     // When watching video (controls hidden), avoid rebuilding the entire screen 10 times per second!
@@ -126,14 +250,102 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _handleError(dynamic error) {
+    if (!mounted) return;
+
+    if (_controller != null) {
+      try {
+        _controller!.removeListener(_videoListener);
+        _controller!.pause();
+      } catch (_) {}
+    }
+
+    final errorInfo = PlayerErrorInfo.fromException(error);
+    _failedStreamUrls.add(_currentStreamUrl);
+
+    final channels = widget.availableChannels;
+    StreamChannel? nextChannel;
+    if (widget.enableAutoFallback && channels != null && channels.length > 1) {
+      final unfailed = channels.where((c) => !_failedStreamUrls.contains(c.url)).toList();
+      if (unfailed.isNotEmpty) {
+        nextChannel = unfailed.first;
+      }
+    }
+
+    if (nextChannel != null) {
+      _autoSwitchTimer?.cancel();
+      setState(() {
+        _isInitialized = false;
+        _hasError = false;
+        _currentErrorInfo = errorInfo;
+        _isAutoSwitching = true;
+        _autoSwitchTarget = nextChannel;
+        _autoSwitchCountdown = 2;
+      });
+      _startAutoSwitchCountdown(nextChannel);
+    } else {
+      _autoSwitchTimer?.cancel();
+      setState(() {
+        _isInitialized = false;
+        _hasError = true;
+        _isAutoSwitching = false;
+        _autoSwitchTarget = null;
+        _currentErrorInfo = errorInfo;
+        _errorMessage = errorInfo.message;
+      });
+    }
+  }
+
+  void _startAutoSwitchCountdown(StreamChannel target) {
+    _autoSwitchTimer?.cancel();
+    _autoSwitchTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_autoSwitchCountdown <= 1) {
+        timer.cancel();
+        _executeAutoSwitch(target);
+      } else {
+        setState(() {
+          _autoSwitchCountdown--;
+        });
+      }
+    });
+  }
+
+  void _executeAutoSwitch(StreamChannel target) {
+    _autoSwitchTimer?.cancel();
+    _switchChannel(target, isAuto: true);
+  }
+
+  void _cancelAutoSwitch() {
+    _autoSwitchTimer?.cancel();
+    setState(() {
+      _isAutoSwitching = false;
+      _autoSwitchTarget = null;
+      _hasError = true;
+    });
+  }
+
+  void _retryCurrentOrAll() {
+    _failedStreamUrls.clear();
+    setState(() {
+      _hasError = false;
+      _isAutoSwitching = false;
+      _autoSwitchTarget = null;
+    });
+    _initPlayer();
+  }
+
   void _setVolume(double newVol) {
     final clamped = newVol.clamp(0.0, 1.0);
     setState(() {
       _volume = clamped;
       _isMuted = clamped == 0.0;
     });
-    if (_isInitialized) {
-      _controller.setVolume(_isMuted ? 0.0 : _volume);
+    if (_isInitialized && _controller != null) {
+      _controller!.setVolume(_isMuted ? 0.0 : _volume);
     }
     _showVolumeHud(clamped);
     _showControlsBriefly();
@@ -171,16 +383,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  void _switchChannel(StreamChannel channel) {
-    if (_currentStreamUrl == channel.url) return;
-    _controller.removeListener(_videoListener);
-    _controller.dispose();
+  void _switchChannel(StreamChannel channel, {bool isAuto = false}) {
+    if (_currentStreamUrl == channel.url && _isInitialized && !_hasError) return;
+    _autoSwitchTimer?.cancel();
+    if (_controller != null) {
+      try {
+        _controller!.removeListener(_videoListener);
+        _controller!.dispose();
+      } catch (_) {}
+      _controller = null;
+    }
     setState(() {
       _currentStreamUrl = channel.url;
       _currentTitle = channel.title;
       _currentHeaders = channel.headers;
+      _isInitialized = false;
+      _hasError = false;
+      _isAutoSwitching = false;
+      _autoSwitchTarget = null;
     });
     _initPlayer();
+
+    _hudFadeTimer?.cancel();
+    final channels = widget.availableChannels;
+    final idx = channels?.indexWhere((c) => c.url == channel.url) ?? -1;
+    setState(() {
+      _hudIcon = 'CHANNEL';
+      _hudText = channel.title;
+      _hudSpeedBadge = isAuto
+          ? 'Tự chuyển'
+          : (idx >= 0 && channels != null ? '${idx + 1}/${channels.length}' : null);
+    });
+
+    _hudFadeTimer = Timer(const Duration(milliseconds: 2500), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+          _hudSpeedBadge = null;
+        });
+      }
+    });
+
+    _showControlsBriefly();
   }
 
   void _switchChannelDelta(int delta) {
@@ -197,26 +442,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
 
     final targetChannel = channels[newIndex];
+    _failedStreamUrls.remove(targetChannel.url);
     _switchChannel(targetChannel);
-
-    _hudFadeTimer?.cancel();
-    setState(() {
-      _hudIcon = 'CHANNEL';
-      _hudText = targetChannel.title;
-      _hudSpeedBadge = '${newIndex + 1}/${channels.length}';
-    });
-
-    _hudFadeTimer = Timer(const Duration(milliseconds: 2500), () {
-      if (mounted) {
-        setState(() {
-          _hudIcon = null;
-          _hudText = null;
-          _hudSpeedBadge = null;
-        });
-      }
-    });
-
-    _showControlsBriefly();
   }
 
   void _startHideControlsTimer() {
@@ -346,7 +573,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _applySeekStep(int direction, int stepSeconds, String speedBadge) {
-    final duration = _controller.value.duration;
+    if (_controller == null) return;
+    final duration = _controller!.value.duration;
     final step = Duration(seconds: stepSeconds * direction);
 
     _seekAccumulatedDelta += step;
@@ -380,7 +608,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _commitPendingSeek() {
     _commitSeekTimer?.cancel();
-    if (!_isHoldingSeek || !_isInitialized || widget.isLive) {
+    if (!_isHoldingSeek || !_isInitialized || widget.isLive || _controller == null) {
       _isHoldingSeek = false;
       return;
     }
@@ -390,7 +618,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _holdRepeatCount = 0;
     _holdStartTime = null;
 
-    _controller.seekTo(target);
+    _controller!.seekTo(target);
 
     _hudFadeTimer?.cancel();
     _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
@@ -408,20 +636,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   // --- Touch Gestures Handling ---
   void _onHorizontalDragStart(DragStartDetails details) {
-    if (!_isInitialized || widget.isLive) return;
-    _dragStartPosition = _controller.value.position;
+    if (!_isInitialized || widget.isLive || _controller == null) return;
+    _dragStartPosition = _controller!.value.position;
     _dragTotalDeltaX = 0.0;
     _isDragging = true;
     _hudFadeTimer?.cancel();
   }
 
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
-    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    if (!_isInitialized || widget.isLive || !_isDragging || _controller == null) return;
     _dragTotalDeltaX += details.primaryDelta ?? 0.0;
 
     // 1px drag = ~0.4s seek
     final deltaSeconds = (_dragTotalDeltaX * 0.4).toInt();
-    final duration = _controller.value.duration;
+    final duration = _controller!.value.duration;
     final targetSeconds = (_dragStartPosition.inSeconds + deltaSeconds).clamp(0, duration.inSeconds);
     final target = Duration(seconds: targetSeconds);
 
@@ -434,9 +662,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
-    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    if (!_isInitialized || widget.isLive || !_isDragging || _controller == null) return;
     _isDragging = false;
-    _controller.seekTo(_dragTargetPosition);
+    _controller!.seekTo(_dragTargetPosition);
 
     _hudFadeTimer?.cancel();
     _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
@@ -479,12 +707,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    _autoSwitchTimer?.cancel();
     _hideControlsTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
     _commitSeekTimer?.cancel();
-    _controller.removeListener(_videoListener);
-    _controller.dispose();
+    if (_controller != null) {
+      try {
+        _controller!.removeListener(_videoListener);
+        _controller!.dispose();
+      } catch (_) {}
+      _controller = null;
+    }
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -497,6 +731,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       autofocus: true,
       onKeyEvent: (node, event) {
         final key = event.logicalKey;
+
+        // If in error or auto-switching state, allow back key to pop,
+        // allow enter/select to trigger switch immediately during auto-switching,
+        // and delegate arrow navigation to child buttons!
+        if (_hasError || _isAutoSwitching) {
+          if (event is KeyDownEvent) {
+            if (key == LogicalKeyboardKey.escape ||
+                key == LogicalKeyboardKey.goBack ||
+                key == LogicalKeyboardKey.backspace) {
+              Navigator.of(context).pop();
+              return KeyEventResult.handled;
+            }
+            if (_isAutoSwitching &&
+                (key == LogicalKeyboardKey.select ||
+                 key == LogicalKeyboardKey.enter ||
+                 key == LogicalKeyboardKey.gameButtonA)) {
+              if (_autoSwitchTarget != null) {
+                _executeAutoSwitch(_autoSwitchTarget!);
+                return KeyEventResult.handled;
+              }
+            }
+          }
+          return KeyEventResult.ignored;
+        }
+
         final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.mediaRewind ||
             key == LogicalKeyboardKey.mediaTrackPrevious;
@@ -619,51 +878,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             alignment: Alignment.center,
             children: [
               // 1. VIDEO CANVAS
-              if (_isInitialized)
+              if (_isInitialized && _controller != null)
                 Center(
                   child: AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio > 0 ? _controller.value.aspectRatio : 16 / 9,
-                    child: VideoPlayer(_controller),
+                    aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 16 / 9,
+                    child: VideoPlayer(_controller!),
                   ),
                 )
+              else if (_isAutoSwitching)
+                _buildAutoSwitchingOverlay()
               else if (_hasError)
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Lỗi phát video',
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _errorMessage,
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 20),
-                        TvFocusableCard(
-                          onTap: _initPlayer,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            color: const Color(0xFF38BDF8),
-                            child: const Text('Thử lại', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
+                _buildErrorScreen(context)
               else
                 const Center(
                   child: Column(
@@ -677,28 +902,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
 
               // 2. DOUBLE-TAP SEEK ZONES (Left 35% & Right 35%)
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: screenSize.width * 0.35,
-                child: GestureDetector(
-                  onDoubleTap: () => _onDoubleTapSide(false),
-                  behavior: HitTestBehavior.translucent,
-                  child: Container(),
+              if (_isInitialized) ...[
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.35,
+                  child: GestureDetector(
+                    onDoubleTap: () => _onDoubleTapSide(false),
+                    behavior: HitTestBehavior.translucent,
+                    child: Container(),
+                  ),
                 ),
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: screenSize.width * 0.35,
-                child: GestureDetector(
-                  onDoubleTap: () => _onDoubleTapSide(true),
-                  behavior: HitTestBehavior.translucent,
-                  child: Container(),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.35,
+                  child: GestureDetector(
+                    onDoubleTap: () => _onDoubleTapSide(true),
+                    behavior: HitTestBehavior.translucent,
+                    child: Container(),
+                  ),
                 ),
-              ),
+              ],
 
               // 3. DOUBLE-TAP RIPPLE INDICATORS
               if (_showDoubleTapLeft)
@@ -805,10 +1032,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (_hudIcon != 'CHANNEL' && !_hudIcon!.startsWith('VOLUME')) ...[
+                        if (_hudIcon != 'CHANNEL' && !_hudIcon!.startsWith('VOLUME') && _controller != null) ...[
                           const SizedBox(height: 4),
                           Text(
-                            '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
+                            '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller!.value.duration)}',
                             style: const TextStyle(color: Colors.white70, fontSize: 13),
                           ),
                         ],
@@ -968,7 +1195,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
                                   child: Icon(
-                                    _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                    (_controller != null && _controller!.value.isPlaying)
+                                        ? Icons.pause_circle_filled
+                                        : Icons.play_circle_filled,
                                     color: const Color(0xFF38BDF8),
                                     size: 68,
                                   ),
@@ -1030,11 +1259,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 ],
 
                                 // Progress Slider for VOD
-                                if (!widget.isLive && _isInitialized) ...[
+                                if (!widget.isLive && _isInitialized && _controller != null) ...[
                                   Row(
                                     children: [
                                       Text(
-                                        _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
+                                        _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller!.value.position),
                                         style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
                                       ),
                                       const SizedBox(width: 8),
@@ -1049,23 +1278,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             trackHeight: 4.0,
                                           ),
                                           child: Slider(
-                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
+                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller!.value.position).inSeconds.toDouble().clamp(
                                                   0.0,
-                                                  _controller.value.duration.inSeconds.toDouble(),
+                                                  _controller!.value.duration.inSeconds.toDouble(),
                                                 ),
-                                            max: _controller.value.duration.inSeconds.toDouble() > 0
-                                                ? _controller.value.duration.inSeconds.toDouble()
+                                            max: _controller!.value.duration.inSeconds.toDouble() > 0
+                                                ? _controller!.value.duration.inSeconds.toDouble()
                                                 : 1.0,
                                             onChanged: (val) {
                                               _startHideControlsTimer();
-                                              _controller.seekTo(Duration(seconds: val.toInt()));
+                                              _controller!.seekTo(Duration(seconds: val.toInt()));
                                             },
                                           ),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
                                       Text(
-                                        _formatDuration(_controller.value.duration),
+                                        _formatDuration(_controller!.value.duration),
                                         style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
                                       ),
                                     ],
@@ -1083,6 +1312,364 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ],
           ),
         ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAutoSwitchingOverlay() {
+    final target = _autoSwitchTarget;
+    if (target == null) return const SizedBox.shrink();
+
+    return Center(
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 520),
+        margin: const EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF38BDF8).withOpacity(0.25),
+              blurRadius: 30,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Color(0xFF38BDF8),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  _currentErrorInfo?.title ?? 'Nguồn phát gián đoạn',
+                  style: const TextStyle(
+                    color: Color(0xFFF59E0B),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Luồng "$_currentTitle" hiện không thể phát.\nĐang tự động chuyển sang "${target.title}" trong ${_autoSwitchCountdown}s...',
+              style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.5),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TvFocusableCard(
+                  autoFocus: true,
+                  onTap: () => _executeAutoSwitch(target),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF38BDF8),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.swap_horiz_rounded, color: Colors.black, size: 18),
+                        SizedBox(width: 6),
+                        Text(
+                          'Chuyển ngay',
+                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                TvFocusableCard(
+                  onTap: _cancelAutoSwitch,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF334155),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Hủy / Chọn thủ công',
+                      style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorScreen(BuildContext context) {
+    final errorInfo = _currentErrorInfo ?? PlayerErrorInfo.fromException(_errorMessage);
+    final channels = widget.availableChannels;
+    final hasMultipleChannels = channels != null && channels.length > 1;
+
+    return Center(
+      child: SingleChildScrollView(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 580),
+          margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: errorInfo.isSourceError
+                  ? const Color(0xFFF59E0B).withOpacity(0.5)
+                  : Colors.redAccent.withOpacity(0.5),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.6),
+                blurRadius: 30,
+                spreadRadius: 4,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: (errorInfo.isSourceError ? const Color(0xFFF59E0B) : Colors.redAccent).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  errorInfo.icon,
+                  color: errorInfo.isSourceError ? const Color(0xFFF59E0B) : Colors.redAccent,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                errorInfo.title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                errorInfo.message,
+                style: const TextStyle(
+                  color: Color(0xFFCBD5E1),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              if (errorInfo.suggestion != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  errorInfo.suggestion!,
+                  style: const TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+
+              if (hasMultipleChannels) ...[
+                const SizedBox(height: 18),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Chọn kênh / máy chủ khác:',
+                    style: TextStyle(
+                      color: Color(0xFF38BDF8),
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
+                  children: channels.map((ch) {
+                    final isCurrent = ch.url == _currentStreamUrl;
+                    final isFailed = _failedStreamUrls.contains(ch.url);
+                    return TvFocusableCard(
+                      autoFocus: !isCurrent && !isFailed,
+                      borderRadius: BorderRadius.circular(8),
+                      onTap: () {
+                        _failedStreamUrls.remove(ch.url);
+                        _switchChannel(ch);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? const Color(0xFF0F172A)
+                              : (isFailed ? const Color(0xFF334155).withOpacity(0.5) : const Color(0xFF0284C7)),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: isFailed ? Colors.redAccent.withOpacity(0.4) : const Color(0xFF38BDF8),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isFailed
+                                  ? Icons.error_outline_rounded
+                                  : (isCurrent ? Icons.play_arrow_rounded : Icons.tv_rounded),
+                              color: isFailed
+                                  ? Colors.redAccent
+                                  : (isCurrent ? Colors.white54 : Colors.white),
+                              size: 15,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              ch.title,
+                              style: TextStyle(
+                                color: isFailed
+                                    ? const Color(0xFF94A3B8)
+                                    : (isCurrent ? Colors.white54 : Colors.white),
+                                fontSize: 12,
+                                fontWeight: isFailed ? FontWeight.normal : FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TvFocusableCard(
+                    autoFocus: !hasMultipleChannels,
+                    onTap: _retryCurrentOrAll,
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF38BDF8),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded, color: Colors.black, size: 17),
+                          SizedBox(width: 6),
+                          Text(
+                            'Thử lại',
+                            style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  TvFocusableCard(
+                    onTap: () => Navigator.of(context).pop(),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF334155),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.arrow_back_rounded, color: Colors.white, size: 17),
+                          SizedBox(width: 6),
+                          Text(
+                            'Quay lại',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showTechnicalDetails = !_showTechnicalDetails;
+                  });
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _showTechnicalDetails ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                        color: const Color(0xFF64748B),
+                        size: 15,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _showTechnicalDetails ? 'Ẩn chi tiết kỹ thuật' : 'Xem chi tiết kỹ thuật',
+                        style: const TextStyle(color: Color(0xFF64748B), fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_showTechnicalDetails) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: SelectableText(
+                    errorInfo.rawError,
+                    style: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

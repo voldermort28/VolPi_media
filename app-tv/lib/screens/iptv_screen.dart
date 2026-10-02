@@ -368,6 +368,7 @@ class _IptvScreenState extends State<IptvScreen> {
           headers: channel.headers,
           availableChannels: availableChannels,
           isLive: true,
+          enableAutoFallback: false,
         ),
       ),
     );
