@@ -449,7 +449,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _controller.value.isPlaying && !_isDragging) {
+      if (mounted && _controller != null && _controller!.value.isPlaying && !_isDragging) {
         setState(() {
           _showControls = false;
         });
@@ -474,14 +474,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _togglePlayPause() {
-    if (!_isInitialized) return;
+    if (!_isInitialized || _controller == null) return;
     setState(() {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
         _showControls = true;
         _hideControlsTimer?.cancel();
       } else {
-        _controller.play();
+        _controller!.play();
         _startHideControlsTimer();
       }
     });
@@ -514,13 +514,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _seekRelative(int seconds) {
-    if (!_isInitialized || widget.isLive) return;
+    if (!_isInitialized || widget.isLive || _controller == null) return;
     final dir = seconds >= 0 ? 1 : -1;
     _handleRemoteSeekStart(dir);
   }
 
   void _handleRemoteSeekStart(int direction) {
-    if (!_isInitialized || widget.isLive) return;
+    if (!_isInitialized || widget.isLive || _controller == null) return;
 
     final now = DateTime.now();
 
@@ -529,7 +529,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _holdSeekDirection = direction;
       _holdStartTime = now;
       _holdRepeatCount = 0;
-      _pendingSeekPosition = _controller.value.position;
+      _pendingSeekPosition = _controller!.value.position;
       _seekAccumulatedDelta = Duration.zero;
     }
 
@@ -1499,7 +1499,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
               ],
 
-              if (hasMultipleChannels) ...[
+              if (channels != null && channels.length > 1) ...[
                 const SizedBox(height: 18),
                 const Align(
                   alignment: Alignment.centerLeft,
@@ -1575,7 +1575,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   TvFocusableCard(
-                    autoFocus: !hasMultipleChannels,
+                    autoFocus: channels == null || channels.length <= 1,
                     onTap: _retryCurrentOrAll,
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
