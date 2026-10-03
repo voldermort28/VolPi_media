@@ -20,7 +20,10 @@ class AdaptiveLayout extends StatefulWidget {
 }
 
 class _AdaptiveLayoutState extends State<AdaptiveLayout> {
-  int _currentTabIndex = 0; // 0: Football, 1: Anime
+  int _currentTabIndex = 0; // 0: Football, 1: Anime, 2: IPTV
+
+  late final List<FocusNode> _tabFocusNodes = List.generate(3, (_) => FocusNode());
+  late final List<FocusNode> _tabContentPrimaryNodes = List.generate(3, (_) => FocusNode());
 
   @override
   void initState() {
@@ -28,6 +31,17 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOtaUpdate(silent: true);
     });
+  }
+
+  @override
+  void dispose() {
+    for (final node in _tabFocusNodes) {
+      node.dispose();
+    }
+    for (final node in _tabContentPrimaryNodes) {
+      node.dispose();
+    }
+    super.dispose();
   }
 
   Future<void> _checkOtaUpdate({bool silent = false}) async {
@@ -175,15 +189,27 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                 children: [
                   ExcludeFocus(
                     excluding: _currentTabIndex != 0,
-                    child: FootballScreen(apiService: widget.apiService),
+                    child: FootballScreen(
+                      apiService: widget.apiService,
+                      primaryFocusNode: _tabContentPrimaryNodes[0],
+                      onNavigateUp: () => _tabFocusNodes[0].requestFocus(),
+                    ),
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 1,
-                    child: AnimeScreen(apiService: widget.apiService),
+                    child: AnimeScreen(
+                      apiService: widget.apiService,
+                      primaryFocusNode: _tabContentPrimaryNodes[1],
+                      onNavigateUp: () => _tabFocusNodes[1].requestFocus(),
+                    ),
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 2,
-                    child: IptvScreen(apiService: widget.apiService),
+                    child: IptvScreen(
+                      apiService: widget.apiService,
+                      primaryFocusNode: _tabContentPrimaryNodes[2],
+                      onNavigateUp: () => _tabFocusNodes[2].requestFocus(),
+                    ),
                   ),
                 ],
               ),
@@ -200,6 +226,17 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     return SizedBox(
       height: 42,
       child: TvFocusableCard(
+        focusNode: _tabFocusNodes[index],
+        onKeyEvent: (node, event) {
+          if (event is KeyDownEvent) {
+            // Press DOWN on active tab -> Jump directly to content primary node!
+            if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+              _tabContentPrimaryNodes[_currentTabIndex].requestFocus();
+              return KeyEventResult.handled;
+            }
+          }
+          return KeyEventResult.ignored;
+        },
         onTap: () {
           setState(() {
             _currentTabIndex = index;

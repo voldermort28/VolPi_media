@@ -7,8 +7,15 @@ import '../player/video_player_screen.dart';
 
 class FootballScreen extends StatefulWidget {
   final ApiService apiService;
+  final VoidCallback? onNavigateUp;
+  final FocusNode? primaryFocusNode;
 
-  const FootballScreen({super.key, required this.apiService});
+  const FootballScreen({
+    super.key,
+    required this.apiService,
+    this.onNavigateUp,
+    this.primaryFocusNode,
+  });
 
   @override
   State<FootballScreen> createState() => _FootballScreenState();
@@ -213,8 +220,16 @@ class _FootballScreenState extends State<FootballScreen> {
               SizedBox(
                 height: 38,
                 child: TvFocusableCard(
+                  focusNode: widget.primaryFocusNode,
                   onTap: () => _loadMatches(forceRefresh: true),
                   borderRadius: BorderRadius.circular(10),
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      widget.onNavigateUp?.call();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     color: const Color(0xFF1E293B),
