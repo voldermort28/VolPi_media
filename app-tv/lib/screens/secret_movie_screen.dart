@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/movie_model.dart';
-import '../models/match_model.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -177,7 +176,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     autoFocus: idx == 0,
                     onTap: () {
                       Navigator.of(ctx).pop();
-                      _playMovieStream(movie, s, servers);
+                      _playMovieStream(movie, s);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -206,14 +205,13 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
   }
 
-  void _playMovieStream(MovieModel movie, StreamChannel server, List<StreamChannel> servers) {
+  void _playMovieStream(MovieModel movie, dynamic server) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
           streamUrl: server.url,
           title: movie.title,
           subtitle: server.title,
-          availableChannels: servers,
           isLive: false,
         ),
       ),

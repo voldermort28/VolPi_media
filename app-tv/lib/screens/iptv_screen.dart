@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/iptv_channel_model.dart';
@@ -9,15 +8,8 @@ import '../player/video_player_screen.dart';
 
 class IptvScreen extends StatefulWidget {
   final ApiService apiService;
-  final VoidCallback? onNavigateUp;
-  final FocusNode? primaryFocusNode;
 
-  const IptvScreen({
-    super.key,
-    required this.apiService,
-    this.onNavigateUp,
-    this.primaryFocusNode,
-  });
+  const IptvScreen({super.key, required this.apiService});
 
   @override
   State<IptvScreen> createState() => _IptvScreenState();
@@ -44,12 +36,6 @@ const List<IptvCategoryItem> kIptvCategories = [
 ];
 
 class _IptvScreenState extends State<IptvScreen> {
-  late final Map<String, FocusNode> _categoryFocusNodes = {
-    for (var cat in kIptvCategories) cat.id: FocusNode(),
-  };
-  final FocusNode _firstChannelCardFocusNode = FocusNode();
-  final FocusNode _refreshBtnFocusNode = FocusNode();
-
   List<IptvChannelModel> _allChannels = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -79,11 +65,6 @@ class _IptvScreenState extends State<IptvScreen> {
   void dispose() {
     _searchFocusNode.dispose();
     _searchController.dispose();
-    for (final node in _categoryFocusNodes.values) {
-      node.dispose();
-    }
-    _firstChannelCardFocusNode.dispose();
-    _refreshBtnFocusNode.dispose();
     super.dispose();
   }
 
@@ -387,7 +368,6 @@ class _IptvScreenState extends State<IptvScreen> {
           headers: channel.headers,
           availableChannels: availableChannels,
           isLive: true,
-          enableAutoFallback: false,
         ),
       ),
     );
@@ -592,34 +572,14 @@ class _IptvScreenState extends State<IptvScreen> {
                     countBadgeBg = const Color(0xFF1E293B);
                   }
 
-                  final focusNode = (cat.id == 'FOOTBALL' && widget.primaryFocusNode != null)
-                      ? widget.primaryFocusNode!
-                      : _categoryFocusNodes[cat.id];
-
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: TvFocusableCard(
-                      focusNode: focusNode,
                       onTap: () {
                         setState(() {
                           _selectedCategory = cat.id;
                           _selectedGroup = 'ALL';
                         });
-                      },
-                      onKeyEvent: (node, event) {
-                        if (event is KeyDownEvent) {
-                          // Press RIGHT -> Jump to first card of channel grid!
-                          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                            _firstChannelCardFocusNode.requestFocus();
-                            return KeyEventResult.handled;
-                          }
-                          // Press UP on first category -> Jump to Top Nav Bar!
-                          if (event.logicalKey == LogicalKeyboardKey.arrowUp && cat.id == kIptvCategories.first.id) {
-                            widget.onNavigateUp?.call();
-                            return KeyEventResult.handled;
-                          }
-                        }
-                        return KeyEventResult.ignored;
                       },
                       borderRadius: BorderRadius.circular(10),
                       child: Container(
@@ -692,13 +652,6 @@ class _IptvScreenState extends State<IptvScreen> {
 
                 TvFocusableCard(
                   onTap: () => _showSourceSelectionDialog(sources),
-                  onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                      _firstChannelCardFocusNode.requestFocus();
-                      return KeyEventResult.handled;
-                    }
-                    return KeyEventResult.ignored;
-                  },
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -754,13 +707,6 @@ class _IptvScreenState extends State<IptvScreen> {
                           setState(() {
                             _selectedGroup = group;
                           });
-                        },
-                        onKeyEvent: (node, event) {
-                          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowRight) {
-                            _firstChannelCardFocusNode.requestFocus();
-                            return KeyEventResult.handled;
-                          }
-                          return KeyEventResult.ignored;
                         },
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
@@ -892,29 +838,6 @@ class _IptvScreenState extends State<IptvScreen> {
 
               // Refresh Button
               TvFocusableCard(
-                focusNode: _refreshBtnFocusNode,
-                onKeyEvent: (node, event) {
-                  if (event is KeyDownEvent) {
-                    // UP -> Jump to Top Nav Bar
-                    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                      widget.onNavigateUp?.call();
-                      return KeyEventResult.handled;
-                    }
-                    // LEFT -> Jump to selected category in sidebar
-                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                      final targetNode = _categoryFocusNodes[_selectedCategory] ??
-                          (widget.primaryFocusNode ?? _categoryFocusNodes['FOOTBALL']);
-                      targetNode?.requestFocus();
-                      return KeyEventResult.handled;
-                    }
-                    // DOWN -> Jump to first channel card
-                    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                      _firstChannelCardFocusNode.requestFocus();
-                      return KeyEventResult.handled;
-                    }
-                  }
-                  return KeyEventResult.ignored;
-                },
                 onTap: _isRefreshing
                     ? () {}
                     : () {
@@ -1215,7 +1138,7 @@ class _IptvScreenState extends State<IptvScreen> {
         ),
         itemCount: channels.length,
         itemBuilder: (context, index) {
-          return _buildChannelCard(channels[index], channels, index: index, crossAxisCount: crossAxisCount);
+          return _buildChannelCard(channels[index], channels);
         },
       );
     }
@@ -1270,7 +1193,7 @@ class _IptvScreenState extends State<IptvScreen> {
                 mainAxisSpacing: 14,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildChannelCard(area1[index], channels, index: index, crossAxisCount: crossAxisCount),
+                (context, index) => _buildChannelCard(area1[index], channels),
                 childCount: area1.length,
                 addAutomaticKeepAlives: true,
                 addRepaintBoundaries: true,
@@ -1322,7 +1245,7 @@ class _IptvScreenState extends State<IptvScreen> {
                 mainAxisSpacing: 14,
               ),
               delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildChannelCard(area2[index], channels, index: index + area1.length, crossAxisCount: crossAxisCount),
+                (context, index) => _buildChannelCard(area2[index], channels),
                 childCount: area2.length,
                 addAutomaticKeepAlives: true,
                 addRepaintBoundaries: true,
@@ -1337,12 +1260,7 @@ class _IptvScreenState extends State<IptvScreen> {
     );
   }
 
-  Widget _buildChannelCard(
-    IptvChannelModel channel,
-    List<IptvChannelModel> currentList, {
-    int index = 0,
-    int crossAxisCount = 4,
-  }) {
+  Widget _buildChannelCard(IptvChannelModel channel, List<IptvChannelModel> currentList) {
     Color focusBorder = const Color(0xFF38BDF8);
     if (channel.isVietnam) {
       focusBorder = const Color(0xFFFDE047);
@@ -1350,28 +1268,7 @@ class _IptvScreenState extends State<IptvScreen> {
       focusBorder = const Color(0xFFF59E0B);
     }
 
-    final isFirstCard = index == 0;
-    final isFirstColumn = crossAxisCount > 0 && (index % crossAxisCount == 0);
-
     return TvFocusableCard(
-      focusNode: isFirstCard ? _firstChannelCardFocusNode : null,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          // If in column 0, pressing LEFT jumps back to sidebar category
-          if (isFirstColumn && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-            final targetNode = _categoryFocusNodes[_selectedCategory] ??
-                (widget.primaryFocusNode ?? _categoryFocusNodes['FOOTBALL']);
-            targetNode?.requestFocus();
-            return KeyEventResult.handled;
-          }
-          // If in row 0, pressing UP jumps to toolbar Refresh button
-          if (index < crossAxisCount && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            _refreshBtnFocusNode.requestFocus();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
       onTap: () => _playChannel(channel, currentList),
       focusBorderColor: focusBorder,
       borderRadius: BorderRadius.circular(14),
@@ -1516,8 +1413,6 @@ class _IptvScreenState extends State<IptvScreen> {
                         imageUrl: channel.logo,
                         memCacheWidth: 80,
                         memCacheHeight: 80,
-                        maxWidthDiskCache: 120,
-                        maxHeightDiskCache: 120,
                         fit: BoxFit.contain,
                         placeholder: (context, url) => const Center(
                           child: Icon(Icons.live_tv_rounded, color: Colors.white24, size: 24),

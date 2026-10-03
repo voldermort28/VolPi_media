@@ -1,8 +1,8 @@
 {
-  "version": "1.0.22",
-  "build": 23,
-  "tag_name": "v1.0.22",
-  "changelog": "• Khắc phục hoàn toàn lỗi không thể bấm phím Lên để chọn các tab trên cùng (Bóng đá, Anime, IPTV): gỡ bỏ rào cản FocusScope chặn trên IndexedStack, cho phép con trỏ tự do di chuyển lên thanh điều hướng Top Bar.\n• Giữ nguyên cơ chế ExcludeFocus giúp cách ly hoàn toàn các tab đang ẩn, không lo bị nhảy ngầm hay phát nhầm trận đấu bóng đá.\n• Tối ưu chuyển hướng tự nhiên 2D giữa các khu vực trên toàn bộ ứng dụng.",
+  "version": "1.0.28",
+  "build": 29,
+  "tag_name": "v1.0.28",
+  "changelog": "• Khôi phục toàn bộ mã nguồn về trạng thái ổn định nguyên bản của commit 230f8ac (v1.0.22).\n• Giữ nguyên cơ chế FocusScope và điều hướng D-pad nguyên bản mượt mà, ổn định.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",

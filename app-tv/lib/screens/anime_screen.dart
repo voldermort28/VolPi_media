@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/anime_model.dart';
@@ -8,15 +7,8 @@ import 'anime_detail_screen.dart';
 
 class AnimeScreen extends StatefulWidget {
   final ApiService apiService;
-  final VoidCallback? onNavigateUp;
-  final FocusNode? primaryFocusNode;
 
-  const AnimeScreen({
-    super.key,
-    required this.apiService,
-    this.onNavigateUp,
-    this.primaryFocusNode,
-  });
+  const AnimeScreen({super.key, required this.apiService});
 
   @override
   State<AnimeScreen> createState() => _AnimeScreenState();
@@ -32,12 +24,6 @@ class _AnimeScreenState extends State<AnimeScreen> {
     {'id': 'yumei-movies', 'name': '🎬 Phim Lẻ Anime'},
   ];
 
-  late final List<FocusNode> _categoryFocusNodes = List.generate(
-    _categories.length,
-    (_) => FocusNode(),
-  );
-  final FocusNode _firstGridCardFocusNode = FocusNode();
-
   int _selectedCategoryIndex = 0;
   List<AnimeModel> _items = [];
   bool _isLoading = true;
@@ -47,15 +33,6 @@ class _AnimeScreenState extends State<AnimeScreen> {
   void initState() {
     super.initState();
     _loadCategory(0);
-  }
-
-  @override
-  void dispose() {
-    for (final node in _categoryFocusNodes) {
-      node.dispose();
-    }
-    _firstGridCardFocusNode.dispose();
-    super.dispose();
   }
 
   Future<void> _loadCategory(int index) async {
@@ -120,32 +97,11 @@ class _AnimeScreenState extends State<AnimeScreen> {
             itemBuilder: (context, idx) {
               final cat = _categories[idx];
               final bool isSelected = idx == _selectedCategoryIndex;
-              final focusNode = (idx == 0 && widget.primaryFocusNode != null)
-                  ? widget.primaryFocusNode!
-                  : _categoryFocusNodes[idx];
 
               return Padding(
                 padding: const EdgeInsets.only(right: 10),
                 child: TvFocusableCard(
-                  focusNode: focusNode,
                   onTap: () => _loadCategory(idx),
-                  onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent) {
-                      // Press UP -> Jump to Top Nav Bar
-                      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                        widget.onNavigateUp?.call();
-                        return KeyEventResult.handled;
-                      }
-                      // Press DOWN -> Jump to first item of movie grid
-                      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-                        if (_items.isNotEmpty) {
-                          _firstGridCardFocusNode.requestFocus();
-                          return KeyEventResult.handled;
-                        }
-                      }
-                    }
-                    return KeyEventResult.ignored;
-                  },
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -199,7 +155,7 @@ class _AnimeScreenState extends State<AnimeScreen> {
                           itemCount: _items.length,
                           itemBuilder: (context, idx) {
                             final anime = _items[idx];
-                            return _buildAnimeCard(anime, idx, crossAxisCount);
+                            return _buildAnimeCard(anime);
                           },
                         );
                       },
@@ -209,22 +165,8 @@ class _AnimeScreenState extends State<AnimeScreen> {
     );
   }
 
-  Widget _buildAnimeCard(AnimeModel anime, int idx, int crossAxisCount) {
+  Widget _buildAnimeCard(AnimeModel anime) {
     return TvFocusableCard(
-      focusNode: idx == 0 ? _firstGridCardFocusNode : null,
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-          // If on the first row of grid items, pressing UP jumps back to category pill
-          if (idx < crossAxisCount) {
-            final targetNode = (widget.primaryFocusNode != null && _selectedCategoryIndex == 0)
-                ? widget.primaryFocusNode!
-                : _categoryFocusNodes[_selectedCategoryIndex];
-            targetNode.requestFocus();
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
       onTap: () => _openDetail(anime),
       borderRadius: BorderRadius.circular(12),
       child: Container(
