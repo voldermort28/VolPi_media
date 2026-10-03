@@ -206,18 +206,14 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
   }
 
-  void _playMovieStream(MovieModel movie, dynamic server, List<dynamic> servers) {
-    final availableChannels = servers
-        .map((s) => StreamChannel(title: s.title as String, url: s.url as String))
-        .toList();
-
+  void _playMovieStream(MovieModel movie, StreamChannel server, List<StreamChannel> servers) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
           streamUrl: server.url,
           title: movie.title,
           subtitle: server.title,
-          availableChannels: availableChannels,
+          availableChannels: servers,
           isLive: false,
         ),
       ),

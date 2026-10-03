@@ -257,10 +257,10 @@ class StreamChannel {
   final Map<String, String> headers;
 
   StreamChannel({
-    required this.name,
+    this.name = '',
     required this.title,
     required this.url,
-    required this.headers,
+    this.headers = const {},
   });
 
   factory StreamChannel.fromJson(Map<String, dynamic> json) {

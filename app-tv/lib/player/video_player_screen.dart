@@ -79,7 +79,7 @@ class PlayerErrorInfo {
         message: 'Bộ giải mã phần cứng của TV không hỗ trợ định dạng video/âm thanh của luồng này.',
         suggestion: 'Vui lòng chọn kênh phát khác với định dạng tiêu chuẩn (H.264 / AAC).',
         isSourceError: false,
-        icon: Icons.developer_board_off_rounded,
+        icon: Icons.tv_off_rounded,
         rawError: raw,
       );
     }
@@ -1045,11 +1045,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
 
               // 5. OSD OVERLAY CONTROLS (Top Bar, Center Play/Seek, Bottom Timeline)
-              AnimatedOpacity(
-                opacity: _showControls ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !_showControls,
+              if (_isInitialized)
+                AnimatedOpacity(
+                  opacity: _showControls ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
                   child: Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
