@@ -200,6 +200,24 @@ class MatchModel {
       {'keys': ['al hilal', 'al-hilal'], 'label': 'AL HILAL'},
       {'keys': ['al ittihad', 'al-ittihad'], 'label': 'AL ITTIHAD'},
       {'keys': ['inter miami'], 'label': 'INTER MIAMI'},
+      {'keys': ['đt anh', 'tuyển anh', 'england'], 'label': 'ĐT ANH'},
+      {'keys': ['đt pháp', 'tuyển pháp', 'france'], 'label': 'ĐT PHÁP'},
+      {'keys': ['đt đức', 'tuyển đức', 'germany'], 'label': 'ĐT ĐỨC'},
+      {'keys': ['đt ý', 'tuyển ý', 'italy'], 'label': 'ĐT Ý'},
+      {'keys': ['đt tây ban nha', 'tuyển tây ban nha', 'spain'], 'label': 'ĐT TÂY BAN NHA'},
+      {'keys': ['đt bồ đào nha', 'tuyển bồ đào nha', 'portugal'], 'label': 'ĐT BỒ ĐÀO NHA'},
+      {'keys': ['đt hà lan', 'tuyển hà lan', 'netherlands'], 'label': 'ĐT HÀ LAN'},
+      {'keys': ['đt bỉ', 'tuyển bỉ', 'belgium'], 'label': 'ĐT BỈ'},
+      {'keys': ['đt argentina', 'tuyển argentina', 'argentina'], 'label': 'ĐT ARGENTINA'},
+      {'keys': ['đt brazil', 'tuyển brazil', 'brazil'], 'label': 'ĐT BRAZIL'},
+      {'keys': ['đt nhật bản', 'tuyển nhật bản', 'japan'], 'label': 'ĐT NHẬT BẢN'},
+      {'keys': ['đt hàn quốc', 'tuyển hàn quốc', 'korea'], 'label': 'ĐT HÀN QUỐC'},
+      {'keys': ['đt ai cập', 'tuyển ai cập', 'ai cập', 'egypt'], 'label': 'ĐT AI CẬP'},
+      {'keys': ['đt ma rốc', 'tuyển ma rốc', 'ma rốc', 'morocco'], 'label': 'ĐT MA RỐC'},
+      {'keys': ['đt nam phi', 'nam phi', 'south africa'], 'label': 'ĐT NAM PHI'},
+      {'keys': ['đt senegal', 'senegal'], 'label': 'ĐT SENEGAL'},
+      {'keys': ['đt nigeria', 'nigeria'], 'label': 'ĐT NIGERIA'},
+      {'keys': ['đt mali', 'mali'], 'label': 'ĐT MALI'},
     ];
 
     bool matchFavorite = isVn || isMu;
@@ -243,6 +261,8 @@ class MatchModel {
       'world cup', 'vòng loại world cup', 'uefa euro', 'vòng loại euro', 'euro 2024', 'euro 2028', 'cúp euro',
       'nations league', 'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
       'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
+      'afcon', 'cúp châu phi', 'african cup', 'can 20', 'can 202',
+      'concacaf', 'gold cup', 'giao hữu quốc tế', 'international friendly',
       'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
     ];
 

@@ -1,10 +1,10 @@
 {
-  "version": "1.0.31",
-  "build": 32,
-  "tag_name": "v1.0.31",
-  "changelog": "• Đưa nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu lên vị trí đầu tiên trên màn hình; nhóm 🔴 Đang Diễn Ra (trong 90') xếp ngay bên dưới.\n• Tích hợp cơ chế tham chiếu chéo tab Trận Hot của Xôi Lạc (data-hot=1) sang dịch vụ IPTV, tự động nhận diện các trận bóng đá quốc tế tâm điểm trên truyền hình.\n• Trỏ con trỏ điều khiển TV Remote vào trận đấu tâm điểm đầu tiên khi mở tab Bóng đá.",
+  "version": "1.0.32",
+  "build": 33,
+  "tag_name": "v1.0.32",
+  "changelog": "• Sửa triệt để trên màn hình IPTV: Đưa nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu lên vị trí đầu tiên (kể cả khi trận tâm điểm đang trực tiếp thi đấu); nhóm 🔴 Đang Diễn Ra (trong 90') xếp ngay bên dưới.\n• Bổ sung danh sách các Đội tuyển Quốc gia lớn (Ai Cập, Ma Rốc, Nam Phi, Anh, Pháp, Đức, Ý, Tây Ban Nha, Bồ Đào Nha, Brazil, Argentina...) và các giải đấu quốc tế (Cúp Châu Phi AFCON/CAN, CONCACAF, Giao hữu) vào nhóm Tâm Điểm của cả Xôi Lạc và IPTV.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-05T01:45:00Z"
+  "published_at": "2026-10-05T02:00:00Z"
 }

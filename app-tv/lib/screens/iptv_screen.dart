@@ -1171,17 +1171,80 @@ class _IptvScreenState extends State<IptvScreen> {
       );
     }
 
-    // FOOTBALL tab: Split into Area 0 (Ongoing), Area 1 (Upcoming Major), Area 2 (Upcoming Other), Area 3 (Finished)
-    final ongoing = channels.where((c) => c.isOngoingNow).toList();
-    final area1 = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel <= 2).toList();
-    final area2 = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2).toList();
+    // FOOTBALL tab: Split into Area 1 (Major on top), Area 2 (Other ongoing), Area 3 (Other upcoming), Area 4 (Finished)
+    final major = channels.where((c) => !c.isFinishedMatch && c.priorityLevel <= 2).toList();
+    major.sort((a, b) {
+      if (a.isOngoingNow && !b.isOngoingNow) return -1;
+      if (!a.isOngoingNow && b.isOngoingNow) return 1;
+      return a.matchTimestamp.compareTo(b.matchTimestamp);
+    });
+
+    final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2).toList();
+    final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2).toList();
     final finished = channels.where((c) => c.isFinishedMatch).toList();
 
     return CustomScrollView(
       cacheExtent: 350,
       slivers: [
-        // Area 0: 🔴 Đang Diễn Ra (Trong 90') - TẬP TRUNG NGAY ĐẦU TIÊN
-        if (ongoing.isNotEmpty) ...[
+        // Area 1: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Lên đầu tiên)
+        if (major.isNotEmpty) ...[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  const Text('⭐', style: TextStyle(fontSize: 18)),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Tâm Điểm & Giải Đấu Hàng Đầu',
+                    style: TextStyle(
+                      color: Colors.amber.shade300,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.amber.withOpacity(0.4), width: 0.8),
+                    ),
+                    child: Text(
+                      '${major.length}',
+                      style: TextStyle(color: Colors.amber.shade300, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            sliver: SliverGrid(
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                mainAxisExtent: 175,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
+              ),
+              delegate: SliverChildBuilderDelegate(
+                (context, index) => _buildChannelCard(
+                  major[index],
+                  channels,
+                  focusNode: index == 0 ? _firstChannelCardFocusNode : null,
+                ),
+                childCount: major.length,
+                addAutomaticKeepAlives: true,
+                addRepaintBoundaries: true,
+              ),
+            ),
+          ),
+        ],
+
+        // Area 2: 🔴 Đang Diễn Ra (Trong 90') - Dưới nhóm tâm điểm
+        if (otherOngoing.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             sliver: SliverToBoxAdapter(
@@ -1213,7 +1276,7 @@ class _IptvScreenState extends State<IptvScreen> {
                       border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.4), width: 0.8),
                     ),
                     child: Text(
-                      '${ongoing.length}',
+                      '${otherOngoing.length}',
                       style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -1232,11 +1295,11 @@ class _IptvScreenState extends State<IptvScreen> {
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
-                  ongoing[index],
+                  otherOngoing[index],
                   channels,
-                  focusNode: index == 0 ? _firstChannelCardFocusNode : null,
+                  focusNode: (major.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
                 ),
-                childCount: ongoing.length,
+                childCount: otherOngoing.length,
                 addAutomaticKeepAlives: true,
                 addRepaintBoundaries: true,
               ),
@@ -1244,64 +1307,8 @@ class _IptvScreenState extends State<IptvScreen> {
           ),
         ],
 
-        // Area 1: Famous / VN matches (Sắp diễn ra)
-        if (area1.isNotEmpty) ...[
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  const Text('⭐', style: TextStyle(fontSize: 18)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Tâm Điểm & Giải Đấu Hàng Đầu',
-                    style: TextStyle(
-                      color: Colors.amber.shade300,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.amber.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${area1.length}',
-                      style: TextStyle(color: Colors.amber.shade300, fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: crossAxisCount,
-                mainAxisExtent: 175,
-                crossAxisSpacing: 14,
-                mainAxisSpacing: 14,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => _buildChannelCard(
-                  area1[index],
-                  channels,
-                  focusNode: (ongoing.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
-                ),
-                childCount: area1.length,
-                addAutomaticKeepAlives: true,
-                addRepaintBoundaries: true,
-              ),
-            ),
-          ),
-        ],
-
-        // Area 2: Other matches (Sắp diễn ra)
-        if (area2.isNotEmpty) ...[
+        // Area 3: Other matches (Sắp diễn ra)
+        if (otherUpcoming.isNotEmpty) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             sliver: SliverToBoxAdapter(
@@ -1325,7 +1332,7 @@ class _IptvScreenState extends State<IptvScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '${area2.length}',
+                      '${otherUpcoming.length}',
                       style: const TextStyle(color: Colors.white38, fontSize: 12),
                     ),
                   ),
@@ -1344,11 +1351,11 @@ class _IptvScreenState extends State<IptvScreen> {
               ),
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
-                  area2[index],
+                  otherUpcoming[index],
                   channels,
-                  focusNode: (ongoing.isEmpty && area1.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
+                  focusNode: (major.isEmpty && otherOngoing.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
                 ),
-                childCount: area2.length,
+                childCount: otherUpcoming.length,
                 addAutomaticKeepAlives: true,
                 addRepaintBoundaries: true,
               ),

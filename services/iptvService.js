@@ -643,7 +643,7 @@ function classifyFootballPriority(name, group = '') {
     return { priorityLevel: 3, isVietnam: false, isFamous: false };
   }
 
-  // 2a. Big Teams & Top Clubs
+  // 2a. Big Teams & Top Clubs / Major National Teams
   const bigTeams = [
     'manchester city', 'man city', 'mancity', ' mc ',
     'liverpool', 'arsenal', 'chelsea', 'tottenham', 'spurs',
@@ -653,7 +653,24 @@ function classifyFootballPriority(name, group = '') {
     'paris saint-germain', 'psg', 'paris sg',
     'juventus', 'juve', 'inter milan', 'ac milan', 'as roma', ' roma ', 'napoli',
     'al nassr', 'al-nassr', 'al hilal', 'al-hilal', 'al ittihad', 'al-ittihad',
-    'inter miami', 'benfica', 'porto', 'sporting lisbon', 'sporting cp'
+    'inter miami', 'benfica', 'porto', 'sporting lisbon', 'sporting cp',
+    // Major National Teams
+    'đt anh', 'tuyển anh', 'england',
+    'đt pháp', 'tuyển pháp', 'france',
+    'đt đức', 'tuyển đức', 'germany',
+    'đt ý', 'tuyển ý', 'italy',
+    'đt tây ban nha', 'tuyển tây ban nha', 'spain',
+    'đt bồ đào nha', 'tuyển bồ đào nha', 'portugal',
+    'đt hà lan', 'tuyển hà lan', 'netherlands',
+    'đt bỉ', 'tuyển bỉ', 'belgium',
+    'đt argentina', 'tuyển argentina', 'argentina',
+    'đt brazil', 'tuyển brazil', 'brazil',
+    'đt nhật bản', 'tuyển nhật bản', 'japan',
+    'đt hàn quốc', 'tuyển hàn quốc', 'korea',
+    'đt ai cập', 'tuyển ai cập', 'ai cập', 'egypt',
+    'đt ma rốc', 'tuyển ma rốc', 'ma rốc', 'morocco',
+    'đt nam phi', 'nam phi', 'south africa',
+    'đt senegal', 'senegal', 'đt nigeria', 'nigeria', 'đt mali', 'mali'
   ];
   if (bigTeams.some((t) => q.includes(t))) {
     return { priorityLevel: 2, isVietnam: false, isFamous: true };
@@ -673,6 +690,8 @@ function classifyFootballPriority(name, group = '') {
     'world cup', 'vòng loại world cup', 'uefa euro', 'vòng loại euro', 'euro 2024', 'euro 2028', 'cúp euro',
     'nations league', 'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
     'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
+    'afcon', 'cúp châu phi', 'african cup', 'can 20', 'can 202',
+    'concacaf', 'gold cup', 'giao hữu quốc tế', 'international friendly',
     'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
   ];
   if (majorLeagues.some((l) => q.includes(l))) {
