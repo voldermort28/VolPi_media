@@ -524,7 +524,7 @@ class _FootballScreenState extends State<FootballScreen> {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(borderColor: borderColor, width: 1),
+          border: Border.all(color: borderColor, width: 1),
         ),
         padding: const EdgeInsets.all(12),
         child: Column(
