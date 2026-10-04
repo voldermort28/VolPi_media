@@ -220,26 +220,28 @@ class _IptvScreenState extends State<IptvScreen> {
       }
 
       // 3. For sports matches (FOOTBALL / OTHER_SPORTS):
-      // ĐẶT CÁC TRẬN ĐANG DIỄN RA (trong 90') LÊN ĐẦU TIÊN!
       // ĐẶT CÁC TRẬN ĐÃ KẾT THÚC (> 100-115' / diễn ra 2 tiếng) XUỐNG DƯỚI CÙNG!
       final bool aIsSport = a.category == 'FOOTBALL' || a.category == 'OTHER_SPORTS';
       final bool bIsSport = b.category == 'FOOTBALL' || b.category == 'OTHER_SPORTS';
       if (aIsSport && bIsSport) {
-        if (a.isOngoingNow && !b.isOngoingNow) return -1;
-        if (!a.isOngoingNow && b.isOngoingNow) return 1;
-
         if (!a.isFinishedMatch && b.isFinishedMatch) return -1;
         if (a.isFinishedMatch && !b.isFinishedMatch) return 1;
       }
 
-      // 4. For FOOTBALL: Area 1 (Famous/VN, priorityLevel 1 & 2) before Area 2 (Others, priorityLevel 3)
+      // 4. For FOOTBALL: Nhóm Tâm Điểm & Giải Đấu Hàng Đầu (priorityLevel 1 & 2) LÊN TRÊN HẾT
       if (a.category == 'FOOTBALL' && b.category == 'FOOTBALL') {
         if (a.priorityLevel != b.priorityLevel) {
           return a.priorityLevel.compareTo(b.priorityLevel);
         }
       }
 
-      // 5. Within the category, Live matches first
+      // 5. Trong cùng nhóm ưu tiên: Trận đang trực tiếp diễn ra (trong 90') xếp trước
+      if (aIsSport && bIsSport) {
+        if (a.isOngoingNow && !b.isOngoingNow) return -1;
+        if (!a.isOngoingNow && b.isOngoingNow) return 1;
+      }
+
+      // 6. Within the category, Live matches first
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
 

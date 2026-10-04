@@ -186,9 +186,25 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  List<MatchModel> get _ongoingMatches => _matches.where((m) => m.isOngoingNow).toList();
-  List<MatchModel> get _upcomingMajorMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && (m.isFamous || m.isVietnam || m.isFavorite)).toList();
-  List<MatchModel> get _upcomingOtherMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite).toList();
+  // Mục 1: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Trận hot, Việt Nam, MU, CLB lớn, C1, Ngoại hạng Anh... chưa kết thúc)
+  // Các trận tâm điểm đang trực tiếp thi đấu sẽ được ưu tiên xếp đầu danh mục này.
+  List<MatchModel> get _majorMatches {
+    final list = _matches.where((m) => !m.isFinishedMatch && (m.isFamous || m.isVietnam || m.isFavorite || m.isHot)).toList();
+    list.sort((a, b) {
+      if (a.isOngoingNow && !b.isOngoingNow) return -1;
+      if (!a.isOngoingNow && b.isOngoingNow) return 1;
+      return a.matchTimestamp.compareTo(b.matchTimestamp);
+    });
+    return list;
+  }
+
+  // Mục 2: 🔴 Đang Diễn Ra (Các trận đấu khác đang trực tiếp diễn ra trong 90')
+  List<MatchModel> get _otherOngoingMatches => _matches.where((m) => m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot).toList();
+
+  // Mục 3: 🌐 Các Trận Đấu & Giải Đấu Khác (Sắp diễn ra)
+  List<MatchModel> get _upcomingOtherMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot).toList();
+
+  // Mục 4: 🏁 Trận Đấu Đã Kết Thúc
   List<MatchModel> get _finishedMatches => _matches.where((m) => m.isFinishedMatch).toList();
 
   @override
@@ -297,8 +313,8 @@ class _FootballScreenState extends State<FootballScreen> {
                             crossAxisCount = 2;
                           }
 
-                          final ongoing = _ongoingMatches;
-                          final major = _upcomingMajorMatches;
+                          final major = _majorMatches;
+                          final ongoing = _otherOngoingMatches;
                           final others = _upcomingOtherMatches;
                           final finished = _finishedMatches;
 
@@ -306,7 +322,20 @@ class _FootballScreenState extends State<FootballScreen> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             cacheExtent: 350,
                             slivers: [
-                              // Khu vực 1: 🔴 Đang Diễn Ra (Trong 90') - NHẢY TỚI NGAY ĐẦU TIÊN
+                              // Khu vực 1: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Lên đầu tiên)
+                              if (major.isNotEmpty) ...[
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '⭐ Tâm Điểm & Giải Đấu Hàng Đầu',
+                                    count: major.length.toString(),
+                                    color: const Color(0xFFF59E0B),
+                                    subtitle: 'Trận Hot • Việt Nam • Ngoại Hạng Anh • Cúp C1 • La Liga • Serie A • Bundesliga...',
+                                  ),
+                                ),
+                                _buildMatchGrid(major, crossAxisCount, isFirstSection: true),
+                              ],
+
+                              // Khu vực 2: 🔴 Đang Diễn Ra (Trong 90') - Dưới nhóm tâm điểm
                               if (ongoing.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
@@ -316,20 +345,7 @@ class _FootballScreenState extends State<FootballScreen> {
                                     subtitle: 'Các trận đấu đang trực tiếp thi đấu trên sân cỏ ngay lúc này',
                                   ),
                                 ),
-                                _buildMatchGrid(ongoing, crossAxisCount, isFirstSection: true),
-                              ],
-
-                              // Khu vực 2: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Sắp diễn ra)
-                              if (major.isNotEmpty) ...[
-                                SliverToBoxAdapter(
-                                  child: _buildSectionHeader(
-                                    title: '⭐ Tâm Điểm & Giải Đấu Hàng Đầu',
-                                    count: major.length.toString(),
-                                    color: const Color(0xFFF59E0B),
-                                    subtitle: 'Việt Nam • Ngoại Hạng Anh • Cúp C1 • La Liga • Serie A • Bundesliga...',
-                                  ),
-                                ),
-                                _buildMatchGrid(major, crossAxisCount, isFirstSection: ongoing.isEmpty),
+                                _buildMatchGrid(ongoing, crossAxisCount, isFirstSection: major.isEmpty),
                               ],
 
                               // Khu vực 3: 🌐 Các Trận Đấu & Giải Đấu Khác (Sắp diễn ra)
@@ -339,10 +355,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     title: '🌐 Các Trận Đấu & Giải Đấu Khác',
                                     count: others.length.toString(),
                                     color: const Color(0xFF38BDF8),
-                                    subtitle: 'Các giải đấu phụ, giải cỏ và hạng dưới hôm nay',
+                                    subtitle: 'Các giải đấu phụ và trận đấu sắp diễn ra hôm nay',
                                   ),
                                 ),
-                                _buildMatchGrid(others, crossAxisCount, isFirstSection: ongoing.isEmpty && major.isEmpty),
+                                _buildMatchGrid(others, crossAxisCount, isFirstSection: major.isEmpty && ongoing.isEmpty),
                               ],
 
                               // Khu vực 4: 🏁 Trận Đấu Đã Kết Thúc (đặt ở cuối cùng để không chắn trận mới)
@@ -359,7 +375,7 @@ class _FootballScreenState extends State<FootballScreen> {
                               ],
 
                               // Fallback nếu không chia được mục nào
-                              if (ongoing.isEmpty && major.isEmpty && others.isEmpty && finished.isEmpty && _matches.isNotEmpty) ...[
+                              if (major.isEmpty && ongoing.isEmpty && others.isEmpty && finished.isEmpty && _matches.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
                                     title: '⚽ Tất Cả Trận Đấu Hôm Nay',

@@ -1,10 +1,10 @@
 {
-  "version": "1.0.30",
-  "build": 31,
-  "tag_name": "v1.0.30",
-  "changelog": "• Đồng bộ chính xác tab Trận Hot từ Xôi Lạc (data-hot): tự động nhận diện và đưa các trận tâm điểm thực thụ lên hàng đầu.\n• Loại bỏ triệt để các giải đấu hạng dưới (La Liga 2, Bundesliga 2, Serie B, Ligue 2...), bóng đá nữ cấp CLB và các giải Esports (Dota 2, CS:GO, LOL...) khỏi danh mục Tâm Điểm & Giải Đấu Hàng Đầu.\n• Giữ vững ưu tiên số 1 cho các trận đấu của Đội tuyển Quốc gia Việt Nam và Manchester United.",
+  "version": "1.0.31",
+  "build": 32,
+  "tag_name": "v1.0.31",
+  "changelog": "• Đưa nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu lên vị trí đầu tiên trên màn hình; nhóm 🔴 Đang Diễn Ra (trong 90') xếp ngay bên dưới.\n• Tích hợp cơ chế tham chiếu chéo tab Trận Hot của Xôi Lạc (data-hot=1) sang dịch vụ IPTV, tự động nhận diện các trận bóng đá quốc tế tâm điểm trên truyền hình.\n• Trỏ con trỏ điều khiển TV Remote vào trận đấu tâm điểm đầu tiên khi mở tab Bóng đá.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-05T01:30:00Z"
+  "published_at": "2026-10-05T01:45:00Z"
 }

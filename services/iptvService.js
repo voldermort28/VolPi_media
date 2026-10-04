@@ -720,11 +720,6 @@ function compareChannels(a, b) {
       return elapsed > (c.isLive ? 115 : 100);
     };
 
-    const aOngoing = isOngoing(a);
-    const bOngoing = isOngoing(b);
-    if (aOngoing && !bOngoing) return -1;
-    if (!aOngoing && bOngoing) return 1;
-
     const aFin = isFinished(a);
     const bFin = isFinished(b);
     if (!aFin && bFin) return -1;
@@ -738,7 +733,20 @@ function compareChannels(a, b) {
     if (pA !== pB) return pA - pB;
   }
 
-  // 5. Within the same category & priority: Live match priority (🟢 LIVE) first
+  // 5. Within same priority level: Ongoing matches (isOngoing, trong 90') first
+  if (aIsSport && bIsSport) {
+    const isOngoing = (c) => {
+      if (!c.matchTimestamp) return c.isLive;
+      const elapsed = (Date.now() - c.matchTimestamp) / (60 * 1000);
+      return elapsed >= -5 && elapsed <= (c.isLive ? 110 : 95);
+    };
+    const aOngoing = isOngoing(a);
+    const bOngoing = isOngoing(b);
+    if (aOngoing && !bOngoing) return -1;
+    if (!aOngoing && bOngoing) return 1;
+  }
+
+  // 6. Within the same category & priority: Live match flag (🟢 LIVE) first
   if (a.isLive && !b.isLive) return -1;
   if (!a.isLive && b.isLive) return 1;
 
@@ -830,6 +838,29 @@ async function fetchRawChannels(config) {
   return allChannels;
 }
 
+let cachedHotMatches = [];
+let lastHotMatchFetch = 0;
+
+/**
+ * Lấy danh sách các trận Tâm Điểm & Trận Hot từ Xôi Lạc (data-hot="1")
+ * để làm căn cứ tham chiếu cho việc phân loại ưu tiên các trận đấu trong IPTV.
+ */
+async function getXoilacHotMatches() {
+  const now = Date.now();
+  if (cachedHotMatches.length > 0 && now - lastHotMatchFetch < 5 * 60 * 1000) {
+    return cachedHotMatches;
+  }
+  try {
+    const xoilac = require('../scrapers/xoilac');
+    const matches = await xoilac.getLiveMatches();
+    cachedHotMatches = (matches || []).filter((m) => m.isHot || (m.priority && m.priority.level <= 2));
+    lastHotMatchFetch = now;
+    return cachedHotMatches;
+  } catch (err) {
+    return cachedHotMatches;
+  }
+}
+
 /**
  * Main function to get channels.
  * forAdmin: true returns all channels with isHidden & isPinned attributes.
@@ -843,6 +874,13 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     const raw = await fetchRawChannels(config);
     cachedChannels = raw;
     lastFetchTime = now;
+  }
+
+  let hotMatches = [];
+  try {
+    hotMatches = await getXoilacHotMatches();
+  } catch {
+    hotMatches = [];
   }
 
   const hiddenSet = new Set(config.hiddenChannelIds || []);
@@ -881,9 +919,25 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       }
     }
 
-    const footballPriority = (cat === 'FOOTBALL')
+    let footballPriority = (cat === 'FOOTBALL')
       ? classifyFootballPriority(c.name, c.group)
       : { priorityLevel: 3, isVietnam: false, isFamous: false };
+
+    // Tham chiếu với danh sách "Trận Hot" của Xôi Lạc (data-hot="1")
+    if (cat === 'FOOTBALL' && footballPriority.priorityLevel > 2 && hotMatches.length > 0) {
+      const q = ` ${c.name} ${c.group} `.toLowerCase();
+      const matchedHot = hotMatches.find((hm) => {
+        const home = (hm.homeTeam || '').toLowerCase().trim();
+        const away = (hm.awayTeam || '').toLowerCase().trim();
+        if (home.length >= 3 && away.length >= 3) {
+          return q.includes(home) && q.includes(away);
+        }
+        return false;
+      });
+      if (matchedHot) {
+        footballPriority = { priorityLevel: 2, isVietnam: false, isFamous: true, isHot: true };
+      }
+    }
 
     return {
       ...c,
@@ -897,6 +951,7 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       priorityLevel: footballPriority.priorityLevel,
       isFamous: footballPriority.isFamous,
       isVietnam: footballPriority.isVietnam,
+      isHot: footballPriority.isHot || false,
       isPinned,
       isHidden: isHidden || isExpired,
       isExpired,
