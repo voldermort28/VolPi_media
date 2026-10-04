@@ -307,7 +307,8 @@ class MatchModel {
       }
     }
 
-    final bool isHotFromScraper = json['isHot'] == true;
+    final bool isHotFromScraper = json['isHot'] == true ||
+        (json['priority'] is Map && (json['priority']['level'] == 1 || json['priority']['level'] == 2));
     final bool isFavoriteMatch = !esportsDetected && !isLowerOrWomenLeague && matchFavorite;
 
     final bool isFamousMatch = !esportsDetected && !isLowerOrWomenLeague && (
