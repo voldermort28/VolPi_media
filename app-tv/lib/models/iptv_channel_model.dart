@@ -83,6 +83,64 @@ class IptvChannelModel {
   String get displayTitle => cleanTitle.isNotEmpty ? cleanTitle : extractCleanTitle(name);
   String get displayTime => matchTime.isNotEmpty ? matchTime : extractMatchTime(name);
 
+  /// Parses match kickoff time into local DateTime.
+  DateTime? get matchStartTime {
+    final targetStr = matchTime.isNotEmpty ? matchTime : name;
+    final regex = RegExp(r'(\d{1,2}):(\d{2})(\s*[-/ ]\s*(\d{1,2})[\./-](\d{1,2}))?');
+    final m = regex.firstMatch(targetStr);
+    if (m != null) {
+      final hour = int.parse(m.group(1)!);
+      final min = int.parse(m.group(2)!);
+      final now = DateTime.now();
+      int day = now.day;
+      int month = now.month;
+      if (m.group(4) != null && m.group(5) != null) {
+        day = int.parse(m.group(4)!);
+        month = int.parse(m.group(5)!);
+      }
+      int year = now.year;
+      if (now.month == 12 && month == 1) year++;
+      return DateTime(year, month, day, hour, min);
+    }
+    if (matchTimestamp > 0) {
+      return DateTime.fromMillisecondsSinceEpoch(matchTimestamp);
+    }
+    return null;
+  }
+
+  /// Calculates elapsed minutes since kickoff. Returns null if start time is unknown.
+  int? get elapsedMinutes {
+    final start = matchStartTime;
+    if (start == null) return null;
+    return DateTime.now().difference(start).inMinutes;
+  }
+
+  /// Returns true if the sports match is currently ongoing (within 90 mins of kickoff, or live within 110 mins).
+  bool get isOngoingNow {
+    if (category != 'FOOTBALL' && category != 'OTHER_SPORTS') return isLive;
+    final elapsed = elapsedMinutes;
+    if (elapsed == null) return isLive;
+    return elapsed >= -5 && elapsed <= (isLive ? 110 : 95);
+  }
+
+  /// Returns true if the sports match started > 100-115 min ago (already finished / 2 tiếng trước).
+  bool get isFinishedMatch {
+    if (category != 'FOOTBALL' && category != 'OTHER_SPORTS') return false;
+    final elapsed = elapsedMinutes;
+    if (elapsed == null) return false;
+    return elapsed > (isLive ? 115 : 100);
+  }
+
+  /// Human-readable match minute label, e.g. "Phút 45'", "Hiệp 2", or "TRỰC TIẾP"
+  String get liveMinuteLabel {
+    final elapsed = elapsedMinutes;
+    if (elapsed == null || elapsed < 0) return 'TRỰC TIẾP';
+    if (elapsed <= 45) return "Phút $elapsed'";
+    if (elapsed <= 60) return "Hiệp 2";
+    if (elapsed <= 90) return "Phút $elapsed'";
+    return "Phút 90+'";
+  }
+
   factory IptvChannelModel.fromJson(Map<String, dynamic> json) {
     Map<String, String> parsedHeaders = {};
     if (json['headers'] is Map) {

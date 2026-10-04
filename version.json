@@ -1,10 +1,10 @@
 {
-  "version": "1.0.28",
-  "build": 29,
-  "tag_name": "v1.0.28",
-  "changelog": "• Khôi phục toàn bộ mã nguồn về trạng thái ổn định nguyên bản của commit 230f8ac (v1.0.22).\n• Giữ nguyên cơ chế FocusScope và điều hướng D-pad nguyên bản mượt mà, ổn định.",
+  "version": "1.0.29",
+  "build": 30,
+  "tag_name": "v1.0.29",
+  "changelog": "• Tự động nhảy tới ngay các trận đấu đang trực tiếp diễn ra (trong 90 phút thi đấu) ở cả tab Bóng Đá và tab IPTV.\n• Loại bỏ tình trạng trận đấu đã diễn ra hơn 2 tiếng chắn ở đầu danh sách, tự động gom các trận đã kết thúc xuống cuối.\n• Tự động trỏ con trỏ điều khiển TV Remote vào trận đấu đang diễn ra đầu tiên ngay khi mở màn hình.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-02T18:48:00Z"
+  "published_at": "2026-10-04T18:00:00Z"
 }

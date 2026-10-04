@@ -58,19 +58,29 @@ class ApiService {
 
   void _sortMatches(List<MatchModel> matches) {
     // Sort:
-    // 1. Level priority: Việt Nam & MU (score 0) -> Famous Leagues & Top Clubs (score 1) -> Others (score 2)
-    // 2. Live matches first (isLive)
-    // 3. Chronological timeline (earlier matches first)
+    // 1. Ongoing matches (kicked off within 90 mins / isOngoingNow) ALWAYS FIRST!
+    // 2. Upcoming matches come before Finished matches (>100 min / 2 tiếng trước)
+    // 3. Level priority: Việt Nam & MU (score 0) -> Famous Leagues & Top Clubs (score 1) -> Others (score 2)
+    // 4. Chronological timeline (earliest kickoff first)
     matches.sort((a, b) {
+      // 1. Ongoing matches (trong 90') first
+      if (a.isOngoingNow && !b.isOngoingNow) return -1;
+      if (!a.isOngoingNow && b.isOngoingNow) return 1;
+
+      // 2. Upcoming matches before Finished matches (>100 min)
+      if (!a.isFinishedMatch && b.isFinishedMatch) return -1;
+      if (a.isFinishedMatch && !b.isFinishedMatch) return 1;
+
+      // 3. Level priority
       int scoreA = (a.isVietnam || a.isMuFavorite) ? 0 : ((a.isFamous || a.isFavorite) ? 1 : 2);
       int scoreB = (b.isVietnam || b.isMuFavorite) ? 0 : ((b.isFamous || b.isFavorite) ? 1 : 2);
       if (scoreA != scoreB) return scoreA.compareTo(scoreB);
 
-      if (a.isLive && !b.isLive) return -1;
-      if (!a.isLive && b.isLive) return 1;
-
-      if (a.matchTimestamp > 0 && b.matchTimestamp > 0) {
-        return a.matchTimestamp.compareTo(b.matchTimestamp);
+      // 4. Chronological timeline
+      final timeA = a.matchStartTime?.millisecondsSinceEpoch ?? a.matchTimestamp;
+      final timeB = b.matchStartTime?.millisecondsSinceEpoch ?? b.matchTimestamp;
+      if (timeA > 0 && timeB > 0) {
+        return timeA.compareTo(timeB);
       }
       return 0;
     });

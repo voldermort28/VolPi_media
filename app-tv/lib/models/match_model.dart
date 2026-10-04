@@ -248,6 +248,75 @@ class MatchModel {
       matchTimestamp: ts,
     );
   }
+
+  /// Parses match kickoff time into local DateTime.
+  DateTime? get matchStartTime {
+    // 1. Try parsing time string with date: e.g. "22:55 - 04.10" or "22:55 04/10"
+    final regex = RegExp(r'(\d{1,2}):(\d{2})\s*[-/ ]\s*(\d{1,2})[\./-](\d{1,2})');
+    final m = regex.firstMatch(time);
+    if (m != null) {
+      final hour = int.parse(m.group(1)!);
+      final min = int.parse(m.group(2)!);
+      final day = int.parse(m.group(3)!);
+      final month = int.parse(m.group(4)!);
+      final now = DateTime.now();
+      int year = now.year;
+      if (now.month == 12 && month == 1) year++;
+      return DateTime(year, month, day, hour, min);
+    }
+
+    // 2. Try parsing time string with only hour:minute: e.g. "22:55"
+    final timeOnlyRegex = RegExp(r'(\d{1,2}):(\d{2})');
+    final mTime = timeOnlyRegex.firstMatch(time);
+    if (mTime != null) {
+      final hour = int.parse(mTime.group(1)!);
+      final min = int.parse(mTime.group(2)!);
+      final now = DateTime.now();
+      return DateTime(now.year, now.month, now.day, hour, min);
+    }
+
+    // 3. Fallback to matchTimestamp
+    if (matchTimestamp > 0) {
+      return DateTime.fromMillisecondsSinceEpoch(matchTimestamp);
+    }
+
+    return null;
+  }
+
+  /// Calculates elapsed minutes since kickoff. Returns null if start time is unknown.
+  int? get elapsedMinutes {
+    final start = matchStartTime;
+    if (start == null) return null;
+    return DateTime.now().difference(start).inMinutes;
+  }
+
+  /// Returns true if the match is currently ongoing (within 90 mins of kickoff, or live within 110 mins).
+  bool get isOngoingNow {
+    final elapsed = elapsedMinutes;
+    if (elapsed == null) return isLive;
+    // Between -5 min (countdown to kickoff) and 95 min (match in progress), or isLive up to 110 min
+    if (elapsed >= -5 && elapsed <= (isLive ? 110 : 95)) {
+      return true;
+    }
+    return false;
+  }
+
+  /// Returns true if the match started > 100-115 min ago (already finished / 2 tiếng trước)
+  bool get isFinishedMatch {
+    final elapsed = elapsedMinutes;
+    if (elapsed == null) return false;
+    return elapsed > (isLive ? 115 : 100);
+  }
+
+  /// Human-readable match minute label, e.g. "Phút 45'", "Hiệp 2", or "TRỰC TIẾP"
+  String get liveMinuteLabel {
+    final elapsed = elapsedMinutes;
+    if (elapsed == null || elapsed < 0) return 'TRỰC TIẾP';
+    if (elapsed <= 45) return "Phút $elapsed'";
+    if (elapsed <= 60) return "Hiệp 2";
+    if (elapsed <= 90) return "Phút $elapsed'";
+    return "Phút 90+'";
+  }
 }
 
 class StreamChannel {

@@ -18,11 +18,18 @@ class _FootballScreenState extends State<FootballScreen> {
   List<MatchModel> _matches = [];
   bool _isLoading = true;
   String? _errorMessage;
+  final FocusNode _firstMatchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _loadMatches(forceRefresh: true);
+  }
+
+  @override
+  void dispose() {
+    _firstMatchFocusNode.dispose();
+    super.dispose();
   }
 
   Future<void> _loadMatches({bool forceRefresh = true}) async {
@@ -37,6 +44,13 @@ class _FootballScreenState extends State<FootballScreen> {
         setState(() {
           _matches = results;
           _isLoading = false;
+        });
+
+        // Tự động nhảy tới ngay trận đấu đang diễn ra đầu tiên khi danh sách load xong
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _matches.isNotEmpty) {
+            _firstMatchFocusNode.requestFocus();
+          }
         });
       }
     } catch (e) {
@@ -172,8 +186,10 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  List<MatchModel> get _majorMatches => _matches.where((m) => m.isFamous || m.isVietnam || m.isFavorite).toList();
-  List<MatchModel> get _otherMatches => _matches.where((m) => !m.isFamous && !m.isVietnam && !m.isFavorite).toList();
+  List<MatchModel> get _ongoingMatches => _matches.where((m) => m.isOngoingNow).toList();
+  List<MatchModel> get _upcomingMajorMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && (m.isFamous || m.isVietnam || m.isFavorite)).toList();
+  List<MatchModel> get _upcomingOtherMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite).toList();
+  List<MatchModel> get _finishedMatches => _matches.where((m) => m.isFinishedMatch).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -281,14 +297,29 @@ class _FootballScreenState extends State<FootballScreen> {
                             crossAxisCount = 2;
                           }
 
-                          final major = _majorMatches;
-                          final others = _otherMatches;
+                          final ongoing = _ongoingMatches;
+                          final major = _upcomingMajorMatches;
+                          final others = _upcomingOtherMatches;
+                          final finished = _finishedMatches;
 
                           return CustomScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
                             cacheExtent: 350,
                             slivers: [
-                              // Khu vực 1: Tâm Điểm & Giải Đấu Hàng Đầu
+                              // Khu vực 1: 🔴 Đang Diễn Ra (Trong 90') - NHẢY TỚI NGAY ĐẦU TIÊN
+                              if (ongoing.isNotEmpty) ...[
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '🔴 Đang Diễn Ra (Trong 90\')',
+                                    count: ongoing.length.toString(),
+                                    color: const Color(0xFFEF4444),
+                                    subtitle: 'Các trận đấu đang trực tiếp thi đấu trên sân cỏ ngay lúc này',
+                                  ),
+                                ),
+                                _buildMatchGrid(ongoing, crossAxisCount, isFirstSection: true),
+                              ],
+
+                              // Khu vực 2: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Sắp diễn ra)
                               if (major.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
@@ -298,10 +329,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     subtitle: 'Việt Nam • Ngoại Hạng Anh • Cúp C1 • La Liga • Serie A • Bundesliga...',
                                   ),
                                 ),
-                                _buildMatchGrid(major, crossAxisCount),
+                                _buildMatchGrid(major, crossAxisCount, isFirstSection: ongoing.isEmpty),
                               ],
 
-                              // Khu vực 2: Các Trận Đấu & Giải Đấu Khác (giải cỏ, giải phụ...)
+                              // Khu vực 3: 🌐 Các Trận Đấu & Giải Đấu Khác (Sắp diễn ra)
                               if (others.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
@@ -311,11 +342,24 @@ class _FootballScreenState extends State<FootballScreen> {
                                     subtitle: 'Các giải đấu phụ, giải cỏ và hạng dưới hôm nay',
                                   ),
                                 ),
-                                _buildMatchGrid(others, crossAxisCount),
+                                _buildMatchGrid(others, crossAxisCount, isFirstSection: ongoing.isEmpty && major.isEmpty),
+                              ],
+
+                              // Khu vực 4: 🏁 Trận Đấu Đã Kết Thúc (đặt ở cuối cùng để không chắn trận mới)
+                              if (finished.isNotEmpty) ...[
+                                SliverToBoxAdapter(
+                                  child: _buildSectionHeader(
+                                    title: '🏁 Trận Đấu Đã Kết Thúc',
+                                    count: finished.length.toString(),
+                                    color: const Color(0xFF64748B),
+                                    subtitle: 'Các trận đấu đã diễn ra hơn 90-100 phút trước',
+                                  ),
+                                ),
+                                _buildMatchGrid(finished, crossAxisCount, isFirstSection: false),
                               ],
 
                               // Fallback nếu không chia được mục nào
-                              if (major.isEmpty && others.isEmpty && _matches.isNotEmpty) ...[
+                              if (ongoing.isEmpty && major.isEmpty && others.isEmpty && finished.isEmpty && _matches.isNotEmpty) ...[
                                 SliverToBoxAdapter(
                                   child: _buildSectionHeader(
                                     title: '⚽ Tất Cả Trận Đấu Hôm Nay',
@@ -323,7 +367,7 @@ class _FootballScreenState extends State<FootballScreen> {
                                     color: const Color(0xFF38BDF8),
                                   ),
                                 ),
-                                _buildMatchGrid(_matches, crossAxisCount),
+                                _buildMatchGrid(_matches, crossAxisCount, isFirstSection: true),
                               ],
 
                               const SliverToBoxAdapter(
@@ -391,7 +435,7 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount) {
+  Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount, {bool isFirstSection = false}) {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       sliver: SliverGrid(
@@ -402,7 +446,10 @@ class _FootballScreenState extends State<FootballScreen> {
           mainAxisExtent: 168,
         ),
         delegate: SliverChildBuilderDelegate(
-          (context, idx) => _buildMatchCard(matches[idx]),
+          (context, idx) => _buildMatchCard(
+            matches[idx],
+            focusNode: (isFirstSection && idx == 0) ? _firstMatchFocusNode : null,
+          ),
           childCount: matches.length,
           addAutomaticKeepAlives: true,
           addRepaintBoundaries: true,
@@ -411,12 +458,19 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildMatchCard(MatchModel match) {
+  Widget _buildMatchCard(MatchModel match, {FocusNode? focusNode}) {
+    final bool isOngoing = match.isOngoingNow;
+    final bool isLiveBadge = isOngoing || match.isLive;
+
     Color cardBg = const Color(0xFF1E293B);
     Color borderColor = const Color(0xFF334155);
     Color focusBorder = const Color(0xFF38BDF8);
 
-    if (match.isVietnam) {
+    if (isOngoing) {
+      cardBg = const Color(0xFF3F0B18).withOpacity(0.85);
+      borderColor = const Color(0xFFE11D48);
+      focusBorder = const Color(0xFFF43F5E);
+    } else if (match.isVietnam) {
       cardBg = const Color(0xFF500724).withOpacity(0.7);
       borderColor = const Color(0xFFDC2626);
       focusBorder = const Color(0xFFFDE047);
@@ -436,10 +490,16 @@ class _FootballScreenState extends State<FootballScreen> {
       cardBg = const Color(0xFF312E81).withOpacity(0.5);
       borderColor = const Color(0xFF4F46E5);
       focusBorder = const Color(0xFF818CF8);
+    } else if (match.isFinishedMatch) {
+      cardBg = const Color(0xFF0F172A).withOpacity(0.6);
+      borderColor = const Color(0xFF1E293B);
+      focusBorder = const Color(0xFF64748B);
     }
 
     Widget footerWidget;
-    if (match.isVietnam) {
+    if (isOngoing) {
+      footerWidget = const Text('🔴 ĐANG THI ĐẤU TRỰC TIẾP (TRONG 90\') 🔴', style: TextStyle(color: Color(0xFFF43F5E), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isVietnam) {
       footerWidget = const Text('⭐ BÓNG ĐÁ VIỆT NAM ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
     } else if (match.isMuFavorite) {
       footerWidget = const Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
@@ -449,11 +509,14 @@ class _FootballScreenState extends State<FootballScreen> {
       footerWidget = Text('🔥 ${match.league.toUpperCase()} 🔥', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis);
     } else if (match.isHot) {
       footerWidget = const Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+    } else if (match.isFinishedMatch) {
+      footerWidget = const Text('Đã thi đấu xong • Xem lại diễn biến', style: TextStyle(color: Color(0xFF64748B), fontSize: 10));
     } else {
       footerWidget = const Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: Color(0xFF64748B), fontSize: 10));
     }
 
     return TvFocusableCard(
+      focusNode: focusNode,
       onTap: () => _onMatchSelected(match),
       focusBorderColor: focusBorder,
       borderRadius: BorderRadius.circular(14),
@@ -461,7 +524,7 @@ class _FootballScreenState extends State<FootballScreen> {
         decoration: BoxDecoration(
           color: cardBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: 1),
+          border: Border.all(borderColor: borderColor, width: 1),
         ),
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -482,10 +545,10 @@ class _FootballScreenState extends State<FootballScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: match.isLive ? Colors.redAccent.withOpacity(0.2) : const Color(0xFF0284C7).withOpacity(0.2),
+                    color: isLiveBadge ? Colors.redAccent.withOpacity(0.2) : const Color(0xFF0284C7).withOpacity(0.2),
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
-                      color: match.isLive ? Colors.redAccent.withOpacity(0.6) : const Color(0xFF38BDF8).withOpacity(0.3),
+                      color: isLiveBadge ? Colors.redAccent.withOpacity(0.6) : const Color(0xFF38BDF8).withOpacity(0.3),
                       width: 0.8,
                     ),
                   ),
@@ -493,15 +556,15 @@ class _FootballScreenState extends State<FootballScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        match.isLive ? Icons.fiber_manual_record : Icons.access_time_rounded,
-                        color: match.isLive ? Colors.redAccent : const Color(0xFF38BDF8),
+                        isLiveBadge ? Icons.fiber_manual_record : (match.isFinishedMatch ? Icons.check_circle_outline_rounded : Icons.access_time_rounded),
+                        color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
                         size: 10,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        match.isLive ? 'TRỰC TIẾP' : match.time,
+                        isOngoing ? 'TRỰC TIẾP • ${match.liveMinuteLabel}' : (match.isLive ? 'TRỰC TIẾP' : (match.isFinishedMatch ? 'HẾT GIỜ' : match.time)),
                         style: TextStyle(
-                          color: match.isLive ? Colors.redAccent : const Color(0xFF38BDF8),
+                          color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),

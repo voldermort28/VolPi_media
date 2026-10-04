@@ -328,20 +328,16 @@ async function getLiveMatches() {
 
       const timeParsed = parseXoilacTime(time, statusText);
 
-      // STRICT FILTER 2: Expired / Ended match filtering with Weather / Delay protection
+      // STRICT FILTER 2: Expired / Ended match filtering (within 90-105m)
       if (timeParsed.isFinished) return;
 
       if (timeParsed.ts > 0) {
         const now = Date.now();
         const elapsedMin = (now - timeParsed.ts) / (60 * 1000);
         if (elapsedMin > 0) {
-          // If match started > 150m ago (2.5 hours):
-          // Keep if isLive (weather delay, extra time, penalty shootout, etc.)
-          if (elapsedMin > 150 && !timeParsed.isLive) {
-            return;
-          }
-          // Over 270m (4.5 hours) is the upper limit for any match even with extreme delays
-          if (elapsedMin > 270) {
+          // If match started > 105m ago (1h45m - ended 90 mins):
+          // Drop non-live matches. If marked live (delays/penalties), allow up to 135m max.
+          if (elapsedMin > (timeParsed.isLive ? 135 : 105)) {
             return;
           }
         }
@@ -376,11 +372,36 @@ async function getLiveMatches() {
       matches.push(matchObj);
     });
 
+    // Helper to identify matches currently ongoing within 90 mins
+    const isOngoingMatch = (m) => {
+      if (!m.matchTimestamp) return !!m.isLive;
+      const elapsed = (Date.now() - m.matchTimestamp) / (60 * 1000);
+      return elapsed >= -5 && elapsed <= (m.isLive ? 110 : 95);
+    };
+
+    const isFinishedMatch = (m) => {
+      if (!m.matchTimestamp) return false;
+      const elapsed = (Date.now() - m.matchTimestamp) / (60 * 1000);
+      return elapsed > (m.isLive ? 115 : 100);
+    };
+
     // Sort:
-    // 1. Level priority (MU #1 -> Big Teams #2 -> Others #3)
-    // 2. Live matches first (isLive)
-    // 3. Chronological timeline (earlier matches first)
+    // 1. Ongoing matches (trong 90') FIRST
+    // 2. Finished matches LAST
+    // 3. Level priority (MU #1 -> Big Teams #2 -> Others #3)
+    // 4. Live matches (isLive)
+    // 5. Chronological kickoff time
     matches.sort((a, b) => {
+      const aOngoing = isOngoingMatch(a);
+      const bOngoing = isOngoingMatch(b);
+      if (aOngoing && !bOngoing) return -1;
+      if (!aOngoing && bOngoing) return 1;
+
+      const aFinished = isFinishedMatch(a);
+      const bFinished = isFinishedMatch(b);
+      if (!aFinished && bFinished) return -1;
+      if (aFinished && !bFinished) return 1;
+
       const pA = a.priority ? a.priority.level : 3;
       const pB = b.priority ? b.priority.level : 3;
       if (pA !== pB) return pA - pB;

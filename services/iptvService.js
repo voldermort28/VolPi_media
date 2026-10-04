@@ -663,18 +663,46 @@ function compareChannels(a, b) {
   const wB = catWeight[b.category] || 3;
   if (wA !== wB) return wA - wB;
 
-  // 3. For FOOTBALL: Sort Area 1 (Famous/VN, priorityLevel 1 & 2) before Area 2 (Other, priorityLevel 3)
+  // 3. For sports matches (FOOTBALL / OTHER_SPORTS):
+  // Ưu tiên các trận ĐANG DIỄN RA (trong 90') lên TRÊN CÙNG
+  // Đẩy các trận ĐÃ KẾT THÚC (> 100-115' / đã đá xong) xuống DƯỚI CÙNG
+  const aIsSport = a.category === 'FOOTBALL' || a.category === 'OTHER_SPORTS';
+  const bIsSport = b.category === 'FOOTBALL' || b.category === 'OTHER_SPORTS';
+  if (aIsSport && bIsSport) {
+    const isOngoing = (c) => {
+      if (!c.matchTimestamp) return !!c.isLive;
+      const elapsed = (Date.now() - c.matchTimestamp) / (60 * 1000);
+      return elapsed >= -5 && elapsed <= (c.isLive ? 110 : 95);
+    };
+    const isFinished = (c) => {
+      if (!c.matchTimestamp) return false;
+      const elapsed = (Date.now() - c.matchTimestamp) / (60 * 1000);
+      return elapsed > (c.isLive ? 115 : 100);
+    };
+
+    const aOngoing = isOngoing(a);
+    const bOngoing = isOngoing(b);
+    if (aOngoing && !bOngoing) return -1;
+    if (!aOngoing && bOngoing) return 1;
+
+    const aFin = isFinished(a);
+    const bFin = isFinished(b);
+    if (!aFin && bFin) return -1;
+    if (aFin && !bFin) return 1;
+  }
+
+  // 4. For FOOTBALL: Sort Area 1 (Famous/VN, priorityLevel 1 & 2) before Area 2 (Other, priorityLevel 3)
   if (a.category === 'FOOTBALL' && b.category === 'FOOTBALL') {
     const pA = a.priorityLevel || 3;
     const pB = b.priorityLevel || 3;
     if (pA !== pB) return pA - pB;
   }
 
-  // 4. Within the same category & priority: Live match priority (🟢 LIVE) first
+  // 5. Within the same category & priority: Live match priority (🟢 LIVE) first
   if (a.isLive && !b.isLive) return -1;
   if (!a.isLive && b.isLive) return 1;
 
-  // 5. Chronological timeline for matches
+  // 6. Chronological timeline for matches
   if (a.matchTimestamp && b.matchTimestamp) {
     if (a.matchTimestamp !== b.matchTimestamp) {
       return a.matchTimestamp - b.matchTimestamp;
@@ -685,7 +713,7 @@ function compareChannels(a, b) {
     return 1;
   }
 
-  // 6. Traditional channels alphabetical
+  // 7. Traditional channels alphabetical
   return (a.name || '').localeCompare(b.name || '', 'vi');
 }
 
@@ -793,9 +821,9 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
     // 1. Traditional 24/7 channels (FIXED_TV) NEVER expire
     // 2. If explicitly finished ("Hết giờ", "FT", "Kết thúc") -> expired
     // 3. If sports match with matchTimestamp > 0:
-    //    - If elapsed <= 150m (2.5h): standard match window -> KEEP
-    //    - If elapsed 150m - 240m (2.5h - 4h): KEEP IF isLive == true (weather delay, extra time, penalty shootout)
-    //    - If elapsed > 270m (4.5h): definitely expired M3U item -> FILTER OUT
+    //    - If elapsed <= 105m (1h45m): standard match window (trong 90') -> KEEP
+    //    - If elapsed 105m - 135m: KEEP ONLY IF isLive == true (weather delay, extra time, penalty shootout)
+    //    - If elapsed > 135m (or non-live > 105m): definitely ended / 2 tiếng trước -> FILTER OUT
     let isExpired = false;
     if (cat === 'FOOTBALL' || cat === 'OTHER_SPORTS') {
       if (timeInfo.isFinished) {
@@ -803,10 +831,10 @@ async function getChannels({ forceRefresh = false, forAdmin = false, sourceId = 
       } else if (timeInfo.matchTimestamp > 0) {
         const elapsedMin = (now - timeInfo.matchTimestamp) / (60 * 1000);
         if (elapsedMin > 0) {
-          if (elapsedMin > 150 && !timeInfo.isLive) {
+          if (elapsedMin > 105 && !timeInfo.isLive) {
             isExpired = true;
           }
-          if (elapsedMin > 270) {
+          if (elapsedMin > 135) {
             isExpired = true;
           }
         }
