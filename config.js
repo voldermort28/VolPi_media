@@ -5,6 +5,7 @@ const CONFIG_FILE = path.join(__dirname, "config.json");
 
 const DEFAULT_CONFIG = {
   xoilacBaseUrl: "https://xoilaczzw.cc",
+  socoliveBaseUrl: "https://webfifa55.live",
   vlxxBaseUrl: "https://vlxx.phd",
   yumeiBaseUrl: "https://yumei-anime.com",
   autoCleanCache: true,
@@ -34,6 +35,12 @@ function saveConfig(newConfig) {
       currentConfig.xoilacBaseUrl = currentConfig.xoilacBaseUrl.trim().replace(/\/+$/, "");
       if (!currentConfig.xoilacBaseUrl.startsWith("http://") && !currentConfig.xoilacBaseUrl.startsWith("https://")) {
         currentConfig.xoilacBaseUrl = "https://" + currentConfig.xoilacBaseUrl;
+      }
+    }
+    if (currentConfig.socoliveBaseUrl) {
+      currentConfig.socoliveBaseUrl = currentConfig.socoliveBaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.socoliveBaseUrl.startsWith("http://") && !currentConfig.socoliveBaseUrl.startsWith("https://")) {
+        currentConfig.socoliveBaseUrl = "https://" + currentConfig.socoliveBaseUrl;
       }
     }
     if (currentConfig.vlxxBaseUrl) {

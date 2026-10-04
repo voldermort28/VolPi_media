@@ -1,16 +1,17 @@
 const { addonBuilder } = require('stremio-addon-sdk');
 const vlxxScraper = require('./scrapers/vlxx');
 const xoilacScraper = require('./scrapers/xoilac');
+const socoliveScraper = require('./scrapers/socolive');
 const yumeiScraper = require('./scrapers/yumei');
 
 const manifest = {
   id: 'community.vnstream.v3',
-  version: '3.6.5',
+  version: '3.7.0',
   name: 'VolPi Media',
-  description: 'Addon tổng hợp xem Anime Vietsub (Pokemon, Tokusatsu, Super Sentai, Power Rangers), Trực tiếp bóng đá Xôi Lạc TV và Phim VLFilm',
+  description: 'Addon tổng hợp xem Anime Vietsub (Pokemon, Tokusatsu, Super Sentai, Power Rangers), Trực tiếp bóng đá Xôi Lạc TV & Socolive TV và Phim VLFilm',
   resources: ['catalog', 'meta', 'stream'],
   types: ['series', 'movie', 'tv'],
-  idPrefixes: ['vlxx:', 'xoilac:', 'yumei:'],
+  idPrefixes: ['vlxx:', 'xoilac:', 'socolive:', 'yumei:'],
   catalogs: [
     // --- SERIES CATALOGS (Chỉ Phim Bộ) ---
     {
@@ -126,6 +127,12 @@ const manifest = {
       name: 'Trực Tiếp Bóng Đá (Xôi Lạc)',
       extra: [{ name: 'search', isRequired: false }],
     },
+    {
+      type: 'tv',
+      id: 'socolive-catalog',
+      name: 'Trực Tiếp Bóng Đá (Socolive)',
+      extra: [{ name: 'search', isRequired: false }],
+    },
   ],
 };
 
@@ -187,6 +194,37 @@ builder.defineCatalogHandler(async (args) => {
           matchTimestamp: m.matchTimestamp,
           poster: `${host}/thumb/xoilac/${m.slug}.svg`,
           background: `${host}/thumb/xoilac/${m.slug}.svg`,
+          posterShape: 'landscape',
+          type: 'tv',
+          description: `🏆 ${m.league} • ⏱️ ${m.time}\n⚽ ${m.homeTeam} vs ${m.awayTeam}`,
+        })),
+      };
+    }
+
+    if (id === 'socolive-catalog') {
+      let matches = [];
+      if (extra && extra.search) {
+        matches = await socoliveScraper.searchMatches(extra.search);
+      } else {
+        matches = await socoliveScraper.getLiveMatches();
+      }
+      return {
+        metas: matches.map((m) => ({
+          id: m.id,
+          name: m.title,
+          homeTeam: m.homeTeam,
+          awayTeam: m.awayTeam,
+          homeLogo: m.homeLogo,
+          awayLogo: m.awayLogo,
+          league: m.league,
+          time: m.time,
+          priority: m.priority,
+          isFamous: m.isFamous,
+          isVietnam: m.isVietnam,
+          isLive: m.isLive,
+          matchTimestamp: m.matchTimestamp,
+          poster: `${host}/thumb/socolive/${m.slug}.svg`,
+          background: `${host}/thumb/socolive/${m.slug}.svg`,
           posterShape: 'landscape',
           type: 'tv',
           description: `🏆 ${m.league} • ⏱️ ${m.time}\n⚽ ${m.homeTeam} vs ${m.awayTeam}`,
@@ -261,6 +299,23 @@ builder.defineMetaHandler(async (args) => {
       };
     }
 
+    if (id.startsWith('socolive:')) {
+      const slug = id.replace('socolive:', '');
+      const details = await socoliveScraper.getMatchDetails(slug);
+      return {
+        meta: {
+          id: details.id,
+          name: details.name,
+          poster: `${host}/thumb/socolive/${slug}.svg`,
+          background: `${host}/thumb/socolive/${slug}.svg`,
+          posterShape: 'landscape',
+          description: details.description,
+          genres: details.genres,
+          type: 'tv',
+        },
+      };
+    }
+
     return { meta: null };
   } catch (err) {
     console.error('Meta handler error:', err);
@@ -305,6 +360,12 @@ builder.defineStreamHandler(async (args) => {
     if (id.startsWith('xoilac:')) {
       const slug = id.replace('xoilac:', '');
       const streams = await xoilacScraper.getMatchStreams(slug);
+      return { streams };
+    }
+
+    if (id.startsWith('socolive:')) {
+      const slug = id.replace('socolive:', '');
+      const streams = await socoliveScraper.getMatchStreams(slug);
       return { streams };
     }
 

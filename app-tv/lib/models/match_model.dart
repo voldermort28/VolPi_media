@@ -49,7 +49,7 @@ class MatchModel {
     final String id = json['id'] ?? '';
     final String slug = (json['slug'] != null && json['slug'].toString().isNotEmpty)
         ? json['slug']
-        : id.replaceFirst('xoilac:', '');
+        : id.replaceFirst(RegExp(r'^(xoilac|socolive):'), '');
 
     String league = json['league'] ?? 'Bóng đá';
     String time = json['time'] ?? 'Đang diễn ra';

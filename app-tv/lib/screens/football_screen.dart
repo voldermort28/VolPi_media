@@ -7,8 +7,15 @@ import '../player/video_player_screen.dart';
 
 class FootballScreen extends StatefulWidget {
   final ApiService apiService;
+  final String source;
+  final String title;
 
-  const FootballScreen({super.key, required this.apiService});
+  const FootballScreen({
+    super.key,
+    required this.apiService,
+    this.source = 'xoilac',
+    this.title = 'Xôi Lạc TV',
+  });
 
   @override
   State<FootballScreen> createState() => _FootballScreenState();
@@ -39,7 +46,10 @@ class _FootballScreenState extends State<FootballScreen> {
     });
 
     try {
-      final results = await widget.apiService.getLiveMatches(forceRefresh: forceRefresh);
+      final results = await widget.apiService.getLiveMatches(
+        forceRefresh: forceRefresh,
+        source: widget.source,
+      );
       if (mounted) {
         setState(() {
           _matches = results.where((m) => !m.isEsports).toList();
@@ -72,7 +82,10 @@ class _FootballScreenState extends State<FootballScreen> {
       ),
     );
 
-    final streams = await widget.apiService.getMatchStreams(match.id);
+    final streams = await widget.apiService.getMatchStreams(
+      match.id,
+      source: widget.source,
+    );
     if (!mounted) return;
     Navigator.of(context).pop(); // dismiss loading dialog
 
@@ -221,9 +234,9 @@ class _FootballScreenState extends State<FootballScreen> {
                 children: [
                   const Text('⚽', style: TextStyle(fontSize: 20)),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Trực Tiếp Hôm Nay',
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                  Text(
+                    '${widget.title} - Trực Tiếp Hôm Nay',
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(width: 10),
                   if (_matches.isNotEmpty)

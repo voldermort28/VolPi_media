@@ -128,11 +128,13 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   const SizedBox(width: 40),
 
                   // TV Nav Tabs
-                  _buildTvNavTab(index: 0, label: 'Bóng Đá Trực Tiếp', icon: Icons.sports_soccer_rounded),
+                  _buildTvNavTab(index: 0, label: 'Xôi Lạc TV', icon: Icons.sports_soccer_rounded),
                   const SizedBox(width: 12),
-                  _buildTvNavTab(index: 1, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
+                  _buildTvNavTab(index: 1, label: 'Socolive TV', icon: Icons.sports_rounded),
                   const SizedBox(width: 12),
-                  _buildTvNavTab(index: 2, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
+                  _buildTvNavTab(index: 2, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
+                  const SizedBox(width: 12),
+                  _buildTvNavTab(index: 3, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
 
                   const Spacer(),
 
@@ -175,14 +177,26 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                 children: [
                   ExcludeFocus(
                     excluding: _currentTabIndex != 0,
-                    child: FootballScreen(apiService: widget.apiService),
+                    child: FootballScreen(
+                      apiService: widget.apiService,
+                      source: 'xoilac',
+                      title: 'Xôi Lạc TV',
+                    ),
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 1,
-                    child: AnimeScreen(apiService: widget.apiService),
+                    child: FootballScreen(
+                      apiService: widget.apiService,
+                      source: 'socolive',
+                      title: 'Socolive TV',
+                    ),
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 2,
+                    child: AnimeScreen(apiService: widget.apiService),
+                  ),
+                  ExcludeFocus(
+                    excluding: _currentTabIndex != 3,
                     child: IptvScreen(apiService: widget.apiService),
                   ),
                 ],
@@ -271,14 +285,26 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         children: [
           ExcludeFocus(
             excluding: _currentTabIndex != 0,
-            child: FootballScreen(apiService: widget.apiService),
+            child: FootballScreen(
+              apiService: widget.apiService,
+              source: 'xoilac',
+              title: 'Xôi Lạc TV',
+            ),
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 1,
-            child: AnimeScreen(apiService: widget.apiService),
+            child: FootballScreen(
+              apiService: widget.apiService,
+              source: 'socolive',
+              title: 'Socolive TV',
+            ),
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 2,
+            child: AnimeScreen(apiService: widget.apiService),
+          ),
+          ExcludeFocus(
+            excluding: _currentTabIndex != 3,
             child: IptvScreen(apiService: widget.apiService),
           ),
         ],
@@ -302,7 +328,11 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.sports_soccer_rounded),
-              label: 'Bóng Đá',
+              label: 'Xôi Lạc',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.sports_rounded),
+              label: 'Socolive',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_rounded),

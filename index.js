@@ -9,9 +9,11 @@ const config = require("./config");
 const unifiedAddon = require("./addon");
 const vlxxAddon = require("./addons/vlxxAddon");
 const xoilacAddon = require("./addons/xoilacAddon");
+const socoliveAddon = require("./addons/socoliveAddon");
 const yumeiAddon = require("./addons/yumeiAddon");
 const vlxxScraper = require("./scrapers/vlxx");
 const xoilacScraper = require("./scrapers/xoilac");
+const socoliveScraper = require("./scrapers/socolive");
 const yumeiScraper = require("./scrapers/yumei");
 const iptvService = require("./services/iptvService");
 const authService = require("./services/authService");
@@ -434,6 +436,15 @@ app.get("/api/matches", async (req, res) => {
   }
 });
 
+app.get("/api/socolive/matches", async (req, res) => {
+  try {
+    const matches = await socoliveScraper.getLiveMatches();
+    res.json(matches || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // -------------------------------------------------------------
 // IPTV API ENDPOINTS
 // Stream Proxy to bypass CORS / Referer restrictions
@@ -821,6 +832,94 @@ app.get("/thumb/xoilac/:slug.svg", async (req, res) => {
   }
 });
 
+// 2b. Socolive Card SVG (Team Highlights & Direct Match Banner)
+app.get("/thumb/socolive/:slug.svg", async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const details = await socoliveScraper.getMatchDetails(slug);
+    const home = details.homeTeam || "Đội nhà";
+    const away = details.awayTeam || "Đội khách";
+    const league = details.league || "Bóng đá";
+    const time = details.time || "Trực tiếp";
+    const priority = details.priority || socoliveScraper.getTeamPriority(details);
+
+    const [homeLogoB64, awayLogoB64] = await Promise.all([
+      getLogoBase64(details.homeLogo),
+      getLogoBase64(details.awayLogo),
+    ]);
+
+    const homeLogoTag = homeLogoB64
+      ? "<image href=\"" + homeLogoB64 + "\" x=\"92\" y=\"80\" width=\"125\" height=\"125\" preserveAspectRatio=\"xMidYMid meet\"/>"
+      : "<text x=\"155\" y=\"150\" fill=\"#64748b\" font-family=\"sans-serif\" font-size=\"54\" text-anchor=\"middle\">🛡️</text>";
+
+    const awayLogoTag = awayLogoB64
+      ? "<image href=\"" + awayLogoB64 + "\" x=\"422\" y=\"80\" width=\"125\" height=\"125\" preserveAspectRatio=\"xMidYMid meet\"/>"
+      : "<text x=\"485\" y=\"150\" fill=\"#64748b\" font-family=\"sans-serif\" font-size=\"54\" text-anchor=\"middle\">🛡️</text>";
+
+    const borderColor = priority.color || "#06b6d4";
+    const borderWidth = priority.level === 1 ? "4.5" : (priority.level === 2 ? "3.5" : "2.5");
+    const topBadgeBg = priority.badgeBg || "#083344";
+    const topTextColor = priority.textColor || "#22d3ee";
+    
+    let topText = "🏆 " + league.toUpperCase() + "  •  ⏱️ " + time;
+    if (priority.badgeText) {
+      topText = priority.badgeText + " • ⏱️ " + time;
+    }
+
+    const svg = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"640\" height=\"360\" viewBox=\"0 0 640 360\">\n" +
+"  <defs>\n" +
+"    <linearGradient id=\"bg\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">\n" +
+"      <stop offset=\"0%\" stop-color=\"#050811\"/>\n" +
+"      <stop offset=\"50%\" stop-color=\"#082f49\"/>\n" +
+"      <stop offset=\"100%\" stop-color=\"#050811\"/>\n" +
+"    </linearGradient>\n" +
+"    <linearGradient id=\"vs\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">\n" +
+"      <stop offset=\"0%\" stop-color=\"#06b6d4\"/>\n" +
+"      <stop offset=\"100%\" stop-color=\"#3b82f6\"/>\n" +
+"    </linearGradient>\n" +
+"  </defs>\n\n" +
+"  <rect width=\"640\" height=\"360\" rx=\"24\" fill=\"url(#bg)\" stroke=\"" + borderColor + "\" stroke-width=\"" + borderWidth + "\"/>\n" +
+"  <rect x=\"12\" y=\"10\" width=\"616\" height=\"56\" rx=\"28\" fill=\"" + topBadgeBg + "\" fill-opacity=\"0.95\" stroke=\"#475569\" stroke-width=\"2\"/>\n" +
+"  <text x=\"320\" y=\"46\" fill=\"" + topTextColor + "\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"23\" font-weight=\"900\" text-anchor=\"middle\">\n" +
+"    " + escapeXml(topText) + "\n" +
+"  </text>\n\n" +
+"  <rect x=\"12\" y=\"72\" width=\"286\" height=\"224\" rx=\"20\" fill=\"#1e293b\" fill-opacity=\"0.8\" stroke=\"#334155\" stroke-width=\"2\"/>\n" +
+"  " + homeLogoTag + "\n" +
+"  <text x=\"155\" y=\"238\" fill=\"#ffffff\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"28\" font-weight=\"900\" text-anchor=\"middle\">\n" +
+"    " + escapeXml(home) + "\n" +
+"  </text>\n" +
+"  <text x=\"155\" y=\"272\" fill=\"#94a3b8\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"15\" font-weight=\"800\" text-anchor=\"middle\">\n" +
+"    CHỦ NHÀ\n" +
+"  </text>\n\n" +
+"  <circle cx=\"320\" cy=\"180\" r=\"42\" fill=\"url(#vs)\" stroke=\"#ffffff\" stroke-width=\"3\"/>\n" +
+"  <text x=\"320\" y=\"190\" fill=\"#ffffff\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"28\" font-weight=\"900\" text-anchor=\"middle\">\n" +
+"    VS\n" +
+"  </text>\n\n" +
+"  <rect x=\"342\" y=\"72\" width=\"286\" height=\"224\" rx=\"20\" fill=\"#1e293b\" fill-opacity=\"0.8\" stroke=\"#334155\" stroke-width=\"2\"/>\n" +
+"  " + awayLogoTag + "\n" +
+"  <text x=\"485\" y=\"238\" fill=\"#ffffff\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"28\" font-weight=\"900\" text-anchor=\"middle\">\n" +
+"    " + escapeXml(away) + "\n" +
+"  </text>\n" +
+"  <text x=\"485\" y=\"272\" fill=\"#94a3b8\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"15\" font-weight=\"800\" text-anchor=\"middle\">\n" +
+"    ĐỘI KHÁCH\n" +
+"  </text>\n\n" +
+"  <rect x=\"140\" y=\"304\" width=\"360\" height=\"48\" rx=\"24\" fill=\"#0284c7\"/>\n" +
+"  <circle cx=\"175\" cy=\"328\" r=\"8\" fill=\"#ffffff\"/>\n" +
+"  <text x=\"330\" y=\"335\" fill=\"#ffffff\" font-family=\"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif\" font-size=\"20\" font-weight=\"900\" text-anchor=\"middle\">\n" +
+"    TRỰC TIẾP • SOCOLIVE TV\n" +
+"  </text>\n" +
+"</svg>";
+
+    res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=300");
+    return res.send(svg);
+  } catch (err) {
+    console.error("Error rendering Socolive SVG:", err.message);
+    return res.status(500).send("Error");
+  }
+});
+
 // 3. Yumei Anime / Tokusatsu Card SVG (Web UI Card Banner style)
 app.get("/thumb/yumei/:id.svg", async (req, res) => {
   try {
@@ -936,6 +1035,7 @@ app.get("/thumb/yumei/:id.svg", async (req, res) => {
 
 app.use("/vlxx", getRouter(vlxxAddon));
 app.use("/xoilac", getRouter(xoilacAddon));
+app.use("/socolive", getRouter(socoliveAddon));
 app.use("/yumei", getRouter(yumeiAddon));
 app.use(getRouter(unifiedAddon));
 

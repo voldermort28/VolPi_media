@@ -12,16 +12,21 @@ class ApiService {
   ApiService({this.baseUrl = defaultHost});
 
   // =========================================================================
-  // 1. FOOTBALL / XÔI LẠC TV
+  // =========================================================================
+  // 1. FOOTBALL / XÔI LẠC TV & SOCOLIVE TV
   // =========================================================================
 
   /// Fetches live matches.
   /// If forceRefresh is true, appends timestamp query to bypass any client/CDN cache.
-  Future<List<MatchModel>> getLiveMatches({bool forceRefresh = false}) async {
+  /// source can be 'xoilac' or 'socolive'.
+  Future<List<MatchModel>> getLiveMatches({bool forceRefresh = false, String source = 'xoilac'}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final isSoco = source.toLowerCase() == 'socolive';
 
-    // 1. Try direct /api/matches first (richest metadata & logo URLs)
-    final apiUrl = '$baseUrl/api/matches?_t=$timestamp';
+    // 1. Try direct API endpoint first (richest metadata & logo URLs)
+    final apiUrl = isSoco
+        ? '$baseUrl/api/socolive/matches?_t=$timestamp'
+        : '$baseUrl/api/matches?_t=$timestamp';
     try {
       final res = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
@@ -35,9 +40,12 @@ class ApiService {
     } catch (_) {}
 
     // 2. Fallback to Stremio catalog endpoint
+    final catalogPath = isSoco
+        ? 'socolive/catalog/tv/socolive-catalog.json'
+        : 'xoilac/catalog/tv/xoilac-catalog.json';
     final catalogUrl = forceRefresh
-        ? '$baseUrl/xoilac/catalog/tv/xoilac-catalog.json?_t=$timestamp'
-        : '$baseUrl/xoilac/catalog/tv/xoilac-catalog.json';
+        ? '$baseUrl/$catalogPath?_t=$timestamp'
+        : '$baseUrl/$catalogPath';
 
     try {
       final res = await http.get(Uri.parse(catalogUrl)).timeout(const Duration(seconds: 10));
@@ -87,9 +95,11 @@ class ApiService {
   }
 
   /// Fetches available stream channels (with BLV names and proxy headers) for a match.
-  Future<List<StreamChannel>> getMatchStreams(String matchId) async {
+  Future<List<StreamChannel>> getMatchStreams(String matchId, {String? source}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final url = '$baseUrl/xoilac/stream/tv/$matchId.json?_t=$timestamp';
+    final isSoco = matchId.startsWith('socolive:') || (source != null && source.toLowerCase() == 'socolive');
+    final streamPath = isSoco ? 'socolive/stream/tv' : 'xoilac/stream/tv';
+    final url = '$baseUrl/$streamPath/$matchId.json?_t=$timestamp';
 
     try {
       final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
