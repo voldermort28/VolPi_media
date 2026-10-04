@@ -1,8 +1,8 @@
 {
-  "version": "1.0.32",
-  "build": 33,
-  "tag_name": "v1.0.32",
-  "changelog": "• Sửa triệt để trên màn hình IPTV: Đưa nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu lên vị trí đầu tiên (kể cả khi trận tâm điểm đang trực tiếp thi đấu); nhóm 🔴 Đang Diễn Ra (trong 90') xếp ngay bên dưới.\n• Bổ sung danh sách các Đội tuyển Quốc gia lớn (Ai Cập, Ma Rốc, Nam Phi, Anh, Pháp, Đức, Ý, Tây Ban Nha, Bồ Đào Nha, Brazil, Argentina...) và các giải đấu quốc tế (Cúp Châu Phi AFCON/CAN, CONCACAF, Giao hữu) vào nhóm Tâm Điểm của cả Xôi Lạc và IPTV.",
+  "version": "1.0.33",
+  "build": 34,
+  "tag_name": "v1.0.33",
+  "changelog": "• Bổ sung cơ chế tự động phân loại Trận Tâm Điểm ngay tại client (Flutter app) cho IPTV: đảm bảo nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu luôn xuất hiện ở đầu bảng ngay cả khi API máy chủ chưa cập nhật priorityLevel.\n• Hiển thị huy hiệu ⭐ TÂM ĐIỂM trên thẻ trận đấu trước giờ bóng lăn.\n• Lọc và loại bỏ chính xác các giải phụ, esports, giải hạng 2 khỏi nhóm tâm điểm.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",

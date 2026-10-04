@@ -1172,15 +1172,15 @@ class _IptvScreenState extends State<IptvScreen> {
     }
 
     // FOOTBALL tab: Split into Area 1 (Major on top), Area 2 (Other ongoing), Area 3 (Other upcoming), Area 4 (Finished)
-    final major = channels.where((c) => !c.isFinishedMatch && c.priorityLevel <= 2).toList();
+    final major = channels.where((c) => !c.isFinishedMatch && (c.priorityLevel <= 2 || c.isFamous || c.isVietnam || c.isHot)).toList();
     major.sort((a, b) {
       if (a.isOngoingNow && !b.isOngoingNow) return -1;
       if (!a.isOngoingNow && b.isOngoingNow) return 1;
       return a.matchTimestamp.compareTo(b.matchTimestamp);
     });
 
-    final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2).toList();
-    final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2).toList();
+    final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot).toList();
+    final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot).toList();
     final finished = channels.where((c) => c.isFinishedMatch).toList();
 
     return CustomScrollView(
@@ -1602,6 +1602,30 @@ class _IptvScreenState extends State<IptvScreen> {
                         fontSize: 9,
                         fontWeight: FontWeight.bold,
                       ),
+                    ),
+                  )
+                else if (channel.isFamous || channel.priorityLevel <= 2 || channel.isHot)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.amber.withOpacity(0.4), width: 0.8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star_rounded, color: Colors.amber, size: 10),
+                        SizedBox(width: 2),
+                        Text(
+                          'TÂM ĐIỂM',
+                          style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else
