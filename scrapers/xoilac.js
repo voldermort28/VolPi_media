@@ -119,6 +119,67 @@ function getTeamPriority(match) {
     };
   }
 
+  // Exclude non-top divisions, youth leagues, women's secondary leagues, and esports
+  const leagueLower = (match.league || '').toLowerCase();
+  const isLowerOrWomenLeague = leagueLower.includes('la liga 2') ||
+                               leagueLower.includes('segunda') ||
+                               leagueLower.includes('hypermotion') ||
+                               leagueLower.includes('bundesliga 2') ||
+                               leagueLower.includes('2. bundesliga') ||
+                               leagueLower.includes('serie b') ||
+                               leagueLower.includes('serie c') ||
+                               leagueLower.includes('ligue 2') ||
+                               leagueLower.includes('hạng 2') ||
+                               leagueLower.includes('hạng 3') ||
+                               leagueLower.includes('u17') ||
+                               leagueLower.includes('u19') ||
+                               leagueLower.includes('u21') ||
+                               (leagueLower.includes('frauen') && !q.includes('việt nam')) ||
+                               (leagueLower.includes('women') && !q.includes('việt nam')) ||
+                               (leagueLower.includes('nữ') && !q.includes('việt nam'));
+
+  const isEsports = leagueLower.includes('esport') ||
+                    leagueLower.includes('dota') ||
+                    leagueLower.includes('cs:go') ||
+                    leagueLower.includes('cs2') ||
+                    leagueLower.includes('counter-strike') ||
+                    leagueLower.includes('crossfire') ||
+                    leagueLower.includes('đột kích') ||
+                    leagueLower.includes('league of legends') ||
+                    leagueLower.includes('demacia cup') ||
+                    leagueLower.includes('cct') ||
+                    leagueLower.includes('esl') ||
+                    leagueLower.includes('european pro league') ||
+                    leagueLower.includes('lcs') ||
+                    leagueLower.includes('lck');
+
+  if (isEsports || isLowerOrWomenLeague) {
+    return {
+      level: 3,
+      isFamous: false,
+      isVietnam: false,
+      tag: '',
+      badgeText: '',
+      color: '#334155',
+      badgeBg: '#1e293b',
+      textColor: '#38bdf8',
+    };
+  }
+
+  // 1c. Tham chiếu trực tiếp từ tab "Trận Hot" của Xôi Lạc (data-hot="1")
+  if (match.isHot) {
+    return {
+      level: 2,
+      isFamous: true,
+      isVietnam: false,
+      tag: '🔥 [TÂM ĐIỂM]',
+      badgeText: '🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥',
+      color: '#f59e0b',
+      badgeBg: '#854d0e',
+      textColor: '#fef08a',
+    };
+  }
+
   // 2a. Highlighted Big Teams & User Favorites (Level 2)
   const bigTeams = [
     { names: ['manchester city', 'man city', 'mancity', ' mc '], label: 'Man City' },
@@ -178,7 +239,7 @@ function getTeamPriority(match) {
     { names: ['bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup'], label: 'Bundesliga' },
     { names: ['ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp'], label: 'Ligue 1' },
     { names: ['world cup', 'vòng loại world cup', 'world cup qualifiers'], label: 'World Cup' },
-    { names: ['euro', 'vòng loại euro', 'uefa euro'], label: 'UEFA Euro' },
+    { names: ['uefa euro', 'vòng loại euro', 'euro 2024', 'euro 2028', 'cúp euro'], label: 'UEFA Euro' },
     { names: ['nations league', 'uefa nations'], label: 'UEFA Nations League' },
     { names: ['copa america'], label: 'Copa America' },
     { names: ['asian cup', 'afc asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á', 'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic'], label: 'Giải Châu Á / ĐNÁ' },
@@ -246,24 +307,23 @@ async function getLiveMatches() {
       const href = $link.attr('href') || '';
       if (!href.startsWith('/truc-tiep/') || href.includes('/link/')) return;
 
-      const $card = $link.closest('.grid-match-item, .grid-match, div[class*="grid-match"]');
+      const $card = $link.closest('.grid-match-item, .grid-matches__item, .grid-match, div[class*="grid-match"]');
 
       // STRICT FILTER: ONLY FOOTBALL MATCHES (Exclude Basketball, Tennis, Badminton, Volleyball, Esports...)
-      const isFootball = $card.hasClass('match-football-item') ||
-                         $card.find('.grid-match-item__footer-football').length > 0;
+      const dataSport = ($card.attr('data-sport') || '').toLowerCase().trim();
+      if (dataSport && dataSport !== 'football') return;
 
-      const isOtherSport = $card.hasClass('match-basketball-item') ||
-                           $card.hasClass('match-tennis-item') ||
-                           $card.hasClass('match-badminton-item') ||
-                           $card.hasClass('match-volleyball-item') ||
-                           $card.hasClass('match-esports-item') ||
-                           href.includes('basketball') ||
-                           href.includes('tennis') ||
-                           href.includes('badminton') ||
-                           href.includes('volleyball') ||
-                           href.includes('esports');
+      const cardClass = ($card.attr('class') || '').toLowerCase();
+      if (cardClass.includes('dota') || cardClass.includes('tennis') || cardClass.includes('basketball') ||
+          cardClass.includes('volleyball') || cardClass.includes('badminton') || cardClass.includes('esport')) {
+        return;
+      }
 
-      if (!isFootball || isOtherSport) return;
+      const hrefLower = href.toLowerCase();
+      if (hrefLower.includes('basketball') || hrefLower.includes('tennis') || hrefLower.includes('badminton') ||
+          hrefLower.includes('volleyball') || hrefLower.includes('esports') || hrefLower.includes('dota')) {
+        return;
+      }
 
       const title = $link.attr('title') || '';
       
@@ -284,6 +344,13 @@ async function getLiveMatches() {
       if (awayLogo && awayLogo.startsWith('//')) awayLogo = 'https:' + awayLogo;
       else if (awayLogo && awayLogo.startsWith('/')) awayLogo = currentBaseUrl + awayLogo;
 
+      // STRICT FILTER 2: Check logo URLs for esports / non-football games
+      const logoText = `${homeLogo} ${awayLogo}`.toLowerCase();
+      if (logoText.includes('/dota') || logoText.includes('/csgo') || logoText.includes('/cs2') ||
+          logoText.includes('/lol/') || logoText.includes('/crossfire') || logoText.includes('/esport')) {
+        return;
+      }
+
       if (!time && title) {
         const matchTime = title.match(/lúc\s+(\d{1,2}:\d{2})\s+ngày\s+(\d{1,2}\/\d{1,2})/i);
         if (matchTime) {
@@ -295,12 +362,13 @@ async function getLiveMatches() {
       const matchSlug = href.replace('/truc-tiep/', '').replace(/\/$/, '');
       if (!matchSlug || matches.some((m) => m.slug === matchSlug)) return;
 
-      // STRICT FILTER 1: Non-football keywords in league, teams, slug
+      // STRICT FILTER 3: Non-football keywords in league, teams, slug
       const allSportText = `${league} ${homeTeam} ${awayTeam} ${matchSlug} ${title}`.toLowerCase();
       const nonFootballPatterns = [
         'esport', 'dota', 'blast slam', 'stake ranked', 'winline', 'fox legacy',
         'cs:go', 'cs2', 'counter-strike', 'league of legends', 'emea masters',
-        'valorant', 'pubg', 'arena of valor', 'tốc chiến', 'liên quân', 'pro league',
+        'crossfire', 'đột kích', 'demacia cup', 'cct 20', 'esl pro league', 'european pro league',
+        'valorant', 'pubg', 'arena of valor', 'tốc chiến', 'liên quân',
         'bóng rổ', 'basketball', 'nba', 'cba', 'vba',
         'tennis', 'quần vợt', 'atp', 'wta',
         'badminton', 'cầu lông', 'bwf',
@@ -328,7 +396,7 @@ async function getLiveMatches() {
 
       const timeParsed = parseXoilacTime(time, statusText);
 
-      // STRICT FILTER 2: Expired / Ended match filtering (within 90-105m)
+      // STRICT FILTER 4: Expired / Ended match filtering (within 90-105m)
       if (timeParsed.isFinished) return;
 
       if (timeParsed.ts > 0) {
@@ -343,6 +411,10 @@ async function getLiveMatches() {
         }
       }
 
+      // Tham chiếu trực tiếp tab "Trận Hot" của Xôi Lạc (data-hot="1")
+      const dataHot = $card.attr('data-hot');
+      const isXoilacHot = dataHot === '1' || dataHot === 1;
+
       const matchObj = {
         id: `xoilac:${matchSlug}`,
         slug: matchSlug,
@@ -354,6 +426,7 @@ async function getLiveMatches() {
         league,
         time: time || 'Đang diễn ra',
         href: `${currentBaseUrl}${href}`,
+        isHot: isXoilacHot,
       };
 
       const priority = getTeamPriority(matchObj);

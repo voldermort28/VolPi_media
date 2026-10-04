@@ -548,7 +548,10 @@ function classifyChannel(name, group = '') {
                        name.includes('🏉') || n.includes('rugby') || name.includes('bóng bầu dục') ||
                        name.includes('⛳') || n.includes('golf') ||
                        name.includes('🏒') || n.includes('hockey') || n.includes('khúc côn cầu') ||
-                       g.includes('tennis') || g.includes('bóng rổ') || g.includes('bóng chuyền') || g.includes('cầu lông') || g.includes('bóng bàn');
+                       n.includes('esport') || n.includes('dota') || n.includes('cs:go') || n.includes('cs2') ||
+                       n.includes('counter-strike') || n.includes('crossfire') || n.includes('đột kích') ||
+                       n.includes('demacia cup') || n.includes('european pro league') ||
+                       g.includes('tennis') || g.includes('bóng rổ') || g.includes('bóng chuyền') || g.includes('cầu lông') || g.includes('bóng bàn') || g.includes('esport');
 
   if (isOtherSport) return 'OTHER_SPORTS';
 
@@ -603,6 +606,43 @@ function classifyFootballPriority(name, group = '') {
     return { priorityLevel: 1, isVietnam: false, isFamous: true };
   }
 
+  // Exclude lower division leagues and secondary women leagues from Major priority
+  const isLowerOrWomenLeague = q.includes('la liga 2') ||
+                               q.includes('segunda') ||
+                               q.includes('hypermotion') ||
+                               q.includes('bundesliga 2') ||
+                               q.includes('2. bundesliga') ||
+                               q.includes('serie b') ||
+                               q.includes('serie c') ||
+                               q.includes('ligue 2') ||
+                               q.includes('hạng 2') ||
+                               q.includes('hạng 3') ||
+                               q.includes('u17') ||
+                               q.includes('u19') ||
+                               q.includes('u21') ||
+                               (q.includes('frauen') && !q.includes('việt nam')) ||
+                               (q.includes('women') && !q.includes('việt nam')) ||
+                               (q.includes('nữ') && !q.includes('việt nam'));
+
+  const isEsports = q.includes('esport') ||
+                    q.includes('dota') ||
+                    q.includes('cs:go') ||
+                    q.includes('cs2') ||
+                    q.includes('counter-strike') ||
+                    q.includes('crossfire') ||
+                    q.includes('đột kích') ||
+                    q.includes('league of legends') ||
+                    q.includes('demacia cup') ||
+                    q.includes('cct') ||
+                    q.includes('esl') ||
+                    q.includes('european pro league') ||
+                    q.includes('lcs') ||
+                    q.includes('lck');
+
+  if (isEsports || isLowerOrWomenLeague) {
+    return { priorityLevel: 3, isVietnam: false, isFamous: false };
+  }
+
   // 2a. Big Teams & Top Clubs
   const bigTeams = [
     'manchester city', 'man city', 'mancity', ' mc ',
@@ -630,8 +670,8 @@ function classifyFootballPriority(name, group = '') {
     'serie a', 'vđqg ý', 'coppa italia', 'cúp ý', 'supercoppa italiana',
     'bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup',
     'ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp',
-    'world cup', 'vòng loại world cup', 'euro', 'vòng loại euro', 'nations league',
-    'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
+    'world cup', 'vòng loại world cup', 'uefa euro', 'vòng loại euro', 'euro 2024', 'euro 2028', 'cúp euro',
+    'nations league', 'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
     'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
     'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
   ];

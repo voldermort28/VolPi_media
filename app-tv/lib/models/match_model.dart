@@ -15,6 +15,7 @@ class MatchModel {
   final bool isFavorite;
   final bool isFamous;
   final bool isHot;
+  final bool isEsports;
   final String favoriteBadgeText;
   final bool isLive;
   final int matchTimestamp;
@@ -36,6 +37,7 @@ class MatchModel {
     this.isFavorite = false,
     this.isFamous = false,
     this.isHot = false,
+    this.isEsports = false,
     this.favoriteBadgeText = '',
     this.isLive = false,
     this.matchTimestamp = 0,
@@ -69,10 +71,57 @@ class MatchModel {
         }
       }
     }
-    if (home.isEmpty) home = 'Đội nhà';
-    if (away.isEmpty) away = 'Đội khách';
+    final String homeLogo = json['homeLogo'] ?? '';
+    final String awayLogo = json['awayLogo'] ?? '';
+    final String logoText = '$homeLogo $awayLogo'.toLowerCase();
+    final String leagueLower = league.toLowerCase();
 
     final String allText = '$rawTitle $desc $league $home $away'.toLowerCase();
+
+    // Check Esports (Dota 2, CS:GO, LOL, Crossfire, etc.)
+    final bool esportsDetected = allText.contains('esport') ||
+        allText.contains('dota') ||
+        allText.contains('cs:go') ||
+        allText.contains('cs2') ||
+        allText.contains('counter-strike') ||
+        allText.contains('crossfire') ||
+        allText.contains('đột kích') ||
+        allText.contains('league of legends') ||
+        allText.contains('demacia cup') ||
+        allText.contains('cct') ||
+        allText.contains('esl') ||
+        allText.contains('european pro league') ||
+        allText.contains('lcs') ||
+        allText.contains('lck') ||
+        allText.contains('valorant') ||
+        allText.contains('pubg') ||
+        allText.contains('arena of valor') ||
+        allText.contains('tốc chiến') ||
+        allText.contains('liên quân') ||
+        logoText.contains('/dota') ||
+        logoText.contains('/csgo') ||
+        logoText.contains('/cs2') ||
+        logoText.contains('/lol/') ||
+        logoText.contains('/crossfire') ||
+        logoText.contains('/esport');
+
+    // Exclude lower division leagues and women leagues (except ĐT Nữ Việt Nam)
+    final bool isLowerOrWomenLeague = leagueLower.contains('la liga 2') ||
+        leagueLower.contains('segunda') ||
+        leagueLower.contains('hypermotion') ||
+        leagueLower.contains('bundesliga 2') ||
+        leagueLower.contains('2. bundesliga') ||
+        leagueLower.contains('serie b') ||
+        leagueLower.contains('serie c') ||
+        leagueLower.contains('ligue 2') ||
+        leagueLower.contains('hạng 2') ||
+        leagueLower.contains('hạng 3') ||
+        leagueLower.contains('u17') ||
+        leagueLower.contains('u19') ||
+        leagueLower.contains('u21') ||
+        (leagueLower.contains('frauen') && !allText.contains('việt nam')) ||
+        (leagueLower.contains('women') && !allText.contains('việt nam')) ||
+        (leagueLower.contains('nữ') && !allText.contains('việt nam'));
 
     // Check Vietnam Football & Vietnamese Clubs
     final bool isVn = json['isVietnam'] == true ||
@@ -191,30 +240,40 @@ class MatchModel {
       'serie a', 'vđqg ý', 'coppa italia', 'cúp ý', 'supercoppa italiana',
       'bundesliga', 'vđqg đức', 'dfb-pokal', 'cúp qg đức', 'dfl-supercup',
       'ligue 1', 'vđqg pháp', 'coupe de france', 'cúp qg pháp',
-      'world cup', 'vòng loại world cup', 'euro', 'vòng loại euro', 'nations league',
-      'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
+      'world cup', 'vòng loại world cup', 'uefa euro', 'vòng loại euro', 'euro 2024', 'euro 2028', 'cúp euro',
+      'nations league', 'copa america', 'asian cup', 'afc champions league', 'cúp c1 châu á', 'cúp c2 châu á',
       'shopee cup', 'aff cup', 'asean cup', 'sea games', 'olympic',
       'saudi pro league', 'saudi league', 'mls', 'major league soccer', 'nhà nghề mỹ'
     ];
 
     bool isMajorLeague = false;
-    for (final lk in majorLeagueKeywords) {
-      if (allText.contains(lk)) {
-        isMajorLeague = true;
-        break;
+    if (!isLowerOrWomenLeague && !esportsDetected) {
+      for (final lk in majorLeagueKeywords) {
+        if (allText.contains(lk)) {
+          isMajorLeague = true;
+          break;
+        }
       }
     }
 
-    final bool isFamousMatch = json['isFamous'] == true ||
+    final bool isHotFromScraper = json['isHot'] == true;
+
+    final bool isFamousMatch = !esportsDetected && !isLowerOrWomenLeague && (
+        isHotFromScraper ||
+        json['isFamous'] == true ||
         isVn ||
         isMu ||
         matchFavorite ||
-        isMajorLeague;
+        isMajorLeague
+    );
 
-    final bool isHotMatch = matchFavorite ||
+    final bool isHotMatch = !esportsDetected && !isLowerOrWomenLeague && (
+        isHotFromScraper ||
+        matchFavorite ||
         isFamousMatch ||
         rawTitle.contains('🔥') ||
-        rawTitle.toLowerCase().contains('tâm điểm');
+        rawTitle.toLowerCase().contains('tâm điểm')
+    );
 
     final bool live = json['isLive'] == true ||
         rawTitle.contains('🟢') ||
@@ -234,8 +293,8 @@ class MatchModel {
       league: league,
       homeTeam: home,
       awayTeam: away,
-      homeLogo: json['homeLogo'] ?? '',
-      awayLogo: json['awayLogo'] ?? '',
+      homeLogo: homeLogo,
+      awayLogo: awayLogo,
       poster: json['poster'] ?? json['background'] ?? '',
       description: desc,
       isVietnam: isVn,
@@ -243,6 +302,7 @@ class MatchModel {
       isFavorite: matchFavorite,
       isFamous: isFamousMatch,
       isHot: isHotMatch,
+      isEsports: esportsDetected,
       favoriteBadgeText: badgeText,
       isLive: live,
       matchTimestamp: ts,

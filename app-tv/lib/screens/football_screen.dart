@@ -42,7 +42,7 @@ class _FootballScreenState extends State<FootballScreen> {
       final results = await widget.apiService.getLiveMatches(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
-          _matches = results;
+          _matches = results.where((m) => !m.isEsports).toList();
           _isLoading = false;
         });
 
