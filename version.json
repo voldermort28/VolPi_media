@@ -1,8 +1,8 @@
 {
-  "version": "1.0.33",
-  "build": 34,
-  "tag_name": "v1.0.33",
-  "changelog": "• Bổ sung cơ chế tự động phân loại Trận Tâm Điểm ngay tại client (Flutter app) cho IPTV: đảm bảo nhóm ⭐ Tâm Điểm & Giải Đấu Hàng Đầu luôn xuất hiện ở đầu bảng ngay cả khi API máy chủ chưa cập nhật priorityLevel.\n• Hiển thị huy hiệu ⭐ TÂM ĐIỂM trên thẻ trận đấu trước giờ bóng lăn.\n• Lọc và loại bỏ chính xác các giải phụ, esports, giải hạng 2 khỏi nhóm tâm điểm.",
+  "version": "1.0.34",
+  "build": 35,
+  "tag_name": "v1.0.34",
+  "changelog": "• Sửa triệt để lỗi phân loại ĐTQG trên tab Xôi Lạc: Tách biệt tên đội bóng thi đấu và tên giải đấu, ngăn chặn việc các giải quốc nội (Hạng 2 Argentina, VĐQG Argentina...) bị nhận diện nhầm thành ĐT Argentina.\n• Chặn hoàn toàn các giải đấu hạng dưới (Hạng 2, Hạng 3, giải trẻ...) và Esports khỏi danh mục Yêu thích & Tâm điểm.\n• Đảm bảo hoạt động ổn định và chính xác trên cả 2 tab Bóng Đá Trực Tiếp và Truyền Hình (IPTV).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",

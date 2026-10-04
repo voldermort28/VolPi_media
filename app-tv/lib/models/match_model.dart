@@ -165,16 +165,21 @@ class MatchModel {
         allText.contains('khánh hòa') ||
         allText.contains('pvf');
 
+    // Separate team names from league & description to avoid league names (e.g. Hạng 2 Argentina)
+    // falsely triggering national team matching (e.g. ĐT Argentina)
+    final String teamsOnly = ' $home $away '.toLowerCase();
+    final String teamsAndTitle = ' $home $away $rawTitle '.toLowerCase();
+
     // Check Manchester United
     final bool isMu = rawTitle.contains('⭐ [MU') ||
         rawTitle.contains('⭐ MANCHESTER') ||
-        allText.contains('manchester united') ||
-        allText.contains('man utd') ||
-        allText.contains('man united') ||
-        RegExp(r'(^|\s)mu(\s|$)').hasMatch(allText);
+        teamsAndTitle.contains('manchester united') ||
+        teamsAndTitle.contains('man utd') ||
+        teamsAndTitle.contains('man united') ||
+        RegExp(r'(^|\s)mu(\s|$)').hasMatch(teamsAndTitle);
 
-    // Check User Favorite Teams & Big Teams
-    final List<Map<String, dynamic>> favoriteKeywords = [
+    // Check User Favorite Clubs (e.g. Man City, Liverpool, Arsenal, Real Madrid, Barca...)
+    final List<Map<String, dynamic>> favoriteClubs = [
       {'keys': ['manchester city', 'man city', 'mancity'], 'label': 'MAN CITY'},
       {'keys': ['liverpool'], 'label': 'LIVERPOOL'},
       {'keys': ['arsenal'], 'label': 'ARSENAL'},
@@ -200,6 +205,10 @@ class MatchModel {
       {'keys': ['al hilal', 'al-hilal'], 'label': 'AL HILAL'},
       {'keys': ['al ittihad', 'al-ittihad'], 'label': 'AL ITTIHAD'},
       {'keys': ['inter miami'], 'label': 'INTER MIAMI'},
+    ];
+
+    // Check Major National Teams (STRICTLY matched against teamsOnly to prevent domestic league false positives!)
+    final List<Map<String, dynamic>> favoriteNationalTeams = [
       {'keys': ['đt anh', 'tuyển anh', 'england'], 'label': 'ĐT ANH'},
       {'keys': ['đt pháp', 'tuyển pháp', 'france'], 'label': 'ĐT PHÁP'},
       {'keys': ['đt đức', 'tuyển đức', 'germany'], 'label': 'ĐT ĐỨC'},
@@ -228,10 +237,11 @@ class MatchModel {
     } else if (isMu) {
       badgeText = 'MANCHESTER UNITED';
     } else {
-      for (final item in favoriteKeywords) {
+      // 1. Check Clubs against teamsAndTitle
+      for (final item in favoriteClubs) {
         final List<String> keys = List<String>.from(item['keys']);
         for (final k in keys) {
-          if (allText.contains(k)) {
+          if (teamsAndTitle.contains(k)) {
             matchFavorite = true;
             badgeText = item['label'];
             break;
@@ -240,11 +250,32 @@ class MatchModel {
         if (matchFavorite) break;
       }
       if (!matchFavorite) {
-        if (RegExp(r'(^|\s)mc(\s|$)').hasMatch(allText)) {
+        if (RegExp(r'(^|\s)mc(\s|$)').hasMatch(teamsAndTitle)) {
           matchFavorite = true;
           badgeText = 'MAN CITY';
         }
       }
+
+      // 2. Check National Teams STRICTLY against teamsOnly (home & away team names)
+      if (!matchFavorite) {
+        for (final item in favoriteNationalTeams) {
+          final List<String> keys = List<String>.from(item['keys']);
+          for (final k in keys) {
+            if (teamsOnly.contains(k) || rawTitle.toLowerCase().contains(k)) {
+              matchFavorite = true;
+              badgeText = item['label'];
+              break;
+            }
+          }
+          if (matchFavorite) break;
+        }
+      }
+    }
+
+    // Never consider lower division or esports as favorite match!
+    if (isLowerOrWomenLeague || esportsDetected) {
+      matchFavorite = false;
+      badgeText = '';
     }
 
     // Check Major / Famous Worldwide Leagues
@@ -277,19 +308,20 @@ class MatchModel {
     }
 
     final bool isHotFromScraper = json['isHot'] == true;
+    final bool isFavoriteMatch = !esportsDetected && !isLowerOrWomenLeague && matchFavorite;
 
     final bool isFamousMatch = !esportsDetected && !isLowerOrWomenLeague && (
         isHotFromScraper ||
         json['isFamous'] == true ||
         isVn ||
         isMu ||
-        matchFavorite ||
+        isFavoriteMatch ||
         isMajorLeague
     );
 
     final bool isHotMatch = !esportsDetected && !isLowerOrWomenLeague && (
         isHotFromScraper ||
-        matchFavorite ||
+        isFavoriteMatch ||
         isFamousMatch ||
         rawTitle.contains('🔥') ||
         rawTitle.toLowerCase().contains('tâm điểm')
@@ -317,9 +349,9 @@ class MatchModel {
       awayLogo: awayLogo,
       poster: json['poster'] ?? json['background'] ?? '',
       description: desc,
-      isVietnam: isVn,
-      isMuFavorite: isMu,
-      isFavorite: matchFavorite,
+      isVietnam: isVn && !esportsDetected,
+      isMuFavorite: isMu && !esportsDetected && !isLowerOrWomenLeague,
+      isFavorite: isFavoriteMatch,
       isFamous: isFamousMatch,
       isHot: isHotMatch,
       isEsports: esportsDetected,

@@ -180,8 +180,8 @@ function getTeamPriority(match) {
     };
   }
 
-  // 2a. Highlighted Big Teams & User Favorites (Level 2)
-  const bigTeams = [
+  // 2a. Highlighted Big Clubs & User Favorites (Level 2)
+  const bigClubs = [
     { names: ['manchester city', 'man city', 'mancity', ' mc '], label: 'Man City' },
     { names: ['liverpool'], label: 'Liverpool' },
     { names: ['arsenal'], label: 'Arsenal' },
@@ -210,6 +210,25 @@ function getTeamPriority(match) {
     { names: ['benfica'], label: 'Benfica' },
     { names: ['porto'], label: 'Porto' },
     { names: ['sporting lisbon', 'sporting cp'], label: 'Sporting CP' },
+  ];
+
+  for (const team of bigClubs) {
+    if (team.names.some((n) => q.includes(n))) {
+      return {
+        level: 2,
+        isFamous: true,
+        isVietnam: false,
+        tag: '🔥 [TÂM ĐIỂM]',
+        badgeText: `🔥 TÂM ĐIỂM: ${team.label.toUpperCase()} 🔥`,
+        color: '#f59e0b',
+        badgeBg: '#854d0e',
+        textColor: '#fef08a',
+      };
+    }
+  }
+
+  // 2b. Major National Teams (Strictly matched on team names, never on league name)
+  const nationalTeams = [
     { names: ['đt anh', 'tuyển anh', 'england'], label: 'ĐT Anh' },
     { names: ['đt pháp', 'tuyển pháp', 'france'], label: 'ĐT Pháp' },
     { names: ['đt đức', 'tuyển đức', 'germany'], label: 'ĐT Đức' },
@@ -230,8 +249,9 @@ function getTeamPriority(match) {
     { names: ['đt mali', 'mali'], label: 'ĐT Mali' },
   ];
 
-  for (const team of bigTeams) {
-    if (team.names.some((n) => q.includes(n))) {
+  const teamsOnly = ` ${match.homeTeam || ''} ${match.awayTeam || ''} `.toLowerCase();
+  for (const team of nationalTeams) {
+    if (team.names.some((n) => teamsOnly.includes(n) || (match.title && match.title.toLowerCase().includes(n)))) {
       return {
         level: 2,
         isFamous: true,

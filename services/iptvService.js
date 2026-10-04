@@ -663,8 +663,8 @@ function classifyFootballPriority(name, group = '') {
     'đt bồ đào nha', 'tuyển bồ đào nha', 'portugal',
     'đt hà lan', 'tuyển hà lan', 'netherlands',
     'đt bỉ', 'tuyển bỉ', 'belgium',
-    'đt argentina', 'tuyển argentina', 'argentina',
-    'đt brazil', 'tuyển brazil', 'brazil',
+    'đt argentina', 'tuyển argentina',
+    'đt brazil', 'tuyển brazil',
     'đt nhật bản', 'tuyển nhật bản', 'japan',
     'đt hàn quốc', 'tuyển hàn quốc', 'korea',
     'đt ai cập', 'tuyển ai cập', 'ai cập', 'egypt',
@@ -673,6 +673,13 @@ function classifyFootballPriority(name, group = '') {
     'đt senegal', 'senegal', 'đt nigeria', 'nigeria', 'đt mali', 'mali'
   ];
   if (bigTeams.some((t) => q.includes(t))) {
+    return { priorityLevel: 2, isVietnam: false, isFamous: true };
+  }
+
+  // Match Argentina / Brazil as actual playing teams (avoid league names like VĐQG Argentina)
+  const isArgentinaOrBrazilPlaying = /(^|[\s⚽/–—-])(argentina|brazil)([\s/–—-]*(vs|v|\(|$))/i.test(q) ||
+                                     /(vs|v)\s*(argentina|brazil)([\s/–—-]|\(|$)/i.test(q);
+  if (isArgentinaOrBrazilPlaying) {
     return { priorityLevel: 2, isVietnam: false, isFamous: true };
   }
 

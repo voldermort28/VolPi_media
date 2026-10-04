@@ -293,8 +293,8 @@ class IptvChannelModel {
       'đt bồ đào nha', 'tuyển bồ đào nha', 'portugal',
       'đt hà lan', 'tuyển hà lan', 'netherlands',
       'đt bỉ', 'tuyển bỉ', 'belgium',
-      'đt argentina', 'tuyển argentina', 'argentina',
-      'đt brazil', 'tuyển brazil', 'brazil',
+      'đt argentina', 'tuyển argentina',
+      'đt brazil', 'tuyển brazil',
       'đt nhật bản', 'tuyển nhật bản', 'japan',
       'đt hàn quốc', 'tuyển hàn quốc', 'korea',
       'đt ai cập', 'tuyển ai cập', 'ai cập', 'egypt',
@@ -309,6 +309,13 @@ class IptvChannelModel {
       if (q.contains(t)) {
         return const FootballPriorityResult(priorityLevel: 2, isFamous: true, isVietnam: false, isHot: true);
       }
+    }
+
+    // Match Argentina / Brazil as actual playing teams (avoid league names like VĐQG Argentina)
+    final bool isArgentinaOrBrazilPlaying = RegExp(r'(^|[\s⚽/–—-])(argentina|brazil)([\s/–—-]*(vs|v|\(|$))').hasMatch(q) ||
+        RegExp(r'(vs|v)\s*(argentina|brazil)([\s/–—-]|\(|$)').hasMatch(q);
+    if (isArgentinaOrBrazilPlaying) {
+      return const FootballPriorityResult(priorityLevel: 2, isFamous: true, isVietnam: false, isHot: true);
     }
 
     // 2b. Major & Famous Worldwide Leagues (Priority 2)
