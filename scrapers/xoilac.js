@@ -342,149 +342,187 @@ async function getLiveMatches() {
     const currentBaseUrl = resolvedBaseUrl || baseUrl;
     const $ = cheerio.load(res.data);
     const matches = [];
+    const seenSlugs = new Set();
 
-    $('a[href*="/truc-tiep/"]').each((_, el) => {
-      const $link = $(el);
-      const href = $link.attr('href') || '';
-      if (!href.startsWith('/truc-tiep/') || href.includes('/link/')) return;
+    function parseCheerioCards($doc, isHotSource = false) {
+      $doc('a[href*="/truc-tiep/"]').each((_, el) => {
+        const $link = $doc(el);
+        const href = $link.attr('href') || '';
+        if (!href.startsWith('/truc-tiep/') || href.includes('/link/')) return;
 
-      const $card = $link.closest('.grid-match-item, .grid-matches__item, .grid-match, div[class*="grid-match"]');
+        const $card = $link.closest('.grid-match-item, .grid-matches__item, .grid-match, div[class*="grid-match"]');
 
-      // STRICT FILTER: ONLY FOOTBALL MATCHES (Exclude Basketball, Tennis, Badminton, Volleyball, Esports...)
-      const dataSport = ($card.attr('data-sport') || '').toLowerCase().trim();
-      if (dataSport && dataSport !== 'football') return;
+        // STRICT FILTER: ONLY FOOTBALL MATCHES (Exclude Basketball, Tennis, Badminton, Volleyball, Esports...)
+        const dataSport = ($card.attr('data-sport') || '').toLowerCase().trim();
+        if (dataSport && dataSport !== 'football') return;
 
-      const cardClass = ($card.attr('class') || '').toLowerCase();
-      if (cardClass.includes('dota') || cardClass.includes('tennis') || cardClass.includes('basketball') ||
-          cardClass.includes('volleyball') || cardClass.includes('badminton') || cardClass.includes('esport')) {
-        return;
-      }
-
-      const hrefLower = href.toLowerCase();
-      if (hrefLower.includes('basketball') || hrefLower.includes('tennis') || hrefLower.includes('badminton') ||
-          hrefLower.includes('volleyball') || hrefLower.includes('esports') || hrefLower.includes('dota')) {
-        return;
-      }
-
-      const title = $link.attr('title') || '';
-      
-      let time = $card.find('.grid-match__date').text().trim() ||
-                 $card.find('.time, .t_time').attr('data-time') ||
-                 $card.find('.time, .t_time').text().trim();
-      
-      const league = $card.find('.grid-match__league, .grid-match__league-name').first().text().trim() || 'Bóng đá';
-      const homeTeam = $card.find('.grid-match__team--home-name, .team--home .team-name, .home-team').first().text().trim() || 'Đội nhà';
-      const awayTeam = $card.find('.grid-match__team--away-name, .team--away .team-name, .away-team').first().text().trim() || 'Đội khách';
-      let homeLogo = $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('src') ||
-                     $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('data-src') || '';
-      let awayLogo = $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('src') ||
-                     $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('data-src') || '';
-
-      if (homeLogo && homeLogo.startsWith('//')) homeLogo = 'https:' + homeLogo;
-      else if (homeLogo && homeLogo.startsWith('/')) homeLogo = currentBaseUrl + homeLogo;
-      if (awayLogo && awayLogo.startsWith('//')) awayLogo = 'https:' + awayLogo;
-      else if (awayLogo && awayLogo.startsWith('/')) awayLogo = currentBaseUrl + awayLogo;
-
-      // STRICT FILTER 2: Check logo URLs for esports / non-football games
-      const logoText = `${homeLogo} ${awayLogo}`.toLowerCase();
-      if (logoText.includes('/dota') || logoText.includes('/csgo') || logoText.includes('/cs2') ||
-          logoText.includes('/lol/') || logoText.includes('/crossfire') || logoText.includes('/esport')) {
-        return;
-      }
-
-      if (!time && title) {
-        const matchTime = title.match(/lúc\s+(\d{1,2}:\d{2})\s+ngày\s+(\d{1,2}\/\d{1,2})/i);
-        if (matchTime) {
-          time = `${matchTime[1]} - ${matchTime[2]}`;
+        const cardClass = ($card.attr('class') || '').toLowerCase();
+        if (cardClass.includes('dota') || cardClass.includes('tennis') || cardClass.includes('basketball') ||
+            cardClass.includes('volleyball') || cardClass.includes('badminton') || cardClass.includes('esport')) {
+          return;
         }
-      }
 
-      const statusText = $card.find('.grid-match__status, .match-status, .badge, .time-status, .live-badge').text().trim();
-      const matchSlug = href.replace('/truc-tiep/', '').replace(/\/$/, '');
-      if (!matchSlug || matches.some((m) => m.slug === matchSlug)) return;
+        const hrefLower = href.toLowerCase();
+        if (hrefLower.includes('basketball') || hrefLower.includes('tennis') || hrefLower.includes('badminton') ||
+            hrefLower.includes('volleyball') || hrefLower.includes('esports') || hrefLower.includes('dota')) {
+          return;
+        }
 
-      // STRICT FILTER 3: Non-football keywords in league, teams, slug
-      const allSportText = `${league} ${homeTeam} ${awayTeam} ${matchSlug} ${title}`.toLowerCase();
-      const nonFootballPatterns = [
-        'esport', 'dota', 'blast slam', 'stake ranked', 'winline', 'fox legacy',
-        'cs:go', 'cs2', 'counter-strike', 'league of legends', 'emea masters',
-        'crossfire', 'đột kích', 'demacia cup', 'cct 20', 'esl pro league', 'european pro league',
-        'valorant', 'pubg', 'arena of valor', 'tốc chiến', 'liên quân',
-        'bóng rổ', 'basketball', 'nba', 'cba', 'vba',
-        'tennis', 'quần vợt', 'atp', 'wta',
-        'badminton', 'cầu lông', 'bwf',
-        'volleyball', 'bóng chuyền', 'vnl',
-        'bóng bàn', 'table tennis', 'ittf',
-        'boxing', 'mma', 'ufc', 'one championship',
-        'billiards', 'bi-a', 'snooker', 'pool 9',
-        'f1', 'formula', 'đua xe', 'motogp',
-        'baseball', 'bóng chày', 'mlb',
-        'rugby', 'bóng bầu dục', 'nfl'
-      ];
-      if (nonFootballPatterns.some((p) => allSportText.includes(p))) return;
+        const title = $link.attr('title') || '';
+        
+        let time = $card.find('.grid-match__date').text().trim() ||
+                   $card.find('.time, .t_time').attr('data-time') ||
+                   $card.find('.time, .t_time').text().trim();
+        
+        const league = $card.find('.grid-match__league, .grid-match__league-name').first().text().trim() || 'Bóng đá';
+        const homeTeam = $card.find('.grid-match__team--home-name, .team--home .team-name, .home-team').first().text().trim() || 'Đội nhà';
+        const awayTeam = $card.find('.grid-match__team--away-name, .team--away .team-name, .away-team').first().text().trim() || 'Đội khách';
+        let homeLogo = $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('src') ||
+                       $card.find('.team-logo-group-home-logo img, .team--home img, .home-logo img').first().attr('data-src') || '';
+        let awayLogo = $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('src') ||
+                       $card.find('.team-logo-group-away-logo img, .team--away img, .away-logo img').first().attr('data-src') || '';
 
-      // Check date in slug (e.g. luc-1000-ngay-26-09-2026): drop stale matches from days ago
-      const slugDateMatch = matchSlug.match(/ngay-(\d{1,2})-(\d{1,2})-(\d{4})/);
-      if (slugDateMatch) {
-        const sDay = parseInt(slugDateMatch[1], 10);
-        const sMonth = parseInt(slugDateMatch[2], 10) - 1;
-        const sYear = parseInt(slugDateMatch[3], 10);
-        const slugDate = new Date(sYear, sMonth, sDay);
-        const now = new Date();
-        const diffDays = (now - slugDate) / (1000 * 60 * 60 * 24);
-        if (diffDays > 1.5) return;
-      }
+        if (homeLogo && homeLogo.startsWith('//')) homeLogo = 'https:' + homeLogo;
+        else if (homeLogo && homeLogo.startsWith('/')) homeLogo = currentBaseUrl + homeLogo;
+        if (awayLogo && awayLogo.startsWith('//')) awayLogo = 'https:' + awayLogo;
+        else if (awayLogo && awayLogo.startsWith('/')) awayLogo = currentBaseUrl + awayLogo;
 
-      const timeParsed = parseXoilacTime(time, statusText);
+        // STRICT FILTER 2: Check logo URLs for esports / non-football games
+        const logoText = `${homeLogo} ${awayLogo}`.toLowerCase();
+        if (logoText.includes('/dota') || logoText.includes('/csgo') || logoText.includes('/cs2') ||
+            logoText.includes('/lol/') || logoText.includes('/crossfire') || logoText.includes('/esport')) {
+          return;
+        }
 
-      // STRICT FILTER 4: Expired / Ended match filtering (within 90-105m)
-      if (timeParsed.isFinished) return;
-
-      if (timeParsed.ts > 0) {
-        const now = Date.now();
-        const elapsedMin = (now - timeParsed.ts) / (60 * 1000);
-        if (elapsedMin > 0) {
-          // If match started > 105m ago (1h45m - ended 90 mins):
-          // Drop non-live matches. If marked live (delays/penalties), allow up to 135m max.
-          if (elapsedMin > (timeParsed.isLive ? 135 : 105)) {
-            return;
+        if (!time && title) {
+          const matchTime = title.match(/lúc\s+(\d{1,2}:\d{2})\s+ngày\s+(\d{1,2}\/\d{1,2})/i);
+          if (matchTime) {
+            time = `${matchTime[1]} - ${matchTime[2]}`;
           }
         }
+
+        const statusText = $card.find('.grid-match__status, .match-status, .badge, .time-status, .live-badge').text().trim();
+        const matchSlug = href.replace('/truc-tiep/', '').replace(/\/$/, '');
+        if (!matchSlug) return;
+
+        if (seenSlugs.has(matchSlug)) {
+          if (isHotSource) {
+            const existing = matches.find((m) => m.slug === matchSlug);
+            if (existing) {
+              existing.isHot = true;
+              if (existing.priority && existing.priority.level > 2) {
+                existing.priority.level = 2;
+                existing.isFamous = true;
+              }
+            }
+          }
+          return;
+        }
+
+        // STRICT FILTER 3: Non-football keywords in league, teams, slug
+        const allSportText = `${league} ${homeTeam} ${awayTeam} ${matchSlug} ${title}`.toLowerCase();
+        const nonFootballPatterns = [
+          'esport', 'dota', 'blast slam', 'stake ranked', 'winline', 'fox legacy',
+          'cs:go', 'cs2', 'counter-strike', 'league of legends', 'emea masters',
+          'crossfire', 'đột kích', 'demacia cup', 'cct 20', 'esl pro league', 'european pro league',
+          'valorant', 'pubg', 'arena of valor', 'tốc chiến', 'liên quân',
+          'bóng rổ', 'basketball', 'nba', 'cba', 'vba',
+          'tennis', 'quần vợt', 'atp', 'wta',
+          'badminton', 'cầu lông', 'bwf',
+          'volleyball', 'bóng chuyền', 'vnl',
+          'bóng bàn', 'table tennis', 'ittf',
+          'boxing', 'mma', 'ufc', 'one championship',
+          'billiards', 'bi-a', 'snooker', 'pool 9',
+          'f1', 'formula', 'đua xe', 'motogp',
+          'baseball', 'bóng chày', 'mlb',
+          'rugby', 'bóng bầu dục', 'nfl'
+        ];
+        if (nonFootballPatterns.some((p) => allSportText.includes(p))) return;
+
+        // Check date in slug (e.g. luc-1000-ngay-26-09-2026): drop stale matches from days ago
+        const slugDateMatch = matchSlug.match(/ngay-(\d{1,2})-(\d{1,2})-(\d{4})/);
+        if (slugDateMatch) {
+          const sDay = parseInt(slugDateMatch[1], 10);
+          const sMonth = parseInt(slugDateMatch[2], 10) - 1;
+          const sYear = parseInt(slugDateMatch[3], 10);
+          const slugDate = new Date(sYear, sMonth, sDay);
+          const now = new Date();
+          const diffDays = (now - slugDate) / (1000 * 60 * 60 * 24);
+          if (diffDays > 1.5) return;
+        }
+
+        const timeParsed = parseXoilacTime(time, statusText);
+
+        // STRICT FILTER 4: Expired / Ended match filtering (within 90-105m)
+        if (timeParsed.isFinished) return;
+
+        if (timeParsed.ts > 0) {
+          const now = Date.now();
+          const elapsedMin = (now - timeParsed.ts) / (60 * 1000);
+          if (elapsedMin > 0) {
+            // If match started > 105m ago (1h45m - ended 90 mins):
+            // Drop non-live matches. If marked live (delays/penalties), allow up to 135m max.
+            if (elapsedMin > (timeParsed.isLive ? 135 : 105)) {
+              return;
+            }
+          }
+        }
+
+        // Tham chiếu trực tiếp tab "Trận Hot" của Xôi Lạc (data-hot="1" hoặc nguồn hot filter)
+        const dataHot = $card.attr('data-hot');
+        const isXoilacHot = isHotSource || dataHot === '1' || dataHot === 1;
+
+        const matchObj = {
+          id: `xoilac:${matchSlug}`,
+          slug: matchSlug,
+          title: '',
+          homeTeam,
+          awayTeam,
+          homeLogo,
+          awayLogo,
+          league,
+          time: time || 'Đang diễn ra',
+          href: `${currentBaseUrl}${href}`,
+          isHot: isXoilacHot,
+        };
+
+        const priority = getTeamPriority(matchObj);
+        matchObj.priority = priority;
+        matchObj.isFamous = !!priority.isFamous || isXoilacHot;
+        matchObj.isVietnam = !!priority.isVietnam;
+
+        const fullTitle = `${homeTeam} vs ${awayTeam}`;
+        const prefix = priority.tag ? `${priority.tag} ` : '';
+        const timeStr = time ? `[${time}] ` : '';
+        matchObj.title = `${prefix}${timeStr}${fullTitle} (${league})`;
+
+        matchObj.isLive = timeParsed.isLive;
+        matchObj.matchTimestamp = timeParsed.ts;
+
+        seenSlugs.add(matchSlug);
+        matches.push(matchObj);
+      });
+    }
+
+    // 1. Fetch & parse "Trận Hot" filter tab (to capture all 26 hot matches including upcoming ones)
+    try {
+      const resHot = await axios.get(`${currentBaseUrl}/sport/football/filter/hot`, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Referer': currentBaseUrl + '/',
+        },
+        timeout: 6000,
+      });
+      if (resHot.data && resHot.data.success && resHot.data.data && Array.isArray(resHot.data.data.htmls)) {
+        const hotHtml = resHot.data.data.htmls.join('\n');
+        parseCheerioCards(cheerio.load(hotHtml), true);
       }
+    } catch (e) {}
 
-      // Tham chiếu trực tiếp tab "Trận Hot" của Xôi Lạc (data-hot="1")
-      const dataHot = $card.attr('data-hot');
-      const isXoilacHot = dataHot === '1' || dataHot === 1;
-
-      const matchObj = {
-        id: `xoilac:${matchSlug}`,
-        slug: matchSlug,
-        title: '',
-        homeTeam,
-        awayTeam,
-        homeLogo,
-        awayLogo,
-        league,
-        time: time || 'Đang diễn ra',
-        href: `${currentBaseUrl}${href}`,
-        isHot: isXoilacHot,
-      };
-
-      const priority = getTeamPriority(matchObj);
-      matchObj.priority = priority;
-      matchObj.isFamous = !!priority.isFamous;
-      matchObj.isVietnam = !!priority.isVietnam;
-
-      const fullTitle = `${homeTeam} vs ${awayTeam}`;
-      const prefix = priority.tag ? `${priority.tag} ` : '';
-      const timeStr = time ? `[${time}] ` : '';
-      matchObj.title = `${prefix}${timeStr}${fullTitle} (${league})`;
-
-      matchObj.isLive = timeParsed.isLive;
-      matchObj.matchTimestamp = timeParsed.ts;
-
-      matches.push(matchObj);
-    });
+    // 2. Parse Homepage (Live / ongoing matches)
+    parseCheerioCards($, false);
 
     // Helper to identify matches currently ongoing within 90 mins
     const isOngoingMatch = (m) => {

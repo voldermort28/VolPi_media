@@ -147,7 +147,7 @@
         </span>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
         <!-- Yumei Anime Domain Box -->
         <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-purple-500">
@@ -263,6 +263,45 @@
           </div>
         </div>
 
+        <!-- Socolive Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-emerald-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">📺</span>
+              <span>Socolive TV</span>
+            </div>
+            <span id="socolive-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-socolive-domain" placeholder="https://webfifa55.live" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setSocoliveDomain('https://webfifa55.live')" class="text-[11px] bg-slate-800 hover:bg-emerald-600/30 hover:border-emerald-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                webfifa55.live ⭐
+              </button>
+              <button type="button" onclick="setSocoliveDomain('https://socolivetvz.top')" class="text-[11px] bg-slate-800 hover:bg-emerald-600/30 hover:border-emerald-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                socolivetvz.top
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('socolive')" id="btn-test-socolive" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
       </div>
 
       <!-- Save Button -->
@@ -285,7 +324,7 @@
         <span class="text-xs text-slate-400">Hỗ trợ 1-Click mở trên Stremio Mobile, Android TV, Desktop</span>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         
         <!-- Yumei Anime Addon Card -->
         <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-purple-500/40 transition">
@@ -327,6 +366,29 @@
               <span>Cài Vào Stremio</span>
             </a>
             <button type="button" onclick="copyManifestUrl('xoilac')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Socolive Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-emerald-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">📺</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-bold">Mới ⭐</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">Socolive TV (Bóng Đá)</h3>
+            <p class="text-xs text-slate-400 mt-1">Nguồn phát bóng đá độc lập với dàn BLV Socolive tiếng Việt nổi tiếng, dự phòng khi Xoilac bị sập.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-socolive-install" href="/socolive/manifest.json" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('socolive')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
               <span>Sao chép Link</span>
             </button>
@@ -492,6 +554,9 @@
     const hostWithPort = window.location.host;
     document.getElementById('link-yumei-install').href = 'stremio://' + hostWithPort + '/yumei/manifest.json';
     document.getElementById('link-xoilac-install').href = 'stremio://' + hostWithPort + '/xoilac/manifest.json';
+    if (document.getElementById('link-socolive-install')) {
+      document.getElementById('link-socolive-install').href = 'stremio://' + hostWithPort + '/socolive/manifest.json';
+    }
     document.getElementById('link-vlxx-install').href = 'stremio://' + hostWithPort + '/vlxx/manifest.json';
     document.getElementById('link-combo-install').href = 'stremio://' + hostWithPort + '/manifest.json';
 
@@ -526,6 +591,7 @@
       let url = origin + '/manifest.json';
       if (type === 'yumei') url = origin + '/yumei/manifest.json';
       if (type === 'xoilac') url = origin + '/xoilac/manifest.json';
+      if (type === 'socolive') url = origin + '/socolive/manifest.json';
       if (type === 'vlxx') url = origin + '/vlxx/manifest.json';
 
       navigator.clipboard.writeText(url).then(function() {
@@ -543,6 +609,12 @@
       document.getElementById('input-xoilac-domain').value = url;
     }
 
+    function setSocoliveDomain(url) {
+      if (document.getElementById('input-socolive-domain')) {
+        document.getElementById('input-socolive-domain').value = url;
+      }
+    }
+
     function setVlxxDomain(url) {
       document.getElementById('input-vlxx-domain').value = url;
     }
@@ -555,6 +627,9 @@
         if (data.config) {
           if (document.getElementById('input-yumei-domain')) {
             document.getElementById('input-yumei-domain').value = data.config.yumeiBaseUrl || '';
+          }
+          if (document.getElementById('input-socolive-domain')) {
+            document.getElementById('input-socolive-domain').value = data.config.socoliveBaseUrl || '';
           }
           document.getElementById('input-xoilac-domain').value = data.config.xoilacBaseUrl || '';
           document.getElementById('input-vlxx-domain').value = data.config.vlxxBaseUrl || '';
@@ -585,6 +660,10 @@
         inputEl = document.getElementById('input-xoilac-domain');
         badgeEl = document.getElementById('xoilac-status-badge');
         btnEl = document.getElementById('btn-test-xoilac');
+      } else if (type === 'socolive') {
+        inputEl = document.getElementById('input-socolive-domain');
+        badgeEl = document.getElementById('socolive-status-badge');
+        btnEl = document.getElementById('btn-test-socolive');
       } else {
         inputEl = document.getElementById('input-vlxx-domain');
         badgeEl = document.getElementById('vlxx-status-badge');
@@ -636,6 +715,7 @@
 
     async function saveAllConfig() {
       const yumeiBaseUrl = document.getElementById('input-yumei-domain') ? document.getElementById('input-yumei-domain').value.trim() : '';
+      const socoliveBaseUrl = document.getElementById('input-socolive-domain') ? document.getElementById('input-socolive-domain').value.trim() : '';
       const xoilacBaseUrl = document.getElementById('input-xoilac-domain').value.trim();
       const vlxxBaseUrl = document.getElementById('input-vlxx-domain').value.trim();
       const saveBtn = document.getElementById('btn-save-config');
@@ -647,7 +727,7 @@
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ yumeiBaseUrl: yumeiBaseUrl, xoilacBaseUrl: xoilacBaseUrl, vlxxBaseUrl: vlxxBaseUrl }),
+          body: JSON.stringify({ yumeiBaseUrl: yumeiBaseUrl, xoilacBaseUrl: xoilacBaseUrl, socoliveBaseUrl: socoliveBaseUrl, vlxxBaseUrl: vlxxBaseUrl }),
         });
         const data = await res.json();
 

@@ -557,10 +557,11 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl, socoliveBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
+      socoliveScraper.clearCache();
       vlxxScraper.clearCache();
       yumeiScraper.clearCache();
       logoCache.clear();
@@ -639,6 +640,28 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
         return res.json({ success: true, count: 4 });
       } else {
         return res.json({ success: false, error: "Không lấy được dữ liệu thư viện từ domain này" });
+      }
+    } else if (type === "socolive") {
+      const response = await axios.get(cleanUrl, {
+        headers: {
+          "User-Agent": socoliveScraper.USER_AGENT,
+          "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $(".match-item, [data-match-id], a[href*=\"/truc-tiep/\"]");
+      if (items.length > 0) {
+        return res.json({ success: true, count: items.length, redirectedUrl: finalOrigin });
+      } else {
+        return res.json({ success: false, error: "Trang web phản hồi nhưng không tìm thấy danh sách trận đấu của Socolive" });
       }
     }
 
