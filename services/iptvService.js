@@ -220,6 +220,11 @@ function convertFlvToHls(url) {
   if (!url || typeof url !== 'string') return url;
   let u = url.trim();
 
+  // 0. Socolive scstream.net -> pull.niues.live
+  if (u.match(/pull[0-9]+\.scstream\.net/i)) {
+    return u.replace(/^https?:\/\/pull[0-9]+\.scstream\.net\//i, 'https://pull.niues.live/').replace(/\.flv(?=([?#]|$))/i, '.m3u8');
+  }
+
   // 1. cdnflv.xbdbotv.live/live/{ID}.flv -> https://cdnhls.xbdbotv.live/live/{ID}/index.m3u8
   if (u.includes('cdnflv.xbdbotv.live/live/')) {
     return u.replace('cdnflv.xbdbotv.live/live/', 'cdnhls.xbdbotv.live/live/').replace(/\.flv(\?|$)/i, '/index.m3u8$1');
@@ -1260,7 +1265,11 @@ async function handleStreamProxy(req, res) {
     return res.status(400).send('Invalid or missing stream URL parameter');
   }
 
-  const targetUrl = convertFlvToHls(rawTarget);
+  let targetUrl = convertFlvToHls(rawTarget);
+  // inplyr.com aborts SSL handshake on port 443; route via plain HTTP port 80 upstream
+  if (targetUrl.includes('live.inplyr.com')) {
+    targetUrl = targetUrl.replace('https://live.inplyr.com', 'http://live.inplyr.com');
+  }
   const referer = req.query.ref || '';
   const userAgent = req.query.ua || '';
 

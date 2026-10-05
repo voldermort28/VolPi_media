@@ -546,10 +546,54 @@ async function getMatchDetails(slug) {
   };
 }
 
+let livingRoomCache = [];
+let lastLivingRoomFetch = 0;
+
+/**
+ * Lấy danh sách phòng livestream BLV đang hoạt động từ CDN API chính thức của Socolive
+ */
+async function getLivingRooms() {
+  const now = Date.now();
+  if (now - lastLivingRoomFetch < 15000 && livingRoomCache.length > 0) {
+    return livingRoomCache;
+  }
+  try {
+    const res = await axios.get('https://biz.vnres.co/api/live/livingRoom', {
+      headers: {
+        'User-Agent': USER_AGENT,
+        'Accept': 'application/json',
+      },
+      timeout: 5000,
+    });
+    if (Array.isArray(res.data)) {
+      livingRoomCache = res.data;
+      lastLivingRoomFetch = now;
+      return livingRoomCache;
+    }
+  } catch (e) {
+    console.error('Error fetching Socolive livingRoom:', e.message);
+  }
+  return livingRoomCache;
+}
+
+/**
+ * Chuẩn hóa URL stream của Socolive sang luồng HLS m3u8 có HTTPS hợp lệ:
+ * CDN chính thức scstream.net -> pull.niues.live (có chứng chỉ SSL hợp lệ)
+ * Đổi .flv -> .m3u8
+ */
+function formatSocoliveStreamUrl(rawUrl) {
+  if (!rawUrl) return '';
+  let streamUrl = rawUrl;
+  streamUrl = streamUrl.replace(/^https?:\/\/pull[0-9]+\.scstream\.net\//i, 'https://pull.niues.live/');
+  streamUrl = streamUrl.replace(/\.flv(?=([?#]|$))/i, '.m3u8');
+  return streamUrl;
+}
+
 async function getMatchStreams(slug) {
   const streams = [];
   const baseUrl = resolvedBaseUrl || getBaseUrl();
   const matchUrl = `${baseUrl}/truc-tiep/${slug}/`;
+  const host = process.env.BASE_HOST || 'https://stremio.laboon.vn';
 
   try {
     const pageRes = await axios.get(matchUrl, {
@@ -580,9 +624,6 @@ async function getMatchStreams(slug) {
       } catch (e) {}
     }
 
-    const playerHost = (streamData && streamData.playerHost)
-      ? streamData.playerHost.replace(/\\\//g, '/')
-      : 'https://live.inplyr.com';
     const matchId = (streamData && streamData.matchId) || '';
 
     // 2. Parse BLV anchors from page
@@ -594,8 +635,9 @@ async function getMatchStreams(slug) {
       streamData.anchors.forEach((a) => {
         if (a && (a.uid || a.roomID)) {
           anchors.push({
-            uid: a.uid || a.roomID,
-            name: a.name || a.streamer_name || 'BLV',
+            uid: String(a.uid || a.roomID),
+            roomID: String(a.roomID || a.uid || ''),
+            name: a.nickName || a.name || a.streamer_name || 'BLV',
           });
         }
       });
@@ -608,50 +650,98 @@ async function getMatchStreams(slug) {
       const m = href.match(/[?&]blv=([^&]+)/);
       const name = $a.find('span').text().trim() || $a.text().trim();
       if (m && m[1]) {
-        if (!anchors.some((x) => x.uid === m[1])) {
-          anchors.push({ uid: m[1], name: name || 'BLV' });
+        const uidStr = String(m[1]);
+        if (!anchors.some((x) => x.uid === uidStr)) {
+          anchors.push({ uid: uidStr, roomID: uidStr, name: name || 'BLV' });
         }
       }
     });
 
+    // 3. Lấy danh sách luồng phát trực tiếp CDN Socolive đang hoạt động
+    const livingRooms = await getLivingRooms();
+    const lrMap = new Map();
+    if (Array.isArray(livingRooms)) {
+      livingRooms.forEach((item) => {
+        if (item && item.id && item.stream) {
+          lrMap.set(String(item.id), item.stream);
+        }
+      });
+    }
+
     const seenUrls = new Set();
 
-    // 3. Generate Commentator Streams
+    // 4. Ưu tiên hàng đầu: Các luồng BLV ĐANG PHÁT TRỰC TIẾP (CDN HTTPS xịn, độ trễ cực thấp, không lỗi SSL)
     for (let i = 0; i < anchors.length; i++) {
       const anchor = anchors[i];
-      const streamUrl = `${playerHost}/room/${anchor.uid}.m3u8`;
-      if (!seenUrls.has(streamUrl)) {
-        seenUrls.add(streamUrl);
-        const label = anchor.name.toUpperCase().includes('BLV') ? anchor.name : `BLV ${anchor.name}`;
-        streams.push({
-          name: `Socolive • ${label}`,
-          title: label,
-          url: streamUrl,
-          headers: {
-            'Referer': finalMatchUrl,
-            'User-Agent': USER_AGENT,
-            'Origin': baseUrl,
-          },
-          behaviorHints: {
-            notWebReady: false,
-          },
-        });
+      const activeStream = lrMap.get(anchor.uid) || lrMap.get(anchor.roomID);
+
+      if (activeStream) {
+        const streamUrl = formatSocoliveStreamUrl(activeStream);
+        if (!seenUrls.has(streamUrl)) {
+          seenUrls.add(streamUrl);
+          const label = anchor.name.toUpperCase().includes('BLV') ? anchor.name : `BLV ${anchor.name}`;
+          streams.push({
+            name: `Socolive • ${label}`,
+            title: `${label} - Trực Tiếp (Full HD)`,
+            url: streamUrl,
+            headers: {
+              'Referer': finalMatchUrl,
+              'User-Agent': USER_AGENT,
+              'Origin': baseUrl,
+            },
+            behaviorHints: {
+              notWebReady: false,
+              proxyHeaders: {
+                request: {
+                  'User-Agent': USER_AGENT,
+                  'Referer': finalMatchUrl,
+                },
+              },
+            },
+          });
+        }
       }
     }
 
-    // 4. Generate Main / Default Match Stream
+    // 5. Luồng Dự Phòng (Qua Backend HTTPS Proxy để tránh lỗi SSL từ live.inplyr.com)
+    for (let i = 0; i < anchors.length; i++) {
+      const anchor = anchors[i];
+      const hasActive = lrMap.has(anchor.uid) || lrMap.has(anchor.roomID);
+      if (!hasActive) {
+        const rawFallback = `http://live.inplyr.com/room/${anchor.uid}.m3u8`;
+        const proxiedUrl = `${host}/api/iptv/stream-proxy?url=${encodeURIComponent(rawFallback)}&ref=${encodeURIComponent(finalMatchUrl)}`;
+        if (!seenUrls.has(proxiedUrl)) {
+          seenUrls.add(proxiedUrl);
+          const label = anchor.name.toUpperCase().includes('BLV') ? anchor.name : `BLV ${anchor.name}`;
+          streams.push({
+            name: `Socolive • ${label} (Dự phòng)`,
+            title: `${label} (Dự phòng)`,
+            url: proxiedUrl,
+            headers: {
+              'Referer': finalMatchUrl,
+              'User-Agent': USER_AGENT,
+            },
+            behaviorHints: {
+              notWebReady: false,
+            },
+          });
+        }
+      }
+    }
+
+    // 6. Luồng Kênh Mặc Định (Qua Backend HTTPS Proxy)
     if (matchId) {
-      const defaultUrl = `${playerHost}/default/${matchId}.m3u8`;
-      if (!seenUrls.has(defaultUrl)) {
-        seenUrls.add(defaultUrl);
+      const rawDefault = `http://live.inplyr.com/default/${matchId}.m3u8`;
+      const proxiedDefault = `${host}/api/iptv/stream-proxy?url=${encodeURIComponent(rawDefault)}&ref=${encodeURIComponent(finalMatchUrl)}`;
+      if (!seenUrls.has(proxiedDefault)) {
+        seenUrls.add(proxiedDefault);
         streams.push({
-          name: 'Socolive • Kênh Mặc Định (HD)',
-          title: 'Kênh Mặc Định (HD)',
-          url: defaultUrl,
+          name: 'Socolive • Kênh Mặc Định (Dự phòng)',
+          title: 'Kênh Mặc Định (Dự phòng)',
+          url: proxiedDefault,
           headers: {
             'Referer': finalMatchUrl,
             'User-Agent': USER_AGENT,
-            'Origin': baseUrl,
           },
           behaviorHints: {
             notWebReady: false,
@@ -660,27 +750,31 @@ async function getMatchStreams(slug) {
       }
     }
 
-    // 5. Fallback: Parse any direct .m3u8 stream links embedded in the page
+    // 7. Fallback: Parse các liên kết .m3u8 trực tiếp được nhúng trong trang (Bọc qua proxy nếu là inplyr)
     const m3u8Matches = html.matchAll(/["'](https?:\/\/[^"']+\.m3u8[^"']*)["']/gi);
     let fallbackIdx = 1;
     for (const m of m3u8Matches) {
-      const foundUrl = m[1].replace(/\\\//g, '/');
-      if (!seenUrls.has(foundUrl) && !foundUrl.includes('test') && !foundUrl.includes('banner')) {
-        seenUrls.add(foundUrl);
-        streams.push({
-          name: `Socolive • Kênh Dự Phòng #${fallbackIdx}`,
-          title: `Kênh Dự Phòng #${fallbackIdx}`,
-          url: foundUrl,
-          headers: {
-            'Referer': finalMatchUrl,
-            'User-Agent': USER_AGENT,
-            'Origin': baseUrl,
-          },
-          behaviorHints: {
-            notWebReady: false,
-          },
-        });
-        fallbackIdx++;
+      let foundUrl = m[1].replace(/\\\//g, '/');
+      if (!foundUrl.includes('test') && !foundUrl.includes('banner')) {
+        if (foundUrl.includes('inplyr.com')) {
+          foundUrl = `${host}/api/iptv/stream-proxy?url=${encodeURIComponent(foundUrl.replace('https://', 'http://'))}&ref=${encodeURIComponent(finalMatchUrl)}`;
+        }
+        if (!seenUrls.has(foundUrl)) {
+          seenUrls.add(foundUrl);
+          streams.push({
+            name: `Socolive • Kênh Dự Phòng #${fallbackIdx}`,
+            title: `Kênh Dự Phòng #${fallbackIdx}`,
+            url: foundUrl,
+            headers: {
+              'Referer': finalMatchUrl,
+              'User-Agent': USER_AGENT,
+            },
+            behaviorHints: {
+              notWebReady: false,
+            },
+          });
+          fallbackIdx++;
+        }
       }
     }
 
