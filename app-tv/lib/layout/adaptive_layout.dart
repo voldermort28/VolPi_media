@@ -181,6 +181,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                       apiService: widget.apiService,
                       source: 'xoilac',
                       title: 'Xôi Lạc TV',
+                      isActive: _currentTabIndex == 0,
                     ),
                   ),
                   ExcludeFocus(
@@ -189,6 +190,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                       apiService: widget.apiService,
                       source: 'socolive',
                       title: 'Socolive TV',
+                      isActive: _currentTabIndex == 1,
                     ),
                   ),
                   ExcludeFocus(
@@ -197,7 +199,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 3,
-                    child: IptvScreen(apiService: widget.apiService),
+                    child: IptvScreen(
+                      apiService: widget.apiService,
+                      isActive: _currentTabIndex == 3,
+                    ),
                   ),
                 ],
               ),
@@ -289,6 +294,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
               apiService: widget.apiService,
               source: 'xoilac',
               title: 'Xôi Lạc TV',
+              isActive: _currentTabIndex == 0,
             ),
           ),
           ExcludeFocus(
@@ -297,6 +303,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
               apiService: widget.apiService,
               source: 'socolive',
               title: 'Socolive TV',
+              isActive: _currentTabIndex == 1,
             ),
           ),
           ExcludeFocus(
@@ -305,7 +312,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 3,
-            child: IptvScreen(apiService: widget.apiService),
+            child: IptvScreen(
+              apiService: widget.apiService,
+              isActive: _currentTabIndex == 3,
+            ),
           ),
         ],
       ),

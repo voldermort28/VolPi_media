@@ -8,8 +8,13 @@ import '../player/video_player_screen.dart';
 
 class IptvScreen extends StatefulWidget {
   final ApiService apiService;
+  final bool isActive;
 
-  const IptvScreen({super.key, required this.apiService});
+  const IptvScreen({
+    super.key,
+    required this.apiService,
+    this.isActive = false,
+  });
 
   @override
   State<IptvScreen> createState() => _IptvScreenState();
@@ -35,7 +40,7 @@ const List<IptvCategoryItem> kIptvCategories = [
   IptvCategoryItem(id: 'ALL', title: 'Tất cả', icon: Icons.public_rounded),
 ];
 
-class _IptvScreenState extends State<IptvScreen> {
+class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   List<IptvChannelModel> _allChannels = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
@@ -52,6 +57,7 @@ class _IptvScreenState extends State<IptvScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {
@@ -63,7 +69,25 @@ class _IptvScreenState extends State<IptvScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && widget.isActive) {
+      // Khi người dùng chuyển từ app khác (ví dụ: trình duyệt vừa thêm source) quay lại app
+      _loadChannels(forceRefresh: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant IptvScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      // Tự động làm mới danh sách kênh khi người dùng chuyển sang tab Truyền Hình (IPTV)
+      _loadChannels(forceRefresh: true);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchFocusNode.dispose();
     _firstChannelCardFocusNode.dispose();
     _searchController.dispose();
@@ -72,7 +96,7 @@ class _IptvScreenState extends State<IptvScreen> {
 
   Future<void> _loadChannels({bool forceRefresh = false, bool triggerServerFetch = false}) async {
     setState(() {
-      if (forceRefresh) {
+      if (forceRefresh && _allChannels.isNotEmpty) {
         _isRefreshing = true;
       } else {
         _isLoading = true;

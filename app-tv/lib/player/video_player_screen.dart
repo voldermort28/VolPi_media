@@ -127,7 +127,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _setVolume(double newVol) {
-    final clamped = newVol.clamp(0.0, 1.0);
+    // Làm tròn chính xác 2 chữ số thập phân để tránh sai số dấu phẩy động (vd: 0.0499999999)
+    final rounded = (newVol * 100).round() / 100.0;
+    final clamped = rounded.clamp(0.0, 1.0);
     setState(() {
       _volume = clamped;
       _isMuted = clamped == 0.0;
@@ -146,6 +148,40 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _preMuteVolume = _volume > 0.0 ? _volume : 1.0;
       _setVolume(0.0);
     }
+  }
+
+  /// Tinh chỉnh âm lượng khi cuộn chuột:
+  /// - Khi giữ phím Shift: Vi chỉnh chính xác từng 1% ở mọi mức âm lượng
+  /// - Khi cuộn thông thường:
+  ///   + Mức > 5%: Tăng/giảm nhanh mỗi nấc 5%
+  ///   + Mức <= 5%: Tự động chuyển sang nấc 1% (cho phép chỉnh về 4%, 3%, 2%, 1% và không bị tắt phụt âm thanh)
+  void _adjustVolumeScroll(bool isScrollUp, {bool isFineTune = false}) {
+    final double current = _isMuted ? 0.0 : _volume;
+    int currentPercent = (current * 100).round();
+
+    int stepPercent;
+    if (isFineTune) {
+      // Giữ phím Shift: vi chỉnh chính xác từng 1%
+      stepPercent = 1;
+    } else if (isScrollUp) {
+      // Khi tăng từ dưới 5%: tăng từng 1% (0% -> 1% -> 2% -> 3% -> 4% -> 5%)
+      // Khi từ 5% trở lên: tăng 5%
+      stepPercent = currentPercent < 5 ? 1 : 5;
+    } else {
+      // Khi giảm: nếu đang <= 5%, giảm từng 1% (5% -> 4% -> 3% -> 2% -> 1% -> 0%)
+      // Nếu đang > 5%, giảm 5%
+      stepPercent = currentPercent <= 5 ? 1 : 5;
+    }
+
+    int targetPercent = isScrollUp ? (currentPercent + stepPercent) : (currentPercent - stepPercent);
+
+    // Khi cuộn thông thường giảm từ mức lớn, căn chỉnh về bội số của 5% (vd: từ 7% -> 5%)
+    if (!isFineTune && !isScrollUp && targetPercent > 5 && targetPercent % 5 != 0) {
+      targetPercent = (targetPercent ~/ 5) * 5;
+    }
+
+    targetPercent = targetPercent.clamp(0, 100);
+    _setVolume(targetPercent / 100.0);
   }
 
   void _changeVolumeBy(double delta) {
@@ -602,10 +638,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         body: Listener(
           onPointerSignal: (pointerSignal) {
             if (_isMacOrDesktop && pointerSignal is PointerScrollEvent) {
+              final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
               if (pointerSignal.scrollDelta.dy < 0) {
-                _changeVolumeBy(0.05);
+                _adjustVolumeScroll(true, isFineTune: isShiftPressed);
               } else if (pointerSignal.scrollDelta.dy > 0) {
-                _changeVolumeBy(-0.05);
+                _adjustVolumeScroll(false, isFineTune: isShiftPressed);
               }
             }
           },

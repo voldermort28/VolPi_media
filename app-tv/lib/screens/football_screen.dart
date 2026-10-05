@@ -9,12 +9,14 @@ class FootballScreen extends StatefulWidget {
   final ApiService apiService;
   final String source;
   final String title;
+  final bool isActive;
 
   const FootballScreen({
     super.key,
     required this.apiService,
     this.source = 'xoilac',
     this.title = 'Xôi Lạc TV',
+    this.isActive = false,
   });
 
   @override
@@ -31,6 +33,14 @@ class _FootballScreenState extends State<FootballScreen> {
   void initState() {
     super.initState();
     _loadMatches(forceRefresh: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant FootballScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive && !oldWidget.isActive) {
+      _loadMatches(forceRefresh: true);
+    }
   }
 
   @override
