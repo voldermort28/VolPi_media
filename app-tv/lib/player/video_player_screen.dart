@@ -1057,7 +1057,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             children: [
                               if (widget.onPrevious != null) ...[
                                 TvFocusableCard(
-                                  onTap: widget.onPrevious,
+                                  onTap: widget.onPrevious!,
                                   borderRadius: BorderRadius.circular(30),
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
@@ -1106,7 +1106,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               if (widget.onNext != null) ...[
                                 const SizedBox(width: 24),
                                 TvFocusableCard(
-                                  onTap: widget.onNext,
+                                  onTap: widget.onNext!,
                                   borderRadius: BorderRadius.circular(30),
                                   child: Container(
                                     padding: const EdgeInsets.all(12),
