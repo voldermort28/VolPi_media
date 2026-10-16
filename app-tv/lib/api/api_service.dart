@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/match_model.dart';
+export '../models/match_model.dart';
 import '../models/anime_model.dart';
 import '../models/movie_model.dart';
 import '../models/iptv_channel_model.dart';

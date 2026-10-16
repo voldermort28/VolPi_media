@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
+import '../models/match_model.dart';
 import '../models/movie_model.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
