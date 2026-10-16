@@ -37,9 +37,16 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     }
   }
 
-  void _playEpisode(EpisodeModel ep) async {
+  void _playEpisodeAtIndex(int index, {BuildContext? replaceContext}) async {
+    final anime = _detailedAnime ?? widget.anime;
+    final episodes = anime.episodes;
+    if (index < 0 || index >= episodes.length) return;
+
+    final ep = episodes[index];
+    final targetContext = replaceContext ?? context;
+
     showDialog(
-      context: context,
+      context: targetContext,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
     );
@@ -52,7 +59,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     );
 
     if (!mounted) return;
-    Navigator.of(context).pop();
+    Navigator.of(targetContext).pop();
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -78,18 +85,28 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
 
     final variantLabel = _selectedVariant == 'SUB' ? 'Phụ Đề' : 'Thuyết Minh';
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: selectedStream.url,
-          title: '${widget.anime.name} ($variantLabel)',
-          subtitle: 'Tập ${ep.episode}: ${ep.title}',
-          headers: selectedStream.headers,
-          availableChannels: streams,
-          isLive: false,
-        ),
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: selectedStream.url,
+        title: '${widget.anime.name} ($variantLabel)',
+        subtitle: 'Tập ${ep.episode}: ${ep.title}',
+        headers: selectedStream.headers,
+        availableChannels: streams,
+        isLive: false,
+        onNext: index + 1 < episodes.length
+            ? () => _playEpisodeAtIndex(index + 1, replaceContext: playerCtx)
+            : null,
+        onPrevious: index > 0
+            ? () => _playEpisodeAtIndex(index - 1, replaceContext: playerCtx)
+            : null,
       ),
     );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
+    }
   }
 
   @override
@@ -303,7 +320,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                         itemBuilder: (context, idx) {
                                           final ep = episodes[idx];
                                           return TvFocusableCard(
-                                            onTap: () => _playEpisode(ep),
+                                            onTap: () => _playEpisodeAtIndex(idx),
                                             borderRadius: BorderRadius.circular(10),
                                             child: Container(
                                               color: const Color(0xFF1E293B),

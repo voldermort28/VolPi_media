@@ -190,104 +190,51 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     _loadMovies();
   }
 
-  void _onMovieSelected(MovieModel movie) {
+  void _playMovieAtIndex(int index, {BuildContext? replaceContext}) {
+    if (index < 0 || index >= _movies.length) return;
+
+    final movie = _movies[index];
     final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
-    final servers = isViet69
+    final List<StreamChannel> servers = isViet69
         ? widget.apiService.getViet69Streams(movie.rawId)
         : widget.apiService.getVlxxStreams(movie.rawId);
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0F172A),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      movie.title,
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white70),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                isViet69
-                    ? 'Chọn máy chủ phát Viet69 (Full HD không quảng cáo):'
-                    : 'Chọn máy chủ phát VLFilm (Full HD không quảng cáo):',
-                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              ListView.separated(
-                shrinkWrap: true,
-                itemCount: servers.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, idx) {
-                  final s = servers[idx];
-                  return TvFocusableCard(
-                    autoFocus: idx == 0,
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      _playMovieStream(movie, s);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      color: const Color(0xFF1E293B),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.play_circle_fill,
-                            color: isViet69 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E),
-                            size: 22,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              s.title,
-                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right, color: Colors.white38),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+    if (servers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy link phát cho phim này.')),
+      );
+      return;
+    }
 
-  void _playMovieStream(MovieModel movie, dynamic server) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: server.url,
-          title: movie.title,
-          subtitle: server.title,
-          isLive: false,
-        ),
+    final initialServer = servers.first;
+
+    // Auto-prefetch more movies if nearing the end
+    if (index >= _movies.length - 3 && _hasMore && !_isLoadingMore) {
+      _loadMoreMovies();
+    }
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: initialServer.url,
+        title: movie.title,
+        subtitle: initialServer.title,
+        headers: initialServer.headers,
+        availableChannels: servers,
+        isLive: false,
+        onNext: index + 1 < _movies.length
+            ? () => _playMovieAtIndex(index + 1, replaceContext: playerCtx)
+            : null,
+        onPrevious: index > 0
+            ? () => _playMovieAtIndex(index - 1, replaceContext: playerCtx)
+            : null,
       ),
     );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
+    }
   }
 
   @override
@@ -560,7 +507,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                         }
 
                                         final movie = _movies[idx];
-                                        return _buildMovieCard(movie, themeColor);
+                                        return _buildMovieCard(movie, idx, themeColor);
                                       },
                                       childCount: _movies.length,
                                       addAutomaticKeepAlives: true,
@@ -661,9 +608,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
   }
 
-  Widget _buildMovieCard(MovieModel movie, Color themeColor) {
+  Widget _buildMovieCard(MovieModel movie, int index, Color themeColor) {
     return TvFocusableCard(
-      onTap: () => _onMovieSelected(movie),
+      onTap: () => _playMovieAtIndex(index),
       focusBorderColor: themeColor,
       borderRadius: BorderRadius.circular(12),
       child: Container(

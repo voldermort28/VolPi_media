@@ -15,6 +15,8 @@ class VideoPlayerScreen extends StatefulWidget {
   final Map<String, String> headers;
   final List<StreamChannel>? availableChannels;
   final bool isLive;
+  final VoidCallback? onNext;
+  final VoidCallback? onPrevious;
 
   const VideoPlayerScreen({
     super.key,
@@ -24,6 +26,8 @@ class VideoPlayerScreen extends StatefulWidget {
     this.headers = const {},
     this.availableChannels,
     this.isLive = false,
+    this.onNext,
+    this.onPrevious,
   });
 
   @override
@@ -208,9 +212,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _switchChannel(StreamChannel channel) {
-    if (_currentStreamUrl == channel.url) return;
-    _controller.removeListener(_videoListener);
-    _controller.dispose();
+    if (_currentStreamUrl == channel.url && !_hasError) return;
+    try {
+      _controller.removeListener(_videoListener);
+      _controller.dispose();
+    } catch (_) {}
     setState(() {
       _currentStreamUrl = channel.url;
       _currentTitle = channel.title;
@@ -533,14 +539,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       autofocus: true,
       onKeyEvent: (node, event) {
         final key = event.logicalKey;
+        final bool isPrevTrack = key == LogicalKeyboardKey.mediaTrackPrevious ||
+            (_isMacOrDesktop && key == LogicalKeyboardKey.keyP);
+        final bool isNextTrack = key == LogicalKeyboardKey.mediaTrackNext ||
+            (_isMacOrDesktop && key == LogicalKeyboardKey.keyN);
+
         final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
             key == LogicalKeyboardKey.mediaRewind ||
-            key == LogicalKeyboardKey.mediaTrackPrevious;
+            (isPrevTrack && widget.onPrevious == null);
         final bool isRight = key == LogicalKeyboardKey.arrowRight ||
             key == LogicalKeyboardKey.mediaFastForward ||
-            key == LogicalKeyboardKey.mediaTrackNext;
+            (isNextTrack && widget.onNext == null);
 
         if (event is KeyDownEvent) {
+          if (isPrevTrack && widget.onPrevious != null) {
+            widget.onPrevious!();
+            return KeyEventResult.handled;
+          }
+          if (isNextTrack && widget.onNext != null) {
+            widget.onNext!();
+            return KeyEventResult.handled;
+          }
           if (key == LogicalKeyboardKey.select ||
               key == LogicalKeyboardKey.enter ||
               key == LogicalKeyboardKey.space ||
@@ -688,6 +707,55 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
+                        if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Chọn luồng phát khác để xem:',
+                            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 10),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: widget.availableChannels!.map((ch) {
+                              final bool isCurrent = ch.url == _currentStreamUrl;
+                              return TvFocusableCard(
+                                onTap: () => _switchChannel(ch),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isCurrent ? const Color(0xFFEF4444).withOpacity(0.3) : const Color(0xFF334155),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isCurrent ? Colors.redAccent : Colors.white24,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.play_circle_outline,
+                                        color: isCurrent ? Colors.redAccent : const Color(0xFF38BDF8),
+                                        size: 16,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        ch.title,
+                                        style: TextStyle(
+                                          color: isCurrent ? Colors.white70 : Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: isCurrent ? FontWeight.normal : FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ],
                         const SizedBox(height: 20),
                         TvFocusableCard(
                           onTap: _initPlayer,
@@ -987,6 +1055,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              if (widget.onPrevious != null) ...[
+                                TvFocusableCard(
+                                  onTap: widget.onPrevious,
+                                  borderRadius: BorderRadius.circular(30),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.black38,
+                                    child: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 36),
+                                  ),
+                                ),
+                                const SizedBox(width: 24),
+                              ],
                               if (!widget.isLive) ...[
                                 TvFocusableCard(
                                   onTap: () => _seekRelative(-10),
@@ -997,7 +1077,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     child: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 36),
                                   ),
                                 ),
-                                const SizedBox(width: 32),
+                                const SizedBox(width: 24),
                               ],
                               TvFocusableCard(
                                 onTap: _togglePlayPause,
@@ -1012,7 +1092,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 ),
                               ),
                               if (!widget.isLive) ...[
-                                const SizedBox(width: 32),
+                                const SizedBox(width: 24),
                                 TvFocusableCard(
                                   onTap: () => _seekRelative(10),
                                   borderRadius: BorderRadius.circular(30),
@@ -1020,6 +1100,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     padding: const EdgeInsets.all(12),
                                     color: Colors.black38,
                                     child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 36),
+                                  ),
+                                ),
+                              ],
+                              if (widget.onNext != null) ...[
+                                const SizedBox(width: 24),
+                                TvFocusableCard(
+                                  onTap: widget.onNext,
+                                  borderRadius: BorderRadius.circular(30),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    color: Colors.black38,
+                                    child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 36),
                                   ),
                                 ),
                               ],
