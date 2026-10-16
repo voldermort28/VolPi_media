@@ -1,10 +1,10 @@
 {
-  "version": "1.0.37",
-  "build": 38,
-  "tag_name": "v1.0.37",
-  "changelog": "• Tối ưu trải nghiệm phát: Mặc định chọn ngay luồng phát đầu tiên, bỏ bảng hỏi chọn server.\n• Tích hợp thanh chọn luồng phát bên dưới player (giống Xôi Lạc) và tự động hiển thị danh sách đổi server khi gặp sự cố luồng.\n• Bổ sung nút Next / Previous trên trình phát cho cả 3 tab Viet69, VLFilm và Anime (chuyển clip/tập tiếp theo & tập trước).\n• Ghi nhớ mức âm lượng (Volume Persistence) khi chuyển clip/tập phim, không bị nổ âm lượng tối đa.\n• Hỗ trợ phím tắt Remote TV (Next/Prev track) và bàn phím (P/N).",
+  "version": "1.0.38",
+  "build": 39,
+  "tag_name": "v1.0.38",
+  "changelog": "• Sửa lỗi phân trang (Infinite Scrolling): Tối ưu cơ chế phân trang dựa trên page index, khắc phục triệt để lỗi bị dừng tải chỉ sau vài chục clip, cho phép cuộn xem mượt mà hàng ngàn clip trên cả Viet69 và VLFilm.\n• Tối ưu trải nghiệm phát: Mặc định chọn ngay luồng phát đầu tiên, bỏ bảng hỏi chọn server.\n• Tích hợp thanh chọn luồng phát bên dưới player (giống Xôi Lạc) và tự động hiển thị danh sách đổi server khi gặp sự cố luồng.\n• Bổ sung nút Next / Previous trên trình phát cho cả 3 tab Viet69, VLFilm và Anime (chuyển clip/tập tiếp theo & tập trước).\n• Ghi nhớ mức âm lượng (Volume Persistence) khi chuyển clip/tập phim, không bị nổ âm lượng tối đa.\n• Hỗ trợ phím tắt Remote TV (Next/Prev track) và bàn phím (P/N).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-17T03:00:00Z"
+  "published_at": "2026-10-17T03:15:00Z"
 }

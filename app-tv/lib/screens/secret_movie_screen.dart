@@ -46,6 +46,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
+  int _currentPage = 1;
   bool _isSearching = false;
   String? _searchQuery;
 
@@ -70,7 +71,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
   void _onScroll() {
     if (_scrollController.hasClients &&
-        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 600) {
       if (!_isLoading && !_isLoadingMore && _hasMore) {
         _loadMoreMovies();
       }
@@ -82,6 +83,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _isLoading = true;
       _isLoadingMore = false;
       _hasMore = true;
+      _currentPage = 1;
       _searchQuery = search;
     });
 
@@ -102,7 +104,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       setState(() {
         _movies = results;
         _isLoading = false;
-        if (results.length < 20) {
+        if (results.isEmpty) {
           _hasMore = false;
         }
       });
@@ -116,7 +118,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _isLoadingMore = true;
     });
 
-    final currentSkip = _movies.length;
+    final nextPage = _currentPage + 1;
+    final currentSkip = (nextPage - 1) * 30;
     List<MovieModel> nextResults = [];
 
     if (_selectedSourceIndex == 0) {
@@ -138,15 +141,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         if (nextResults.isEmpty) {
           _hasMore = false;
         } else {
+          _currentPage = nextPage;
           final existingIds = _movies.map((m) => m.id).toSet();
           final uniqueNew = nextResults.where((m) => !existingIds.contains(m.id)).toList();
-          if (uniqueNew.isEmpty) {
-            _hasMore = false;
-          } else {
+          if (uniqueNew.isNotEmpty) {
             _movies.addAll(uniqueNew);
-            if (nextResults.length < 20) {
-              _hasMore = false;
-            }
           }
         }
       });
