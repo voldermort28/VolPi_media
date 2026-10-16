@@ -69,7 +69,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _commitSeekTimer;
   String? _hudSpeedBadge;
 
-  // Volume Control (Specially tailored for macOS & Desktop)
+  // Volume Control (Remembered across clip and episode transitions)
+  static double _lastVolume = 1.0;
+  static bool _lastIsMuted = false;
+  static double _lastPreMuteVolume = 1.0;
+
   double _volume = 1.0;
   bool _isMuted = false;
   double _preMuteVolume = 1.0;
@@ -82,6 +86,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _currentStreamUrl = widget.streamUrl;
     _currentTitle = widget.title;
     _currentHeaders = widget.headers;
+    _volume = _lastVolume;
+    _isMuted = _lastIsMuted;
+    _preMuteVolume = _lastPreMuteVolume;
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _initPlayer();
@@ -100,6 +107,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
 
       await _controller.initialize();
+      _controller.setVolume(_isMuted ? 0.0 : _volume);
       _controller.play();
 
       _controller.addListener(_videoListener);
@@ -137,6 +145,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     setState(() {
       _volume = clamped;
       _isMuted = clamped == 0.0;
+      _lastVolume = _volume;
+      _lastIsMuted = _isMuted;
     });
     if (_isInitialized) {
       _controller.setVolume(_isMuted ? 0.0 : _volume);
@@ -150,6 +160,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _setVolume(_preMuteVolume > 0.0 ? _preMuteVolume : 1.0);
     } else {
       _preMuteVolume = _volume > 0.0 ? _volume : 1.0;
+      _lastPreMuteVolume = _preMuteVolume;
       _setVolume(0.0);
     }
   }
