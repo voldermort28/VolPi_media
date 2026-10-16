@@ -21,8 +21,25 @@ class SecretMovieScreen extends StatefulWidget {
 
 class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _genreScrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+
+  // Tab 0: VLFilm, Tab 1: Viet69
+  int _selectedSourceIndex = 0;
+  String _selectedGenre = 'Tất cả';
+
+  final List<String> _viet69Genres = const [
+    'Tất cả',
+    'Phim sex Việt mới',
+    'Sinh viên',
+    'Teen',
+    'Check hàng',
+    'Camera',
+    'BDSM',
+    'Máy bay bà già',
+    'Thủ dâm',
+  ];
 
   List<MovieModel> _movies = [];
   bool _isLoading = true;
@@ -42,6 +59,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _genreScrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _movies.clear();
@@ -66,12 +84,24 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _searchQuery = search;
     });
 
-    final results = await widget.apiService.getVlxxCatalog(searchQuery: search, skip: 0);
+    List<MovieModel> results = [];
+    if (_selectedSourceIndex == 0) {
+      // VLFilm
+      results = await widget.apiService.getVlxxCatalog(searchQuery: search, skip: 0);
+    } else {
+      // Viet69
+      results = await widget.apiService.getViet69Catalog(
+        searchQuery: search,
+        skip: 0,
+        genre: _selectedGenre,
+      );
+    }
+
     if (mounted) {
       setState(() {
         _movies = results;
         _isLoading = false;
-        if (results.length < 30) {
+        if (results.length < 20) {
           _hasMore = false;
         }
       });
@@ -86,10 +116,20 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     });
 
     final currentSkip = _movies.length;
-    final nextResults = await widget.apiService.getVlxxCatalog(
-      searchQuery: _searchQuery,
-      skip: currentSkip,
-    );
+    List<MovieModel> nextResults = [];
+
+    if (_selectedSourceIndex == 0) {
+      nextResults = await widget.apiService.getVlxxCatalog(
+        searchQuery: _searchQuery,
+        skip: currentSkip,
+      );
+    } else {
+      nextResults = await widget.apiService.getViet69Catalog(
+        searchQuery: _searchQuery,
+        skip: currentSkip,
+        genre: _selectedGenre,
+      );
+    }
 
     if (mounted) {
       setState(() {
@@ -103,13 +143,36 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
             _hasMore = false;
           } else {
             _movies.addAll(uniqueNew);
-            if (nextResults.length < 30) {
+            if (nextResults.length < 20) {
               _hasMore = false;
             }
           }
         }
       });
     }
+  }
+
+  void _switchSource(int index) {
+    if (_selectedSourceIndex == index) return;
+    setState(() {
+      _selectedSourceIndex = index;
+      _selectedGenre = 'Tất cả';
+      _isSearching = false;
+      _searchController.clear();
+      _searchQuery = null;
+    });
+    _loadMovies();
+  }
+
+  void _selectGenre(String genre) {
+    if (_selectedGenre == genre) return;
+    setState(() {
+      _selectedGenre = genre;
+      _isSearching = false;
+      _searchController.clear();
+      _searchQuery = null;
+    });
+    _loadMovies();
   }
 
   void _submitSearch() {
@@ -128,7 +191,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   void _onMovieSelected(MovieModel movie) {
-    final servers = widget.apiService.getVlxxStreams(movie.rawId);
+    final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
+    final servers = isViet69
+        ? widget.apiService.getViet69Streams(movie.rawId)
+        : widget.apiService.getVlxxStreams(movie.rawId);
 
     showModalBottomSheet(
       context: context,
@@ -161,9 +227,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Chọn máy chủ phát (Full HD không quảng cáo):',
-                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              Text(
+                isViet69
+                    ? 'Chọn máy chủ phát Viet69 (Full HD không quảng cáo):'
+                    : 'Chọn máy chủ phát VLFilm (Full HD không quảng cáo):',
+                style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
               ),
               const SizedBox(height: 16),
               ListView.separated(
@@ -183,7 +251,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                       color: const Color(0xFF1E293B),
                       child: Row(
                         children: [
-                          const Icon(Icons.play_circle_fill, color: Color(0xFFF43F5E), size: 22),
+                          Icon(
+                            Icons.play_circle_fill,
+                            color: isViet69 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E),
+                            size: 22,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
@@ -220,6 +292,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final themeColor = _selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E);
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
@@ -241,15 +315,46 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text('🎬', style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 8),
-                  Text(
-                    _searchQuery != null && _searchQuery!.isNotEmpty
-                        ? 'Tìm: "$_searchQuery"'
-                        : 'Kho Phim Riêng Tư',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+
+                  // TAB SWITCHER: VLFilm vs Viet69
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white10),
+                    ),
+                    padding: const EdgeInsets.all(3),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSourceTab(
+                          index: 0,
+                          label: 'VLFilm',
+                          icon: Icons.movie_outlined,
+                          activeColor: const Color(0xFFF43F5E),
+                        ),
+                        const SizedBox(width: 4),
+                        _buildSourceTab(
+                          index: 1,
+                          label: 'Viet69',
+                          icon: Icons.local_fire_department_rounded,
+                          activeColor: const Color(0xFFEA580C),
+                        ),
+                      ],
+                    ),
                   ),
-                  const Spacer(),
+
+                  const SizedBox(width: 12),
+                  if (_searchQuery != null && _searchQuery!.isNotEmpty)
+                    Expanded(
+                      child: Text(
+                        'Tìm: "$_searchQuery"',
+                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    )
+                  else
+                    const Spacer(),
 
                   // Search toggle button or search input
                   if (_isSearching)
@@ -262,7 +367,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         decoration: BoxDecoration(
                           color: const Color(0xFF1E293B),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: const Color(0xFFF43F5E), width: 1.5),
+                          border: Border.all(color: themeColor, width: 1.5),
                         ),
                         child: Row(
                           children: [
@@ -273,9 +378,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                 controller: _searchController,
                                 focusNode: _searchFocusNode,
                                 style: const TextStyle(color: Colors.white, fontSize: 13),
-                                decoration: const InputDecoration(
-                                  hintText: 'Nhập từ khóa, mã phim...',
-                                  hintStyle: TextStyle(color: Colors.white38, fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: _selectedSourceIndex == 1
+                                      ? 'Nhập từ khóa clip, sinh viên, teen...'
+                                      : 'Nhập từ khóa, mã phim...',
+                                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
                                   contentPadding: EdgeInsets.zero,
@@ -339,10 +446,51 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               ),
             ),
 
+            // Category Bar (Only visible when Viet69 tab is active & not in search mode)
+            if (_selectedSourceIndex == 1 && (_searchQuery == null || _searchQuery!.isEmpty))
+              Container(
+                height: 40,
+                margin: const EdgeInsets.only(bottom: 6),
+                child: ListView.separated(
+                  controller: _genreScrollController,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _viet69Genres.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, idx) {
+                    final genre = _viet69Genres[idx];
+                    final bool isSelected = _selectedGenre == genre;
+                    return TvFocusableCard(
+                      onTap: () => _selectGenre(genre),
+                      borderRadius: BorderRadius.circular(20),
+                      focusBorderColor: const Color(0xFFEA580C),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? const Color(0xFFEA580C) : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFFEA580C) : Colors.white12,
+                          ),
+                        ),
+                        child: Text(
+                          genre,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontSize: 12,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+
             // Content Grid with Infinite Scroll
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator(color: Color(0xFFF43F5E)))
+                  ? Center(child: CircularProgressIndicator(color: themeColor))
                   : _movies.isEmpty
                       ? Center(
                           child: Column(
@@ -351,7 +499,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                               const Icon(Icons.search_off, size: 48, color: Colors.white38),
                               const SizedBox(height: 12),
                               Text(
-                                _searchQuery != null ? 'Không tìm thấy phim phù hợp với "$_searchQuery"' : 'Không tìm thấy phim.',
+                                _searchQuery != null
+                                    ? 'Không tìm thấy phim phù hợp với "$_searchQuery"'
+                                    : 'Không tìm thấy nội dung.',
                                 style: const TextStyle(color: Colors.white54, fontSize: 14),
                               ),
                               if (_searchQuery != null) ...[
@@ -410,7 +560,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                         }
 
                                         final movie = _movies[idx];
-                                        return _buildMovieCard(movie);
+                                        return _buildMovieCard(movie, themeColor);
                                       },
                                       childCount: _movies.length,
                                       addAutomaticKeepAlives: true,
@@ -420,9 +570,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
                                 // Bottom Loading Indicator
                                 if (_isLoadingMore)
-                                  const SliverToBoxAdapter(
+                                  SliverToBoxAdapter(
                                     child: Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 24),
+                                      padding: const EdgeInsets.symmetric(vertical: 24),
                                       child: Center(
                                         child: Row(
                                           mainAxisAlignment: MainAxisAlignment.center,
@@ -432,12 +582,12 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                               height: 20,
                                               child: CircularProgressIndicator(
                                                 strokeWidth: 2.5,
-                                                color: Color(0xFFF43F5E),
+                                                color: themeColor,
                                               ),
                                             ),
-                                            SizedBox(width: 12),
-                                            Text(
-                                              'Đang tải thêm phim...',
+                                            const SizedBox(width: 12),
+                                            const Text(
+                                              'Đang tải thêm nội dung...',
                                               style: TextStyle(
                                                 color: Color(0xFF94A3B8),
                                                 fontSize: 13,
@@ -454,10 +604,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                 if (!_hasMore && _movies.isNotEmpty)
                                   const SliverToBoxAdapter(
                                     child: Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 28),
+                                      padding: const EdgeInsets.symmetric(vertical: 28),
                                       child: Center(
                                         child: Text(
-                                          '🎉 Đã hiển thị toàn bộ danh sách phim',
+                                          '🎉 Đã hiển thị toàn bộ danh sách',
                                           style: TextStyle(color: Colors.white38, fontSize: 13),
                                         ),
                                       ),
@@ -474,10 +624,47 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
   }
 
-  Widget _buildMovieCard(MovieModel movie) {
+  Widget _buildSourceTab({
+    required int index,
+    required String label,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final bool isSelected = _selectedSourceIndex == index;
+
+    return TvFocusableCard(
+      onTap: () => _switchSource(index),
+      borderRadius: BorderRadius.circular(9),
+      focusBorderColor: activeColor,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.white60, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMovieCard(MovieModel movie, Color themeColor) {
     return TvFocusableCard(
       onTap: () => _onMovieSelected(movie),
-      focusBorderColor: const Color(0xFFF43F5E),
+      focusBorderColor: themeColor,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         color: const Color(0xFF1E293B),
@@ -506,7 +693,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF43F5E),
+                          color: themeColor,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

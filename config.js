@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   xoilacBaseUrl: "https://xoilaczzw.cc",
   socoliveBaseUrl: "https://webfifa55.live",
   vlxxBaseUrl: "https://vlxx.phd",
+  viet69BaseUrl: "https://viet69.be",
   yumeiBaseUrl: "https://yumei-anime.com",
   autoCleanCache: true,
 };
@@ -47,6 +48,12 @@ function saveConfig(newConfig) {
       currentConfig.vlxxBaseUrl = currentConfig.vlxxBaseUrl.trim().replace(/\/+$/, "");
       if (!currentConfig.vlxxBaseUrl.startsWith("http://") && !currentConfig.vlxxBaseUrl.startsWith("https://")) {
         currentConfig.vlxxBaseUrl = "https://" + currentConfig.vlxxBaseUrl;
+      }
+    }
+    if (currentConfig.viet69BaseUrl) {
+      currentConfig.viet69BaseUrl = currentConfig.viet69BaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.viet69BaseUrl.startsWith("http://") && !currentConfig.viet69BaseUrl.startsWith("https://")) {
+        currentConfig.viet69BaseUrl = "https://" + currentConfig.viet69BaseUrl;
       }
     }
     if (currentConfig.yumeiBaseUrl) {

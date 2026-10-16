@@ -257,6 +257,60 @@ class ApiService {
   }
 
   // =========================================================================
+  // 3.1 VIET69 / KHO PHIM RIÊNG TƯ (TAB MỚI)
+  // =========================================================================
+
+  Future<List<MovieModel>> getViet69Catalog({String? searchQuery, int skip = 0, String? genre}) async {
+    String url = skip > 0
+        ? '$baseUrl/viet69/catalog/movie/viet69-catalog/skip=$skip.json'
+        : '$baseUrl/viet69/catalog/movie/viet69-catalog.json';
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/viet69/catalog/movie/viet69-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/viet69/catalog/movie/viet69-catalog/search=$encoded.json';
+    } else if (genre != null && genre.isNotEmpty && genre != 'Tất cả') {
+      final encodedGenre = Uri.encodeComponent(genre);
+      url = skip > 0
+          ? '$baseUrl/viet69/catalog/movie/viet69-catalog/genre=$encodedGenre&skip=$skip.json'
+          : '$baseUrl/viet69/catalog/movie/viet69-catalog/genre=$encodedGenre.json';
+    }
+
+    try {
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data['metas'] != null) {
+          final List list = data['metas'];
+          return list.map((item) => MovieModel.fromJson(item)).toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  /// Get direct master.m3u8 proxy URLs for Viet69
+  List<StreamChannel> getViet69Streams(String rawId) {
+    final cleanId = rawId.replaceFirst('viet69:', '');
+    return [
+      StreamChannel(
+        name: 'Viet69',
+        title: 'Server #2 (Full HD M3U8 - Không quảng cáo)',
+        url: '$baseUrl/viet69/hls/$cleanId/2/master.m3u8',
+        headers: {},
+      ),
+      StreamChannel(
+        name: 'Viet69',
+        title: 'Server #1 (Full HD - Không quảng cáo)',
+        url: '$baseUrl/viet69/hls/$cleanId/1/master.m3u8',
+        headers: {},
+      ),
+    ];
+  }
+
+  // =========================================================================
   // 4. IPTV / TRUYỀN HÌNH TRỰC TUYẾN
   // =========================================================================
 

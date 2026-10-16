@@ -1,10 +1,10 @@
 {
-  "version": "1.0.35",
-  "build": 36,
-  "tag_name": "v1.0.35",
-  "changelog": "• Bổ sung nguồn phát sóng thể thao Socolive TV: Tích hợp thành tab riêng biệt trên ứng dụng và catalog mới trên Stremio Addon.\n• Hoạt động song song và độc lập hoàn toàn với nguồn Xôi Lạc TV, làm kênh dự phòng không lo gián đoạn.\n• Áp dụng cùng quy chuẩn xếp hạng Tâm Điểm, giải đấu hàng đầu và phân loại trận đấu tương tự Xôi Lạc.",
+  "version": "1.0.36",
+  "build": 37,
+  "tag_name": "v1.0.36",
+  "changelog": "• Bổ sung nguồn phim Viet69 (viet69.be): Tích hợp thành tab mới trong Kho Phim Riêng Tư (Profile PIN 3105) và catalog mới trên Stremio Addon.\n• Bổ sung bộ lọc danh mục cho Viet69: Phim mới, Sinh viên, Teen, Check hàng, Camera, BDSM, Máy bay, Thủ dâm.\n• Tối ưu điều khiển Remote Android TV và cảm ứng điện thoại/iPad.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-05T03:15:00Z"
+  "published_at": "2026-10-17T01:45:00Z"
 }

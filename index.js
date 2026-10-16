@@ -8,10 +8,12 @@ const { getRouter } = require("stremio-addon-sdk");
 const config = require("./config");
 const unifiedAddon = require("./addon");
 const vlxxAddon = require("./addons/vlxxAddon");
+const viet69Addon = require("./addons/viet69Addon");
 const xoilacAddon = require("./addons/xoilacAddon");
 const socoliveAddon = require("./addons/socoliveAddon");
 const yumeiAddon = require("./addons/yumeiAddon");
 const vlxxScraper = require("./scrapers/vlxx");
+const viet69Scraper = require("./scrapers/viet69");
 const xoilacScraper = require("./scrapers/xoilac");
 const socoliveScraper = require("./scrapers/socolive");
 const yumeiScraper = require("./scrapers/yumei");
@@ -557,12 +559,13 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, yumeiBaseUrl, socoliveBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, yumeiBaseUrl, socoliveBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
       socoliveScraper.clearCache();
       vlxxScraper.clearCache();
+      viet69Scraper.clearCache();
       yumeiScraper.clearCache();
       logoCache.clear();
       vlxxPosterCache.clear();
@@ -625,6 +628,23 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
       }
       const $ = cheerio.load(response.data);
       const items = $("#video-list .video-item, .video-item");
+      return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
+    } else if (type === "viet69") {
+      const response = await axios.get(cleanUrl, {
+        headers: {
+          "User-Agent": viet69Scraper.USER_AGENT,
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $(".item-video, .clip-link");
       return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
     } else if (type === "yumei") {
       const response = await axios.get(cleanUrl + "/thu-vien", {
@@ -1057,6 +1077,7 @@ app.get("/thumb/yumei/:id.svg", async (req, res) => {
 // -------------------------------------------------------------
 
 app.use("/vlxx", getRouter(vlxxAddon));
+app.use("/viet69", getRouter(viet69Addon));
 app.use("/xoilac", getRouter(xoilacAddon));
 app.use("/socolive", getRouter(socoliveAddon));
 app.use("/yumei", getRouter(yumeiAddon));
@@ -1065,6 +1086,19 @@ app.use(getRouter(unifiedAddon));
 // -------------------------------------------------------------
 // STREAM PLAYBACK PROXIES
 // -------------------------------------------------------------
+
+app.get("/thumb/viet69/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const info = await viet69Scraper.getVideoInfo(rawId);
+    if (info && info.poster) {
+      return res.redirect(info.poster);
+    }
+    return res.status(404).send("Not found");
+  } catch (e) {
+    return res.status(404).send("Not found");
+  }
+});
 
 app.get("/hls/:id/:server/master.m3u8", async (req, res) => {
   try {
@@ -1098,6 +1132,50 @@ app.get("/hls/:id/:server/master.m3u8", async (req, res) => {
     return res.send(rewritten);
   } catch (err) {
     console.error("Error generating HLS manifest:", err.message);
+    return res.status(500).send("Error loading playlist");
+  }
+});
+
+app.get(["/viet69/hls/:id/:server/master.m3u8", "/viet69/hls/:id/master.m3u8"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const server = req.params.server || 2;
+    const rawUrl = await viet69Scraper.getRawManifestUrl(id, server);
+    if (!rawUrl) {
+      return res.status(404).send("Stream manifest not found");
+    }
+
+    if (!rawUrl.includes(".m3u8")) {
+      return res.redirect(rawUrl);
+    }
+
+    const manifestRes = await axios.get(rawUrl, {
+      headers: {
+        "Referer": "https://emb.cd-vs.com/",
+        "User-Agent": viet69Scraper.USER_AGENT,
+      },
+      timeout: 10000,
+    });
+
+    const host = process.env.BASE_HOST || "https://" + req.get("host");
+    const m3u8Base = rawUrl.substring(0, rawUrl.lastIndexOf("/") + 1);
+    const lines = manifestRes.data.split("\n");
+    const rewritten = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      let segUrl = trimmed;
+      if (!segUrl.startsWith("http://") && !segUrl.startsWith("https://")) {
+        segUrl = m3u8Base + segUrl;
+      }
+      return host + "/seg?u=" + encodeURIComponent(segUrl);
+    }).join("\n");
+
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Accel-Buffering", "no");
+    return res.send(rewritten);
+  } catch (err) {
+    console.error("Error generating Viet69 HLS manifest:", err.message);
     return res.status(500).send("Error loading playlist");
   }
 });
@@ -1148,6 +1226,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("👉 Yumei Anime:     http://localhost:" + PORT + "/yumei/manifest.json");
   console.log("👉 Xôi Lạc Only:    http://localhost:" + PORT + "/xoilac/manifest.json");
   console.log("👉 VLXX Only:       http://localhost:" + PORT + "/vlxx/manifest.json");
+  console.log("👉 Viet69 Only:     http://localhost:" + PORT + "/viet69/manifest.json");
   console.log("👉 Combo Tất Cả:    http://localhost:" + PORT + "/manifest.json");
   console.log("======================================================\n");
 });

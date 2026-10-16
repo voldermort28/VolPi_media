@@ -263,6 +263,45 @@
           </div>
         </div>
 
+        <!-- Viet69 Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-orange-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">🔥</span>
+              <span>Viet69 Stream</span>
+            </div>
+            <span id="viet69-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-viet69-domain" placeholder="https://viet69.be" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setViet69Domain('https://viet69.be')" class="text-[11px] bg-slate-800 hover:bg-orange-600/30 hover:border-orange-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                viet69.be ⭐
+              </button>
+              <button type="button" onclick="setViet69Domain('https://viet69.sex')" class="text-[11px] bg-slate-800 hover:bg-orange-600/30 hover:border-orange-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                viet69.sex
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('viet69')" id="btn-test-viet69" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Socolive Domain Box -->
         <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-emerald-500">
           <div class="flex items-center justify-between">
@@ -418,6 +457,29 @@
           </div>
         </div>
 
+        <!-- Viet69 Addon Card -->
+        <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-orange-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-2xl">🔥</span>
+              <span class="text-[11px] px-2.5 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/30 text-orange-400 font-bold">18+ Clip</span>
+            </div>
+            <h3 class="font-extrabold text-white text-sm">Viet69 Stream</h3>
+            <p class="text-xs text-slate-400 mt-1">Clip sex Việt Nam tuyển chọn, sinh viên, teen, m3u8 Full HD trực tiếp.</p>
+          </div>
+
+          <div class="mt-4 space-y-2 pt-3 border-t border-slate-800">
+            <a id="link-viet69-install" href="/viet69/manifest.json" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Cài Vào Stremio</span>
+            </a>
+            <button type="button" onclick="copyManifestUrl('viet69')" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao chép Link</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Combo Addon Card -->
         <div class="glass-panel rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/40 transition">
           <div>
@@ -558,6 +620,9 @@
       document.getElementById('link-socolive-install').href = 'stremio://' + hostWithPort + '/socolive/manifest.json';
     }
     document.getElementById('link-vlxx-install').href = 'stremio://' + hostWithPort + '/vlxx/manifest.json';
+    if (document.getElementById('link-viet69-install')) {
+      document.getElementById('link-viet69-install').href = 'stremio://' + hostWithPort + '/viet69/manifest.json';
+    }
     document.getElementById('link-combo-install').href = 'stremio://' + hostWithPort + '/manifest.json';
 
     function showToast(title, message, isSuccess) {
@@ -593,6 +658,7 @@
       if (type === 'xoilac') url = origin + '/xoilac/manifest.json';
       if (type === 'socolive') url = origin + '/socolive/manifest.json';
       if (type === 'vlxx') url = origin + '/vlxx/manifest.json';
+      if (type === 'viet69') url = origin + '/viet69/manifest.json';
 
       navigator.clipboard.writeText(url).then(function() {
         showToast('Đã sao chép!', url, true);
@@ -619,6 +685,12 @@
       document.getElementById('input-vlxx-domain').value = url;
     }
 
+    function setViet69Domain(url) {
+      if (document.getElementById('input-viet69-domain')) {
+        document.getElementById('input-viet69-domain').value = url;
+      }
+    }
+
     async function fetchStatus(showNotification) {
       try {
         const res = await fetch('/api/status');
@@ -633,6 +705,9 @@
           }
           document.getElementById('input-xoilac-domain').value = data.config.xoilacBaseUrl || '';
           document.getElementById('input-vlxx-domain').value = data.config.vlxxBaseUrl || '';
+          if (document.getElementById('input-viet69-domain')) {
+            document.getElementById('input-viet69-domain').value = data.config.viet69BaseUrl || '';
+          }
         }
 
         if (data.matchesCount !== undefined) {
@@ -664,6 +739,10 @@
         inputEl = document.getElementById('input-socolive-domain');
         badgeEl = document.getElementById('socolive-status-badge');
         btnEl = document.getElementById('btn-test-socolive');
+      } else if (type === 'viet69') {
+        inputEl = document.getElementById('input-viet69-domain');
+        badgeEl = document.getElementById('viet69-status-badge');
+        btnEl = document.getElementById('btn-test-viet69');
       } else {
         inputEl = document.getElementById('input-vlxx-domain');
         badgeEl = document.getElementById('vlxx-status-badge');
@@ -718,6 +797,7 @@
       const socoliveBaseUrl = document.getElementById('input-socolive-domain') ? document.getElementById('input-socolive-domain').value.trim() : '';
       const xoilacBaseUrl = document.getElementById('input-xoilac-domain').value.trim();
       const vlxxBaseUrl = document.getElementById('input-vlxx-domain').value.trim();
+      const viet69BaseUrl = document.getElementById('input-viet69-domain') ? document.getElementById('input-viet69-domain').value.trim() : '';
       const saveBtn = document.getElementById('btn-save-config');
 
       saveBtn.disabled = true;
@@ -727,7 +807,7 @@
         const res = await fetch('/api/config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ yumeiBaseUrl: yumeiBaseUrl, xoilacBaseUrl: xoilacBaseUrl, socoliveBaseUrl: socoliveBaseUrl, vlxxBaseUrl: vlxxBaseUrl }),
+          body: JSON.stringify({ yumeiBaseUrl: yumeiBaseUrl, xoilacBaseUrl: xoilacBaseUrl, socoliveBaseUrl: socoliveBaseUrl, vlxxBaseUrl: vlxxBaseUrl, viet69BaseUrl: viet69BaseUrl }),
         });
         const data = await res.json();
 
