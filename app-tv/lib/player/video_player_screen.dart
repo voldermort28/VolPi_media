@@ -933,289 +933,349 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 5. OSD OVERLAY CONTROLS (Top Bar, Center Play/Seek, Bottom Timeline)
+              // 5. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
               AnimatedOpacity(
                 opacity: _showControls ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 200),
                 child: IgnorePointer(
                   ignoring: !_showControls,
-                  child: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.black87, Colors.transparent, Colors.black87],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Top Bar
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            child: Row(
-                              children: [
-                                TvFocusableCard(
-                                  onTap: () => Navigator.of(context).pop(),
-                                  scale: 1.1,
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    color: Colors.white12,
-                                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                                  ),
-                                ),
-                                const SizedBox(width: 14),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _currentTitle,
-                                        style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (widget.subtitle.isNotEmpty)
-                                        Text(
-                                          widget.subtitle,
-                                          style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.w500),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                if (widget.isLive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.redAccent,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.fiber_manual_record, color: Colors.white, size: 10),
-                                        SizedBox(width: 4),
-                                        Text('TRỰC TIẾP', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                      ],
-                                    ),
-                                  ),
-                                if (_isMacOrDesktop) ...[
-                                  const SizedBox(width: 12),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.12),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(color: Colors.white24, width: 0.8),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        TvFocusableCard(
-                                          onTap: _toggleMute,
-                                          borderRadius: BorderRadius.circular(16),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(4),
-                                            child: Icon(
-                                              _isMuted || _volume == 0.0
-                                                  ? Icons.volume_off_rounded
-                                                  : (_volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
-                                              color: _isMuted ? Colors.redAccent : Colors.white,
-                                              size: 18,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(
-                                          width: 75,
-                                          child: SliderTheme(
-                                            data: SliderTheme.of(context).copyWith(
-                                              activeTrackColor: const Color(0xFF38BDF8),
-                                              inactiveTrackColor: Colors.white24,
-                                              thumbColor: const Color(0xFF38BDF8),
-                                              overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                                              trackHeight: 3.0,
-                                            ),
-                                            child: Slider(
-                                              value: _isMuted ? 0.0 : _volume,
-                                              min: 0.0,
-                                              max: 1.0,
-                                              onChanged: (val) {
-                                                _startHideControlsTimer();
-                                                _setVolume(val);
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          _isMuted ? '0%' : '${(_volume * 100).round()}%',
-                                          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
-                                        ),
-                                        const SizedBox(width: 4),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                  child: SafeArea(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Top Bar with localized gentle gradient (No full-screen darkening)
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withOpacity(0.65),
+                                Colors.transparent,
                               ],
                             ),
                           ),
-
-                          // Center Play/Seek Controls Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: Row(
                             children: [
-                              if (widget.onPrevious != null) ...[
-                                TvFocusableCard(
-                                  onTap: widget.onPrevious!,
-                                  borderRadius: BorderRadius.circular(30),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    color: Colors.black38,
-                                    child: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 36),
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                              ],
-                              if (!widget.isLive) ...[
-                                TvFocusableCard(
-                                  onTap: () => _seekRelative(-10),
-                                  borderRadius: BorderRadius.circular(30),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    color: Colors.black38,
-                                    child: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 36),
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                              ],
                               TvFocusableCard(
-                                onTap: _togglePlayPause,
-                                borderRadius: BorderRadius.circular(40),
+                                onTap: () => Navigator.of(context).pop(),
+                                scale: 1.1,
+                                borderRadius: BorderRadius.circular(20),
                                 child: Container(
                                   padding: const EdgeInsets.all(8),
-                                  child: Icon(
-                                    _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                                    color: const Color(0xFF38BDF8),
-                                    size: 68,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.15),
+                                    shape: BoxShape.circle,
                                   ),
+                                  child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
                                 ),
                               ),
-                              if (!widget.isLive) ...[
-                                const SizedBox(width: 24),
-                                TvFocusableCard(
-                                  onTap: () => _seekRelative(10),
-                                  borderRadius: BorderRadius.circular(30),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    color: Colors.black38,
-                                    child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 36),
-                                  ),
-                                ),
-                              ],
-                              if (widget.onNext != null) ...[
-                                const SizedBox(width: 24),
-                                TvFocusableCard(
-                                  onTap: widget.onNext!,
-                                  borderRadius: BorderRadius.circular(30),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(12),
-                                    color: Colors.black38,
-                                    child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 36),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-
-                          // Bottom Bar with Timeline & Channel/Variant Switcher
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            child: Column(
-                              children: [
-                                // Available Channels / Streams Switcher Row
-                                if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
-                                  SizedBox(
-                                    height: 38,
-                                    child: ListView.builder(
-                                      scrollDirection: Axis.horizontal,
-                                      itemCount: widget.availableChannels!.length,
-                                      itemBuilder: (context, index) {
-                                        final ch = widget.availableChannels![index];
-                                        final bool isSelected = ch.url == _currentStreamUrl;
-                                        return Padding(
-                                          padding: const EdgeInsets.only(right: 8),
-                                          child: TvFocusableCard(
-                                            onTap: () => _switchChannel(ch),
-                                            borderRadius: BorderRadius.circular(8),
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                              color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                                              child: Text(
-                                                ch.title,
-                                                style: TextStyle(
-                                                  color: isSelected ? Colors.white : Colors.white70,
-                                                  fontSize: 12,
-                                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                ],
-
-                                // Progress Slider for VOD
-                                if (!widget.isLive && _isInitialized) ...[
-                                  Row(
-                                    children: [
-                                      Text(
-                                        _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
-                                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _currentTitle,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [Shadow(color: Colors.black87, blurRadius: 6, offset: Offset(0, 1))],
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (widget.subtitle.isNotEmpty)
+                                      Text(
+                                        widget.subtitle,
+                                        style: const TextStyle(
+                                          color: Color(0xFF38BDF8),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              if (widget.isLive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.redAccent,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.fiber_manual_record, color: Colors.white, size: 10),
+                                      SizedBox(width: 4),
+                                      Text('TRỰC TIẾP', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              if (_isMacOrDesktop) ...[
+                                const SizedBox(width: 12),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24, width: 0.8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      TvFocusableCard(
+                                        onTap: _toggleMute,
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          child: Icon(
+                                            _isMuted || _volume == 0.0
+                                                ? Icons.volume_off_rounded
+                                                : (_volume < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                                            color: _isMuted ? Colors.redAccent : Colors.white,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 75,
                                         child: SliderTheme(
                                           data: SliderTheme.of(context).copyWith(
                                             activeTrackColor: const Color(0xFF38BDF8),
                                             inactiveTrackColor: Colors.white24,
                                             thumbColor: const Color(0xFF38BDF8),
                                             overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                                            trackHeight: 4.0,
+                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                            trackHeight: 3.0,
                                           ),
                                           child: Slider(
-                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
-                                                  0.0,
-                                                  _controller.value.duration.inSeconds.toDouble(),
-                                                ),
-                                            max: _controller.value.duration.inSeconds.toDouble() > 0
-                                                ? _controller.value.duration.inSeconds.toDouble()
-                                                : 1.0,
+                                            value: _isMuted ? 0.0 : _volume,
+                                            min: 0.0,
+                                            max: 1.0,
                                             onChanged: (val) {
                                               _startHideControlsTimer();
-                                              _controller.seekTo(Duration(seconds: val.toInt()));
+                                              _setVolume(val);
                                             },
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
                                       Text(
-                                        _formatDuration(_controller.value.duration),
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                        _isMuted ? '0%' : '${(_volume * 100).round()}%',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold),
                                       ),
+                                      const SizedBox(width: 4),
                                     ],
                                   ),
-                                ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        // Center: Clean transparent space (No screen darkening, No blocking buttons)
+                        const Spacer(),
+
+                        // Bottom Bar with Timeline & Playback Controls Below Progress Bar
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Colors.black.withOpacity(0.75),
+                                Colors.transparent,
                               ],
                             ),
                           ),
-                        ],
-                      ),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Available Channels / Streams Switcher Row
+                              if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
+                                SizedBox(
+                                  height: 38,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: widget.availableChannels!.length,
+                                    itemBuilder: (context, index) {
+                                      final ch = widget.availableChannels![index];
+                                      final bool isSelected = ch.url == _currentStreamUrl;
+                                      return Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: TvFocusableCard(
+                                          onTap: () => _switchChannel(ch),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                                            child: Text(
+                                              ch.title,
+                                              style: TextStyle(
+                                                color: isSelected ? Colors.white : Colors.white70,
+                                                fontSize: 12,
+                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+
+                              // Progress Slider for VOD (Thanh tiến trình)
+                              if (!widget.isLive && _isInitialized) ...[
+                                Row(
+                                  children: [
+                                    Text(
+                                      _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          activeTrackColor: const Color(0xFF38BDF8),
+                                          inactiveTrackColor: Colors.white24,
+                                          thumbColor: const Color(0xFF38BDF8),
+                                          overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                          trackHeight: 3.5,
+                                        ),
+                                        child: Slider(
+                                          value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
+                                                0.0,
+                                                _controller.value.duration.inSeconds.toDouble(),
+                                              ),
+                                          max: _controller.value.duration.inSeconds.toDouble() > 0
+                                              ? _controller.value.duration.inSeconds.toDouble()
+                                              : 1.0,
+                                          onChanged: (val) {
+                                            _startHideControlsTimer();
+                                            _controller.seekTo(Duration(seconds: val.toInt()));
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _formatDuration(_controller.value.duration),
+                                      style: const TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+
+                              // Playback Controls Row (Nút điều khiển xuất hiện DƯỚI thanh tiến trình)
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (widget.onPrevious != null) ...[
+                                    TvFocusableCard(
+                                      onTap: widget.onPrevious!,
+                                      scale: 1.15,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 18),
+                                  ],
+                                  if (!widget.isLive) ...[
+                                    TvFocusableCard(
+                                      onTap: () => _seekRelative(-10),
+                                      scale: 1.15,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 18),
+                                  ],
+                                  TvFocusableCard(
+                                    onTap: _togglePlayPause,
+                                    scale: 1.15,
+                                    borderRadius: BorderRadius.circular(30),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF38BDF8).withOpacity(0.2),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                        color: const Color(0xFF38BDF8),
+                                        size: 46,
+                                      ),
+                                    ),
+                                  ),
+                                  if (!widget.isLive) ...[
+                                    const SizedBox(width: 18),
+                                    TvFocusableCard(
+                                      onTap: () => _seekRelative(10),
+                                      scale: 1.15,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                  ],
+                                  if (widget.onNext != null) ...[
+                                    const SizedBox(width: 18),
+                                    TvFocusableCard(
+                                      onTap: widget.onNext!,
+                                      scale: 1.15,
+                                      borderRadius: BorderRadius.circular(24),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
