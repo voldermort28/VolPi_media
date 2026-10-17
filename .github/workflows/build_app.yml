@@ -290,11 +290,11 @@ jobs:
         working-directory: app-tv
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml || true
-          mkdir -p /tmp/macos_entitlements
-          cp macos/Runner/*.entitlements /tmp/macos_entitlements/ 2>/dev/null || true
+          mkdir -p /tmp/macos_runner_backup
+          cp -r macos/Runner/* /tmp/macos_runner_backup/ 2>/dev/null || true
           flutter create . --platforms=macos --org=com.volpi --project-name=volpi_media
           mkdir -p macos/Runner
-          cp /tmp/macos_entitlements/*.entitlements macos/Runner/ 2>/dev/null || true
+          cp -r /tmp/macos_runner_backup/* macos/Runner/ 2>/dev/null || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
 
           # Grant Sandbox Network Entitlements for IPTV & API streaming

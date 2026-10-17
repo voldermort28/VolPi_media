@@ -209,23 +209,33 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  // Mục 1: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Trận hot, Việt Nam, MU, CLB lớn, C1, Ngoại hạng Anh... chưa kết thúc)
-  // Các trận tâm điểm đang trực tiếp thi đấu sẽ được ưu tiên xếp đầu danh mục này.
+  // Mục 1: ⭐ Tâm Điểm & Giải Đấu Hàng Đầu (Ngoại Hạng Anh & Cúp C1 lên đầu danh sách, Trận hot, Việt Nam, MU... chưa kết thúc)
   List<MatchModel> get _majorMatches {
-    final list = _matches.where((m) => !m.isFinishedMatch && (m.isFamous || m.isVietnam || m.isFavorite || m.isHot)).toList();
+    final list = _matches.where((m) => !m.isFinishedMatch && (m.isFamous || m.isVietnam || m.isFavorite || m.isHot || m.isPremierLeagueOrC1)).toList();
     list.sort((a, b) {
-      if (a.isOngoingNow && !b.isOngoingNow) return -1;
-      if (!a.isOngoingNow && b.isOngoingNow) return 1;
+      // 1. Ưu tiên giải Ngoại Hạng Anh & Cúp C1 lên vị trí đầu tiên trong mục tâm điểm
+      final aPlC1 = a.isPremierLeagueOrC1;
+      final bPlC1 = b.isPremierLeagueOrC1;
+      if (aPlC1 != bPlC1) {
+        return aPlC1 ? -1 : 1;
+      }
+
+      // 2. Trong cùng nhóm, ưu tiên các trận đang trực tiếp diễn ra (ongoing)
+      if (a.isOngoingNow != b.isOngoingNow) {
+        return a.isOngoingNow ? -1 : 1;
+      }
+
+      // 3. Sắp xếp theo mốc thời gian thi đấu (trận diễn ra sớm hơn đứng trước)
       return a.matchTimestamp.compareTo(b.matchTimestamp);
     });
     return list;
   }
 
   // Mục 2: 🔴 Đang Diễn Ra (Các trận đấu khác đang trực tiếp diễn ra trong 90')
-  List<MatchModel> get _otherOngoingMatches => _matches.where((m) => m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot).toList();
+  List<MatchModel> get _otherOngoingMatches => _matches.where((m) => m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot && !m.isPremierLeagueOrC1).toList();
 
   // Mục 3: 🌐 Các Trận Đấu & Giải Đấu Khác (Sắp diễn ra)
-  List<MatchModel> get _upcomingOtherMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot).toList();
+  List<MatchModel> get _upcomingOtherMatches => _matches.where((m) => !m.isOngoingNow && !m.isFinishedMatch && !m.isFamous && !m.isVietnam && !m.isFavorite && !m.isHot && !m.isPremierLeagueOrC1).toList();
 
   // Mục 4: 🏁 Trận Đấu Đã Kết Thúc
   List<MatchModel> get _finishedMatches => _matches.where((m) => m.isFinishedMatch).toList();

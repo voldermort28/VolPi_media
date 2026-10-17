@@ -307,6 +307,19 @@ class MatchModel {
       }
     }
 
+    final bool isPlOrC1 = !esportsDetected && !isLowerOrWomenLeague && (
+        allText.contains('premier league') ||
+        allText.contains('ngoại hạng anh') ||
+        allText.contains('epl') ||
+        allText.contains('english premier league') ||
+        allText.contains('champions league') ||
+        allText.contains('cúp c1') ||
+        allText.contains('c1 châu âu') ||
+        allText.contains('uefa champions') ||
+        allText.contains('ucl') ||
+        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(leagueLower)
+    );
+
     final bool isHotFromScraper = json['isHot'] == true ||
         (json['priority'] is Map && (json['priority']['level'] == 1 || json['priority']['level'] == 2));
     final bool isFavoriteMatch = !esportsDetected && !isLowerOrWomenLeague && matchFavorite;
@@ -317,13 +330,15 @@ class MatchModel {
         isVn ||
         isMu ||
         isFavoriteMatch ||
-        isMajorLeague
+        isMajorLeague ||
+        isPlOrC1
     );
 
     final bool isHotMatch = !esportsDetected && !isLowerOrWomenLeague && (
         isHotFromScraper ||
         isFavoriteMatch ||
         isFamousMatch ||
+        isPlOrC1 ||
         rawTitle.contains('🔥') ||
         rawTitle.toLowerCase().contains('tâm điểm')
     );
@@ -429,6 +444,26 @@ class MatchModel {
     if (elapsed <= 60) return "Hiệp 2";
     if (elapsed <= 90) return "Phút $elapsed'";
     return "Phút 90+'";
+  }
+
+  /// Returns true if this match belongs to Premier League (Ngoại Hạng Anh) or UEFA Champions League (Cúp C1)
+  bool get isPremierLeagueOrC1 {
+    final t = '$league $title $description $homeTeam $awayTeam'.toLowerCase();
+    if (t.contains('premier league') ||
+        t.contains('ngoại hạng anh') ||
+        t.contains('epl') ||
+        t.contains('english premier league')) {
+      return true;
+    }
+    if (t.contains('champions league') ||
+        t.contains('cúp c1') ||
+        t.contains('c1 châu âu') ||
+        t.contains('uefa champions') ||
+        t.contains('ucl') ||
+        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(league.toLowerCase())) {
+      return true;
+    }
+    return false;
   }
 }
 

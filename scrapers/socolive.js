@@ -482,6 +482,12 @@ async function getLiveMatches() {
       const pB = b.priority ? b.priority.level : 3;
       if (pA !== pB) return pA - pB;
 
+      // Ưu tiên giải Ngoại Hạng Anh & Cúp C1 lên đầu nhóm tâm điểm
+      const isPlOrC1A = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${a.league || ''} ${a.title || ''}`);
+      const isPlOrC1B = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${b.league || ''} ${b.title || ''}`);
+      if (isPlOrC1A && !isPlOrC1B) return -1;
+      if (!isPlOrC1A && isPlOrC1B) return 1;
+
       if (a.isLive && !b.isLive) return -1;
       if (!a.isLive && b.isLive) return 1;
 

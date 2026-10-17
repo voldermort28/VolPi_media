@@ -1,10 +1,10 @@
 {
-  "version": "1.0.15",
-  "build": 16,
-  "tag_name": "v1.0.15",
-  "changelog": "• Cố định Release Keystore vĩnh viễn: Sửa dứt điểm lỗi 'Ứng dụng chưa được cài đặt' khi cập nhật OTA tự động trong app Android.\n• Bổ sung bản cài đặt Native Desktop cho macOS (MacBook, Mac mini, iMac) hỗ trợ điều hướng phím & chuột.\n• Giao diện Sidebar hiện đại: Gom nhóm danh mục Thể Thao (Bóng đá, Môn khác), Kênh cố định và Nguồn phát bên trái.\n• Hiển thị thời gian và tên 2 đội bóng trên dòng riêng biệt rõ ràng, không bị che khuất.\n• Tối ưu luồng phát HLS tương thích chuẩn Apple AVPlayer trên iOS và macOS.",
+  "version": "1.0.39",
+  "build": 40,
+  "tag_name": "v1.0.39",
+  "changelog": "• Ưu tiên giải Ngoại Hạng Anh & Cúp C1: Tự động xếp các trận đấu Ngoại Hạng Anh (Premier League / EPL) và Cúp C1 (UEFA Champions League / UCL) lên vị trí đầu tiên trong mục Tâm Điểm trên cả tab Xôi Lạc, Socolive và IPTV.\n• Tăng gấp đôi kích thước cửa sổ mặc định trên macOS: Mở ứng dụng với kích thước 1440x900 rộng rãi, căn giữa màn hình và giới hạn tối thiểu 960x600, không cần kéo giãn thủ công.\n• Khắc phục kẹt con trỏ tìm kiếm kênh IPTV trên TV: Tích hợp cơ chế D-Pad Navigation thông minh, bấm phím Xuống / Back / Lên / Trái / Phải hoặc Enter để thoát ngay khỏi ô tìm kiếm về lưới kênh một cách mượt mà kèm nút Thoát trực quan.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-01T22:05:00Z"
+  "published_at": "2026-10-18T00:40:00Z"
 }

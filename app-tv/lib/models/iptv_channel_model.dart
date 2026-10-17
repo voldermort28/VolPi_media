@@ -163,6 +163,26 @@ class IptvChannelModel {
     return "Phút 90+'";
   }
 
+  /// Returns true if this IPTV channel/match belongs to Premier League (Ngoại Hạng Anh) or UEFA Champions League (Cúp C1)
+  bool get isPremierLeagueOrC1 {
+    final q = ' $name $cleanTitle $group '.toLowerCase();
+    if (q.contains('premier league') ||
+        q.contains('ngoại hạng anh') ||
+        q.contains('epl') ||
+        q.contains('english premier league')) {
+      return true;
+    }
+    if (q.contains('champions league') ||
+        q.contains('cúp c1') ||
+        q.contains('c1 châu âu') ||
+        q.contains('uefa champions') ||
+        q.contains('ucl') ||
+        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(q)) {
+      return true;
+    }
+    return false;
+  }
+
   /// Classifies Football match priority client-side:
   /// 1. Việt Nam Football & Manchester United (Priority 1)
   /// 2. Major Leagues, Top Clubs & Major National Teams (Priority 2)

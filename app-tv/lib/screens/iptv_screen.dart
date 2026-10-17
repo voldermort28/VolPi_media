@@ -50,14 +50,61 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   String _selectedGroup = 'ALL';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
+  late final FocusNode _searchFocusNode;
   final FocusNode _firstChannelCardFocusNode = FocusNode();
+  final FocusNode _refreshButtonFocusNode = FocusNode();
   bool _isSearchFocused = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _searchFocusNode = FocusNode(
+      debugLabel: 'IptvSearchBox',
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          // 1. Phím mũi tên XUỐNG: Thoát ngay khỏi ô tìm kiếm và chuyển con trỏ xuống kênh đầu tiên
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            _searchFocusNode.unfocus();
+            _firstChannelCardFocusNode.requestFocus();
+            return KeyEventResult.handled;
+          }
+          // 2. Phím BACK (remote TV) hoặc ESC: Thoát khỏi ô tìm kiếm và quay lại danh sách kênh
+          if (event.logicalKey == LogicalKeyboardKey.escape ||
+              event.logicalKey == LogicalKeyboardKey.goBack) {
+            _searchFocusNode.unfocus();
+            _firstChannelCardFocusNode.requestFocus();
+            return KeyEventResult.handled;
+          }
+          // 3. Phím mũi tên LÊN: Thoát lên thanh điều hướng tab trên cùng
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            _searchFocusNode.unfocus();
+            FocusScope.of(context).focusInDirection(TraversalDirection.up);
+            return KeyEventResult.handled;
+          }
+          // 4. Phím mũi tên SANG PHẢI: Khi text rỗng hoặc con trỏ ở cuối text -> chuyển sang nút Làm mới
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+            if (_searchController.text.isEmpty ||
+                _searchController.selection.baseOffset >= _searchController.text.length) {
+              _searchFocusNode.unfocus();
+              _refreshButtonFocusNode.requestFocus();
+              return KeyEventResult.handled;
+            }
+          }
+          // 5. Phím mũi tên SANG TRÁI: Khi text rỗng hoặc con trỏ ở đầu text -> thoát sang sidebar
+          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            if (_searchController.text.isEmpty ||
+                _searchController.selection.baseOffset <= 0) {
+              _searchFocusNode.unfocus();
+              FocusScope.of(context).focusInDirection(TraversalDirection.left);
+              return KeyEventResult.handled;
+            }
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
+
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {
@@ -90,6 +137,7 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _searchFocusNode.dispose();
     _firstChannelCardFocusNode.dispose();
+    _refreshButtonFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -851,7 +899,12 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                   child: TextField(
                     focusNode: _searchFocusNode,
                     controller: _searchController,
+                    textInputAction: TextInputAction.search,
                     style: const TextStyle(color: Colors.white, fontSize: 12),
+                    onSubmitted: (_) {
+                      _searchFocusNode.unfocus();
+                      _firstChannelCardFocusNode.requestFocus();
+                    },
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm kênh...',
                       hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
@@ -860,15 +913,45 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                         color: _isSearchFocused ? const Color(0xFF38BDF8) : Colors.white54,
                         size: 16,
                       ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
-                              onPressed: () {
-                                setState(() {
-                                  _searchController.clear();
-                                  _searchQuery = '';
-                                });
-                              },
+                      suffixIcon: (_searchQuery.isNotEmpty || _isSearchFocused)
+                          ? Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_searchQuery.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                        _searchQuery = '';
+                                      });
+                                    },
+                                  ),
+                                if (_isSearchFocused)
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchFocusNode.unfocus();
+                                      _firstChannelCardFocusNode.requestFocus();
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 6),
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF38BDF8).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.5), width: 0.8),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text('Thoát', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
+                                          SizedBox(width: 2),
+                                          Icon(Icons.arrow_downward_rounded, color: Color(0xFF38BDF8), size: 10),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             )
                           : null,
                       border: InputBorder.none,
@@ -886,6 +969,7 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
               // Refresh Button
               TvFocusableCard(
+                focusNode: _refreshButtonFocusNode,
                 onTap: _isRefreshing
                     ? () {}
                     : () {
@@ -1195,16 +1279,27 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       );
     }
 
-    // FOOTBALL tab: Split into Area 1 (Major on top), Area 2 (Other ongoing), Area 3 (Other upcoming), Area 4 (Finished)
-    final major = channels.where((c) => !c.isFinishedMatch && (c.priorityLevel <= 2 || c.isFamous || c.isVietnam || c.isHot)).toList();
+    // FOOTBALL tab: Split into Area 1 (Major on top with Premier League & C1 priority), Area 2 (Other ongoing), Area 3 (Other upcoming), Area 4 (Finished)
+    final major = channels.where((c) => !c.isFinishedMatch && (c.priorityLevel <= 2 || c.isFamous || c.isVietnam || c.isHot || c.isPremierLeagueOrC1)).toList();
     major.sort((a, b) {
-      if (a.isOngoingNow && !b.isOngoingNow) return -1;
-      if (!a.isOngoingNow && b.isOngoingNow) return 1;
+      // 1. Ưu tiên giải Ngoại Hạng Anh & Cúp C1 lên vị trí đầu tiên trong mục tâm điểm
+      final aPlC1 = a.isPremierLeagueOrC1;
+      final bPlC1 = b.isPremierLeagueOrC1;
+      if (aPlC1 != bPlC1) {
+        return aPlC1 ? -1 : 1;
+      }
+
+      // 2. Trong cùng nhóm, ưu tiên các trận đang trực tiếp diễn ra (ongoing)
+      if (a.isOngoingNow != b.isOngoingNow) {
+        return a.isOngoingNow ? -1 : 1;
+      }
+
+      // 3. Sắp xếp theo mốc thời gian thi đấu (trận diễn ra sớm hơn đứng trước)
       return a.matchTimestamp.compareTo(b.matchTimestamp);
     });
 
-    final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot).toList();
-    final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot).toList();
+    final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot && !c.isPremierLeagueOrC1).toList();
+    final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot && !c.isPremierLeagueOrC1).toList();
     final finished = channels.where((c) => c.isFinishedMatch).toList();
 
     return CustomScrollView(
