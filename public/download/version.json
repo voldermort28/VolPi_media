@@ -2,9 +2,9 @@
   "version": "1.0.39",
   "build": 40,
   "tag_name": "v1.0.39",
-  "changelog": "• Ưu tiên giải Ngoại Hạng Anh & Cúp C1: Tự động xếp các trận đấu Ngoại Hạng Anh (Premier League / EPL) và Cúp C1 (UEFA Champions League / UCL) lên vị trí đầu tiên trong mục Tâm Điểm trên cả tab Xôi Lạc, Socolive và IPTV.\n• Tăng gấp đôi kích thước cửa sổ mặc định trên macOS: Mở ứng dụng với kích thước 1440x900 rộng rãi, căn giữa màn hình và giới hạn tối thiểu 960x600, không cần kéo giãn thủ công.\n• Khắc phục kẹt con trỏ tìm kiếm kênh IPTV trên TV: Tích hợp cơ chế D-Pad Navigation thông minh, bấm phím Xuống / Back / Lên / Trái / Phải hoặc Enter để thoát ngay khỏi ô tìm kiếm về lưới kênh một cách mượt mà kèm nút Thoát trực quan.",
+  "changelog": "• Ưu tiên giải Ngoại Hạng Anh & Cúp C1: Tự động xếp các trận đấu Ngoại Hạng Anh (Premier League / EPL) và Cúp C1 (UEFA Champions League / UCL) lên vị trí đầu tiên trong mục Tâm Điểm trên cả tab Xôi Lạc, Socolive và IPTV.\n• Tăng gấp đôi kích thước cửa sổ mặc định trên macOS: Mở ứng dụng với kích thước 1440x900 rộng rãi, căn giữa màn hình và giới hạn tối thiểu 960x600, không cần kéo giãn thủ công.\n• Khắc phục kẹt con trỏ tìm kiếm kênh IPTV trên TV: Tách biệt hoàn hảo 2 chế độ (Duyệt D-Pad & Nhập liệu). Khi lướt qua ô tìm kiếm, remote tự do di chuyển Xuống/Lên/Trái/Phải không bị kẹt. Khi bấm OK để gõ chữ, bàn phím ảo mở ra và D-Pad dùng 100% để chọn từng chữ cái (A, B, C...) mà không bị nhảy element.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-18T00:40:00Z"
+  "published_at": "2026-10-18T00:55:00Z"
 }

@@ -50,68 +50,35 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   String _selectedGroup = 'ALL';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  late final FocusNode _searchFocusNode;
-  final FocusNode _firstChannelCardFocusNode = FocusNode();
-  final FocusNode _refreshButtonFocusNode = FocusNode();
-  bool _isSearchFocused = false;
+  final FocusNode _searchCardFocusNode = FocusNode(debugLabel: 'IptvSearchCard');
+  final FocusNode _searchTextFieldFocusNode = FocusNode(debugLabel: 'IptvSearchTextField');
+  final FocusNode _firstChannelCardFocusNode = FocusNode(debugLabel: 'IptvFirstChannel');
+  final FocusNode _refreshButtonFocusNode = FocusNode(debugLabel: 'IptvRefreshButton');
+  bool _isSearchCardFocused = false;
+  bool _isSearchActive = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _searchFocusNode = FocusNode(
-      debugLabel: 'IptvSearchBox',
-      onKeyEvent: (node, event) {
-        if (event is KeyDownEvent) {
-          // 1. Phím mũi tên XUỐNG: Thoát ngay khỏi ô tìm kiếm và chuyển con trỏ xuống kênh đầu tiên
-          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-            _searchFocusNode.unfocus();
-            _firstChannelCardFocusNode.requestFocus();
-            return KeyEventResult.handled;
-          }
-          // 2. Phím BACK (remote TV) hoặc ESC: Thoát khỏi ô tìm kiếm và quay lại danh sách kênh
-          if (event.logicalKey == LogicalKeyboardKey.escape ||
-              event.logicalKey == LogicalKeyboardKey.goBack) {
-            _searchFocusNode.unfocus();
-            _firstChannelCardFocusNode.requestFocus();
-            return KeyEventResult.handled;
-          }
-          // 3. Phím mũi tên LÊN: Thoát lên thanh điều hướng tab trên cùng
-          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-            _searchFocusNode.unfocus();
-            FocusScope.of(context).focusInDirection(TraversalDirection.up);
-            return KeyEventResult.handled;
-          }
-          // 4. Phím mũi tên SANG PHẢI: Khi text rỗng hoặc con trỏ ở cuối text -> chuyển sang nút Làm mới
-          if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-            if (_searchController.text.isEmpty ||
-                _searchController.selection.baseOffset >= _searchController.text.length) {
-              _searchFocusNode.unfocus();
-              _refreshButtonFocusNode.requestFocus();
-              return KeyEventResult.handled;
-            }
-          }
-          // 5. Phím mũi tên SANG TRÁI: Khi text rỗng hoặc con trỏ ở đầu text -> thoát sang sidebar
-          if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-            if (_searchController.text.isEmpty ||
-                _searchController.selection.baseOffset <= 0) {
-              _searchFocusNode.unfocus();
-              FocusScope.of(context).focusInDirection(TraversalDirection.left);
-              return KeyEventResult.handled;
-            }
-          }
-        }
-        return KeyEventResult.ignored;
-      },
-    );
-
-    _searchFocusNode.addListener(() {
+    _searchCardFocusNode.addListener(() {
       if (mounted) {
         setState(() {
-          _isSearchFocused = _searchFocusNode.hasFocus;
+          _isSearchCardFocused = _searchCardFocusNode.hasFocus;
         });
       }
     });
+
+    _searchTextFieldFocusNode.addListener(() {
+      if (mounted) {
+        if (!_searchTextFieldFocusNode.hasFocus && _isSearchActive) {
+          setState(() {
+            _isSearchActive = false;
+          });
+        }
+      }
+    });
+
     _loadChannels(forceRefresh: false);
   }
 
@@ -135,7 +102,8 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _searchFocusNode.dispose();
+    _searchCardFocusNode.dispose();
+    _searchTextFieldFocusNode.dispose();
     _firstChannelCardFocusNode.dispose();
     _refreshButtonFocusNode.dispose();
     _searchController.dispose();
@@ -171,7 +139,7 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
         // Tự động focus vào kênh trận đấu đang diễn ra đầu tiên
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _allChannels.isNotEmpty && !_searchFocusNode.hasFocus) {
+          if (mounted && _allChannels.isNotEmpty && !_searchCardFocusNode.hasFocus && !_searchTextFieldFocusNode.hasFocus) {
             _firstChannelCardFocusNode.requestFocus();
           }
         });
@@ -881,89 +849,122 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
               const Spacer(),
 
-              // Search bar
+              // Search bar with TV D-Pad Protection (Browse Mode vs Input Mode)
               SizedBox(
-                width: 240,
+                width: 250,
                 height: 38,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: _isSearchFocused
-                        ? const Color(0xFF0284C7).withOpacity(0.18)
-                        : const Color(0xFF161E2E),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _isSearchFocused ? const Color(0xFF38BDF8) : const Color(0xFF334155),
-                      width: _isSearchFocused ? 2.5 : 1.0,
-                    ),
-                  ),
-                  child: TextField(
-                    focusNode: _searchFocusNode,
-                    controller: _searchController,
-                    textInputAction: TextInputAction.search,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                    onSubmitted: (_) {
-                      _searchFocusNode.unfocus();
-                      _firstChannelCardFocusNode.requestFocus();
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Tìm kiếm kênh...',
-                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                      prefixIcon: Icon(
-                        Icons.search_rounded,
-                        color: _isSearchFocused ? const Color(0xFF38BDF8) : Colors.white54,
-                        size: 16,
+                child: _isSearchActive
+                    ? Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0284C7).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF38BDF8), width: 2.0),
+                        ),
+                        child: TextField(
+                          focusNode: _searchTextFieldFocusNode,
+                          controller: _searchController,
+                          autofocus: true,
+                          textInputAction: TextInputAction.search,
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          onSubmitted: (_) {
+                            setState(() {
+                              _isSearchActive = false;
+                            });
+                            _searchTextFieldFocusNode.unfocus();
+                            _firstChannelCardFocusNode.requestFocus();
+                          },
+                          decoration: InputDecoration(
+                            hintText: 'Nhập tên kênh...',
+                            hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                            prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF38BDF8), size: 16),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 16),
+                              onPressed: () {
+                                setState(() {
+                                  _isSearchActive = false;
+                                });
+                                _searchTextFieldFocusNode.unfocus();
+                                _firstChannelCardFocusNode.requestFocus();
+                              },
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              _searchQuery = val.trim();
+                            });
+                          },
+                        ),
+                      )
+                    : TvFocusableCard(
+                        focusNode: _searchCardFocusNode,
+                        borderRadius: BorderRadius.circular(8),
+                        onTap: () {
+                          setState(() {
+                            _isSearchActive = true;
+                          });
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _searchTextFieldFocusNode.requestFocus();
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _isSearchCardFocused
+                                ? const Color(0xFF0284C7).withOpacity(0.18)
+                                : const Color(0xFF161E2E),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: _isSearchCardFocused ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                              width: _isSearchCardFocused ? 2.0 : 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.search_rounded,
+                                color: _isSearchCardFocused ? const Color(0xFF38BDF8) : Colors.white54,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _searchQuery.isNotEmpty ? _searchQuery : 'Tìm kiếm kênh...',
+                                  style: TextStyle(
+                                    color: _searchQuery.isNotEmpty ? Colors.white : Colors.white38,
+                                    fontSize: 12,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (_searchQuery.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchQuery = '';
+                                    });
+                                  },
+                                  child: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
+                                )
+                              else if (_isSearchCardFocused)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF38BDF8).withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: const Text(
+                                    'Bấm OK',
+                                    style: TextStyle(color: Color(0xFF38BDF8), fontSize: 9, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                      suffixIcon: (_searchQuery.isNotEmpty || _isSearchFocused)
-                          ? Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (_searchQuery.isNotEmpty)
-                                  IconButton(
-                                    icon: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
-                                    onPressed: () {
-                                      setState(() {
-                                        _searchController.clear();
-                                        _searchQuery = '';
-                                      });
-                                    },
-                                  ),
-                                if (_isSearchFocused)
-                                  GestureDetector(
-                                    onTap: () {
-                                      _searchFocusNode.unfocus();
-                                      _firstChannelCardFocusNode.requestFocus();
-                                    },
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 6),
-                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF38BDF8).withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.5), width: 0.8),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text('Thoát', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold)),
-                                          SizedBox(width: 2),
-                                          Icon(Icons.arrow_downward_rounded, color: Color(0xFF38BDF8), size: 10),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    ),
-                    onChanged: (val) {
-                      setState(() {
-                        _searchQuery = val.trim();
-                      });
-                    },
-                  ),
-                ),
               ),
               const SizedBox(width: 10),
 
