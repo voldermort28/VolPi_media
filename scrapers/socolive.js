@@ -5,15 +5,16 @@ const config = require('../config');
 let resolvedBaseUrl = null;
 
 const CANDIDATE_DOMAINS = [
-  'https://webfifa55.live',
+  'https://socolive2.top',
   'https://socolivevq.top',
   'https://socolive85.live',
   'https://socolivetvz.top',
+  'https://webfifa55.live',
 ];
 
 function getBaseUrl() {
   if (resolvedBaseUrl) return resolvedBaseUrl;
-  return config.getConfig().socoliveBaseUrl || 'https://webfifa55.live';
+  return config.getConfig().socoliveBaseUrl || 'https://socolive2.top';
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';

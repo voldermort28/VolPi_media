@@ -5,7 +5,7 @@ const CONFIG_FILE = path.join(__dirname, "config.json");
 
 const DEFAULT_CONFIG = {
   xoilacBaseUrl: "https://xoilaczzw.cc",
-  socoliveBaseUrl: "https://webfifa55.live",
+  socoliveBaseUrl: "https://socolive2.top",
   vlxxBaseUrl: "https://vlxx.phd",
   viet69BaseUrl: "https://viet69.be",
   yumeiBaseUrl: "https://yumei-anime.com",
