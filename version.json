@@ -1,10 +1,10 @@
 {
-  "version": "1.0.40",
-  "build": 41,
-  "tag_name": "v1.0.40",
-  "changelog": "• Nâng cấp giao diện Trình phát video (Player):\n- Loại bỏ lớp phủ tối màn hình khi thao tác (pause, tua, next,...), giữ khung hình video luôn sáng rõ 100% không bị mờ đen.\n- Chuyển toàn bộ các nút điều khiển (Play/Pause, Tua ±10s, Next, Prev) từ giữa màn hình xuống dưới thanh tiến trình, trả lại không gian xem phim và bóng đá thông thoáng không bị che chắn.",
+  "version": "1.0.41",
+  "build": 42,
+  "tag_name": "v1.0.41",
+  "changelog": "• Tính năng mới & Nâng cấp v1.0.41:\n- Lịch sử xem phim: Tự động lưu tiến độ, popup hỏi Xem tiếp / Xem từ đầu khi vào phim dở.\n- Thư viện Anime: Đổi tên filter thành Toàn Bộ, bổ sung Phim lẻ Anime (41+ Phim), click thumbnail vào danh mục hiển thị phân chia season chuẩn.\n- Tab Riêng Tư: Đánh dấu đồng hồ 🕒 ở góc poster phim đã xem, hỗ trợ popup xem tiếp.\n- Yêu Thích: Nhấn giữ nút OK (600ms) trên Remote TV để thêm/xóa Yêu thích hoặc xóa khỏi Lịch sử.\n- Đồng bộ đám mây (Cloud Sync): Tự động đồng bộ lịch sử xem và yêu thích đa thiết bị.\n- Tối ưu hóa hiệu năng TV: Chống lag giật remote và giảm tải RAM.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-18T02:27:00Z"
+  "published_at": "2026-10-18T04:15:00Z"
 }
