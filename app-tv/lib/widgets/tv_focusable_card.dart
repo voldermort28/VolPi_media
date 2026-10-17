@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+bool get _isMacOS => !kIsWeb && Platform.isMacOS;
 
 class TvFocusableCard extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
+  final VoidCallback? onSecondaryTap;
   final double scale;
   final Color focusBorderColor;
   final BorderRadius borderRadius;
@@ -17,6 +22,7 @@ class TvFocusableCard extends StatefulWidget {
     required this.child,
     required this.onTap,
     this.onLongPress,
+    this.onSecondaryTap,
     this.scale = 1.0,
     this.focusBorderColor = const Color(0xFF38BDF8), // Electric Sky Blue
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
@@ -140,36 +146,46 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
 
           return KeyEventResult.ignored;
         },
-        child: GestureDetector(
-          onTap: () {
-            _focusNode.requestFocus();
-            widget.onTap();
-          },
-          onLongPress: widget.onLongPress != null
-              ? () {
-                  _focusNode.requestFocus();
-                  widget.onLongPress!();
-                }
-              : null,
-          child: AnimatedScale(
-            scale: _isFocused ? widget.scale : 1.0,
-            duration: const Duration(milliseconds: 120),
-            curve: Curves.easeOutCubic,
-            child: AnimatedContainer(
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              _focusNode.requestFocus();
+              widget.onTap();
+            },
+            onSecondaryTap: (widget.onSecondaryTap ?? widget.onLongPress) != null
+                ? () {
+                    _focusNode.requestFocus();
+                    (widget.onSecondaryTap ?? widget.onLongPress)!();
+                  }
+                : null,
+            onLongPress: (widget.onLongPress != null && !_isMacOS)
+                ? () {
+                    _focusNode.requestFocus();
+                    widget.onLongPress!();
+                  }
+                : null,
+            child: AnimatedScale(
+              scale: _isFocused ? widget.scale : 1.0,
               duration: const Duration(milliseconds: 120),
-              foregroundDecoration: BoxDecoration(
-                borderRadius: widget.borderRadius,
-                border: Border.all(
-                  color: _isFocused ? widget.focusBorderColor : Colors.transparent,
-                  width: _isFocused ? 3.5 : 0.0,
+              curve: Curves.easeOutCubic,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                foregroundDecoration: BoxDecoration(
+                  borderRadius: widget.borderRadius,
+                  border: Border.all(
+                    color: _isFocused ? widget.focusBorderColor : Colors.transparent,
+                    width: _isFocused ? 3.5 : 0.0,
+                  ),
+                  color: _isFocused
+                      ? widget.focusBorderColor.withOpacity(0.08)
+                      : Colors.transparent,
                 ),
-                color: _isFocused
-                    ? widget.focusBorderColor.withOpacity(0.08)
-                    : Colors.transparent,
-              ),
-              child: ClipRRect(
-                borderRadius: widget.borderRadius,
-                child: widget.child,
+                child: ClipRRect(
+                  borderRadius: widget.borderRadius,
+                  child: widget.child,
+                ),
               ),
             ),
           ),
