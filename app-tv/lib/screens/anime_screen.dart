@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/anime_model.dart';
+import '../models/favorite_item_model.dart';
+import '../models/watch_history_model.dart';
+import '../player/video_player_screen.dart';
+import '../services/favorites_service.dart';
+import '../services/sync_service.dart';
+import '../services/watch_history_service.dart';
+import '../widgets/movie_action_dialog.dart';
+import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import 'anime_detail_screen.dart';
 
@@ -16,7 +24,8 @@ class AnimeScreen extends StatefulWidget {
 
 class _AnimeScreenState extends State<AnimeScreen> {
   final List<Map<String, String>> _categories = [
-    {'id': 'yumei-top', 'name': '🌟 4 Thế Giới'},
+    {'id': 'yumei-top', 'name': '🌟 Toàn Bộ'},
+    {'id': 'favorites', 'name': '❤️ Yêu Thích'},
     {'id': 'yumei-pokemon', 'name': '⚡ Pokemon'},
     {'id': 'yumei-sentai', 'name': '⚔️ Super Sentai'},
     {'id': 'yumei-power-rangers', 'name': '⚡ Power Rangers'},
@@ -32,11 +41,57 @@ class _AnimeScreenState extends State<AnimeScreen> {
   @override
   void initState() {
     super.initState();
+    WatchHistoryService.instance.changeNotifier.addListener(_onServiceUpdate);
+    FavoritesService.instance.changeNotifier.addListener(_onServiceUpdate);
     _loadCategory(0);
+  }
+
+  @override
+  void dispose() {
+    WatchHistoryService.instance.changeNotifier.removeListener(_onServiceUpdate);
+    FavoritesService.instance.changeNotifier.removeListener(_onServiceUpdate);
+    super.dispose();
+  }
+
+  void _onServiceUpdate() {
+    if (!mounted) return;
+    if (_categories[_selectedCategoryIndex]['id'] == 'favorites') {
+      _loadFavoritesCategory();
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _loadFavoritesCategory() {
+    final favs = FavoritesService.instance
+        .getFavorites()
+        .where((f) => f.category != 'secret')
+        .toList();
+
+    setState(() {
+      _items = favs
+          .map((f) => AnimeModel(
+                id: f.id.startsWith('anime:') ? f.id.substring(6) : f.id,
+                name: f.title,
+                poster: f.poster,
+                description: '',
+              ))
+          .toList();
+      _isLoading = false;
+    });
   }
 
   Future<void> _loadCategory(int index) async {
     final catId = _categories[index]['id']!;
+
+    if (catId == 'favorites') {
+      setState(() {
+        _selectedCategoryIndex = index;
+        _isLoading = true;
+      });
+      _loadFavoritesCategory();
+      return;
+    }
 
     if (_catalogCache.containsKey(catId)) {
       setState(() {
@@ -71,6 +126,38 @@ class _AnimeScreenState extends State<AnimeScreen> {
     }
   }
 
+  int _findCategoryIndexForAnime(AnimeModel anime) {
+    final id = anime.id.toLowerCase();
+    final name = anime.name.toLowerCase();
+    if (id.contains('pokemon') || name.contains('pokemon')) {
+      return _categories.indexWhere((c) => c['id'] == 'yumei-pokemon');
+    }
+    if (id.contains('sentai') || name.contains('sentai')) {
+      return _categories.indexWhere((c) => c['id'] == 'yumei-sentai');
+    }
+    if (id.contains('power-rangers') || id.contains('rangers') || name.contains('power rangers')) {
+      return _categories.indexWhere((c) => c['id'] == 'yumei-power-rangers');
+    }
+    if (id.contains('movies') || name.contains('phim lẻ')) {
+      return _categories.indexWhere((c) => c['id'] == 'yumei-movies');
+    }
+    if (id.contains('anime') || name.contains('anime khác') || name.contains('digimon') || name.contains('yugioh')) {
+      return _categories.indexWhere((c) => c['id'] == 'yumei-anime');
+    }
+    return -1;
+  }
+
+  void _onAnimeCardTap(AnimeModel anime) {
+    if (_selectedCategoryIndex == 0) {
+      final targetIndex = _findCategoryIndexForAnime(anime);
+      if (targetIndex != -1) {
+        _loadCategory(targetIndex);
+        return;
+      }
+    }
+    _openDetail(anime);
+  }
+
   void _openDetail(AnimeModel anime) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -82,38 +169,432 @@ class _AnimeScreenState extends State<AnimeScreen> {
     );
   }
 
+  void _playContinueWatching(WatchHistoryItem item) async {
+    if (item.streamUrl != null && item.streamUrl!.isNotEmpty) {
+      final choice = await ResumePlaybackDialog.show(context, item);
+      if (choice == null || !mounted) return;
+
+      final startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
+      if (!choice) {
+        WatchHistoryService.instance.clearProgress(item.id);
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            streamUrl: item.streamUrl!,
+            title: item.title,
+            isLive: false,
+            initialPosition: startPos,
+            mediaId: item.id,
+            mediaCategory: item.category,
+            mediaPoster: item.poster,
+            episode: item.episode,
+            season: item.season,
+          ),
+        ),
+      );
+    } else {
+      // Fallback
+      _openDetail(AnimeModel(
+        id: item.id.replaceAll(RegExp(r'^anime:|:ep:\d+$'), ''),
+        name: item.title,
+        poster: item.poster,
+        description: '',
+      ));
+    }
+  }
+
+  void _openContinueWatchingMenu(WatchHistoryItem item) async {
+    final favId = 'anime:${item.id.replaceAll(RegExp(r'^anime:|:ep:\d+$'), '')}';
+    final isFav = FavoritesService.instance.isFavorite(favId) ||
+        FavoritesService.instance.isFavorite(item.id);
+
+    final action = await MovieActionDialog.show(
+      context,
+      title: item.title,
+      poster: item.poster,
+      isFavorite: isFav,
+      hasHistory: true,
+    );
+
+    if (action == null || action == MovieAction.cancel) return;
+
+    if (action == MovieAction.toggleFavorite) {
+      final nowFav = FavoritesService.instance.toggleFavorite(
+        FavoriteItem(
+          id: favId,
+          title: item.title,
+          poster: item.poster,
+          category: 'anime',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+      );
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(nowFav ? 'Đã thêm vào danh sách Yêu thích ❤️' : 'Đã xóa khỏi danh sách Yêu thích 💔'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+      }
+    } else if (action == MovieAction.removeHistory) {
+      WatchHistoryService.instance.clearProgress(item.id);
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa khỏi danh sách đã xem 🗑️'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+      }
+    } else if (action == MovieAction.play) {
+      _playContinueWatching(item);
+    }
+  }
+
+  void _openAnimeMenu(AnimeModel anime) async {
+    // Nếu ở Toàn Bộ và click vào danh mục đại diện (Pokemon, Sentai...) thì chuyển danh mục
+    if (_selectedCategoryIndex == 0 && _findCategoryIndexForAnime(anime) != -1) {
+      _loadCategory(_findCategoryIndexForAnime(anime));
+      return;
+    }
+
+    final favId = 'anime:${anime.id}';
+    final isFav = FavoritesService.instance.isFavorite(favId) ||
+        FavoritesService.instance.isFavorite(anime.id);
+    final hasHist = WatchHistoryService.instance.hasProgressForPrefix(favId) ||
+        WatchHistoryService.instance.hasProgressForPrefix(anime.id) ||
+        WatchHistoryService.instance.getProgress(favId) != null ||
+        WatchHistoryService.instance.getProgress(anime.id) != null;
+
+    final action = await MovieActionDialog.show(
+      context,
+      title: anime.name,
+      poster: anime.poster,
+      isFavorite: isFav,
+      hasHistory: hasHist,
+    );
+
+    if (action == null || action == MovieAction.cancel) return;
+
+    if (action == MovieAction.toggleFavorite) {
+      final nowFav = FavoritesService.instance.toggleFavorite(
+        FavoriteItem(
+          id: favId,
+          title: anime.name,
+          poster: anime.poster,
+          category: 'anime',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+      );
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(nowFav ? 'Đã thêm vào danh sách Yêu thích ❤️' : 'Đã xóa khỏi danh sách Yêu thích 💔'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+      }
+    } else if (action == MovieAction.removeHistory) {
+      WatchHistoryService.instance.clearProgressForPrefix(favId);
+      WatchHistoryService.instance.clearProgressForPrefix(anime.id);
+      WatchHistoryService.instance.clearProgress(favId);
+      WatchHistoryService.instance.clearProgress(anime.id);
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa khỏi danh sách đã xem 🗑️'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+      }
+    } else if (action == MovieAction.play) {
+      _onAnimeCardTap(anime);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final continueWatching = WatchHistoryService.instance.getContinueWatching(excludeCategory: 'secret');
+
+    return PopScope(
+      canPop: _selectedCategoryIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_selectedCategoryIndex != 0) {
+          _loadCategory(0);
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Category Selector Row (Remote Navigable)
+          Container(
+            height: 44,
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: _categories.length,
+              itemBuilder: (context, idx) {
+                final cat = _categories[idx];
+                final bool isSelected = idx == _selectedCategoryIndex;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: TvFocusableCard(
+                    onTap: () => _loadCategory(idx),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(10),
+                        border: isSelected
+                            ? Border.all(color: const Color(0xFF38BDF8), width: 1.2)
+                            : null,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        cat['name']!,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white70,
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Continue Watching Row (Tiếp tục xem)
+          if (continueWatching.isNotEmpty)
+            _buildContinueWatchingRow(continueWatching),
+
+          // Grid Content Area
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
+                : _items.isEmpty
+                    ? Center(
+                        child: Text(
+                          _categories[_selectedCategoryIndex]['id'] == 'favorites'
+                              ? 'Chưa có phim nào trong danh sách Yêu thích.'
+                              : 'Không có nội dung trong danh mục này.',
+                          style: const TextStyle(color: Colors.white54),
+                        ),
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          int crossAxisCount = 2;
+                          if (constraints.maxWidth > 1200) {
+                            crossAxisCount = 6;
+                          } else if (constraints.maxWidth > 900) {
+                            crossAxisCount = 5;
+                          } else if (constraints.maxWidth > 650) {
+                            crossAxisCount = 4;
+                          } else if (constraints.maxWidth > 450) {
+                            crossAxisCount = 3;
+                          }
+
+                          return GridView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                            addAutomaticKeepAlives: true,
+                            addRepaintBoundaries: true,
+                            cacheExtent: 350,
+                            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: crossAxisCount,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 16,
+                              childAspectRatio: 0.68,
+                            ),
+                            itemCount: _items.length,
+                            itemBuilder: (context, idx) {
+                              final anime = _items[idx];
+                              return _buildAnimeCard(anime);
+                            },
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContinueWatchingRow(List<WatchHistoryItem> list) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category Selector Row (Remote Navigable)
-        Container(
-          height: 44,
-          margin: const EdgeInsets.symmetric(vertical: 10),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 2, 20, 8),
+          child: Row(
+            children: [
+              const Icon(Icons.history_toggle_off_rounded, color: Color(0xFF38BDF8), size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Tiếp tục xem',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0284C7).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                ),
+                child: Text(
+                  '${list.length}',
+                  style: const TextStyle(
+                    color: Color(0xFF38BDF8),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 140,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _categories.length,
+            itemCount: list.length,
             itemBuilder: (context, idx) {
-              final cat = _categories[idx];
-              final bool isSelected = idx == _selectedCategoryIndex;
-
+              final item = list[idx];
               return Padding(
-                padding: const EdgeInsets.only(right: 10),
+                padding: const EdgeInsets.only(right: 12),
                 child: TvFocusableCard(
-                  onTap: () => _loadCategory(idx),
+                  onTap: () => _playContinueWatching(item),
+                  onLongPress: () => _openContinueWatchingMenu(item),
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                    alignment: Alignment.center,
-                    child: Text(
-                      cat['name']!,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.white70,
-                        fontSize: 13,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                      ),
+                    width: 170,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Thumbnail with Progress bar
+                        Expanded(
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ClipRRect(
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
+                                child: CachedNetworkImage(
+                                  imageUrl: item.poster,
+                                  memCacheWidth: 200,
+                                  memCacheHeight: 120,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    color: const Color(0xFF334155),
+                                    child: const Icon(Icons.movie_outlined, color: Colors.white30, size: 28),
+                                  ),
+                                ),
+                              ),
+                              // Play overlay icon
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.6),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white30),
+                                  ),
+                                  child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                                ),
+                              ),
+                              // Progress bar
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Container(
+                                  height: 4,
+                                  color: Colors.black54,
+                                  child: FractionallySizedBox(
+                                    alignment: Alignment.centerLeft,
+                                    widthFactor: item.progressPercent.clamp(0.0, 1.0),
+                                    child: Container(
+                                      color: const Color(0xFF38BDF8),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Episode badge if present
+                              if (item.episode != null && item.episode! > 0)
+                                Positioned(
+                                  top: 6,
+                                  left: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withOpacity(0.75),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Tập ${item.episode}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        // Title + Duration info
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${item.formattedPosition} / ${item.formattedDuration}',
+                                style: const TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -121,53 +602,23 @@ class _AnimeScreenState extends State<AnimeScreen> {
             },
           ),
         ),
-
-        // Grid Content Area
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
-              : _items.isEmpty
-                  ? const Center(child: Text('Không có nội dung trong danh mục này.', style: TextStyle(color: Colors.white54)))
-                  : LayoutBuilder(
-                      builder: (context, constraints) {
-                        int crossAxisCount = 2;
-                        if (constraints.maxWidth > 1200) {
-                          crossAxisCount = 6;
-                        } else if (constraints.maxWidth > 900) {
-                          crossAxisCount = 5;
-                        } else if (constraints.maxWidth > 650) {
-                          crossAxisCount = 4;
-                        } else if (constraints.maxWidth > 450) {
-                          crossAxisCount = 3;
-                        }
-
-                        return GridView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          addAutomaticKeepAlives: true,
-                          addRepaintBoundaries: true,
-                          cacheExtent: 350,
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: crossAxisCount,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 16,
-                            childAspectRatio: 0.68,
-                          ),
-                          itemCount: _items.length,
-                          itemBuilder: (context, idx) {
-                            final anime = _items[idx];
-                            return _buildAnimeCard(anime);
-                          },
-                        );
-                      },
-                    ),
-        ),
+        const SizedBox(height: 8),
       ],
     );
   }
 
   Widget _buildAnimeCard(AnimeModel anime) {
+    final favId = 'anime:${anime.id}';
+    final isFav = FavoritesService.instance.isFavorite(favId) ||
+        FavoritesService.instance.isFavorite(anime.id);
+    final hasHist = WatchHistoryService.instance.hasProgressForPrefix(favId) ||
+        WatchHistoryService.instance.hasProgressForPrefix(anime.id) ||
+        WatchHistoryService.instance.getProgress(favId) != null ||
+        WatchHistoryService.instance.getProgress(anime.id) != null;
+
     return TvFocusableCard(
-      onTap: () => _openDetail(anime),
+      onTap: () => _onAnimeCardTap(anime),
+      onLongPress: () => _openAnimeMenu(anime),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         color: const Color(0xFF1E293B),
@@ -189,6 +640,38 @@ class _AnimeScreenState extends State<AnimeScreen> {
                       child: const Icon(Icons.movie_creation_outlined, color: Colors.white30, size: 36),
                     ),
                   ),
+                  // Badge icon đồng hồ ở góc trên bên trái nếu đã xem
+                  if (hasHist)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.5), width: 0.8),
+                        ),
+                        child: const Icon(Icons.access_time_rounded, color: Color(0xFF38BDF8), size: 12),
+                      ),
+                    ),
+                  // Badge icon tim đỏ nếu đã yêu thích
+                  if (isFav)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE11D48),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 4),
+                          ],
+                        ),
+                        child: const Icon(Icons.favorite, color: Colors.white, size: 12),
+                      ),
+                    ),
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(

@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/anime_model.dart';
+import '../models/favorite_item_model.dart';
 import '../models/match_model.dart';
+import '../models/watch_history_model.dart';
+import '../services/favorites_service.dart';
+import '../services/sync_service.dart';
+import '../services/watch_history_service.dart';
+import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -44,6 +50,21 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
 
     final ep = episodes[index];
     final targetContext = replaceContext ?? context;
+
+    final historyId = 'anime:${widget.anime.id}:ep:${ep.episode}';
+    final saved = WatchHistoryService.instance.getProgress(historyId);
+
+    Duration? startPosition;
+    if (saved != null && saved.isInProgress && replaceContext == null) {
+      final choice = await ResumePlaybackDialog.show(context, saved);
+      if (choice == null) return; // Hủy
+      if (choice) {
+        startPosition = Duration(milliseconds: saved.positionMs);
+      } else {
+        startPosition = Duration.zero;
+        WatchHistoryService.instance.clearProgress(historyId);
+      }
+    }
 
     showDialog(
       context: targetContext,
@@ -93,6 +114,12 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         headers: selectedStream.headers,
         availableChannels: streams,
         isLive: false,
+        initialPosition: startPosition,
+        mediaId: historyId,
+        mediaCategory: 'anime',
+        mediaPoster: ep.thumbnail.isNotEmpty ? ep.thumbnail : anime.poster,
+        episode: ep.episode,
+        season: ep.season,
         onNext: index + 1 < episodes.length
             ? () => _playEpisodeAtIndex(index + 1, replaceContext: playerCtx)
             : null,
@@ -142,6 +169,71 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  ),
+                  const SizedBox(width: 12),
+                  ValueListenableBuilder<int>(
+                    valueListenable: FavoritesService.instance.changeNotifier,
+                    builder: (context, _, __) {
+                      final favId = 'anime:${widget.anime.id}';
+                      final isFav = FavoritesService.instance.isFavorite(favId) ||
+                          FavoritesService.instance.isFavorite(widget.anime.id);
+
+                      return TvFocusableCard(
+                        onTap: () {
+                          final nowFav = FavoritesService.instance.toggleFavorite(
+                            FavoriteItem(
+                              id: favId,
+                              title: widget.anime.name,
+                              poster: widget.anime.poster,
+                              category: 'anime',
+                              createdAt: DateTime.now().toIso8601String(),
+                            ),
+                          );
+                          SyncService.schedulePush(widget.apiService.baseUrl);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                nowFav
+                                    ? 'Đã thêm vào danh sách Yêu thích ❤️'
+                                    : 'Đã xóa khỏi danh sách Yêu thích 💔',
+                              ),
+                              duration: const Duration(seconds: 2),
+                              backgroundColor: const Color(0xFF0284C7),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isFav ? const Color(0xFFE11D48) : const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: isFav ? const Color(0xFFFB7185) : Colors.white12,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isFav ? Icons.favorite : Icons.favorite_border,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isFav ? 'Đã Thích' : 'Yêu Thích',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -319,6 +411,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                         itemCount: episodes.length,
                                         itemBuilder: (context, idx) {
                                           final ep = episodes[idx];
+                                          final epHistoryId = 'anime:${anime.id}:ep:${ep.episode}';
+                                          final epSaved = WatchHistoryService.instance.getProgress(epHistoryId);
                                           return TvFocusableCard(
                                             onTap: () => _playEpisodeAtIndex(idx),
                                             borderRadius: BorderRadius.circular(10),
@@ -326,10 +420,32 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                               color: const Color(0xFF1E293B),
                                               alignment: Alignment.center,
                                               padding: const EdgeInsets.symmetric(horizontal: 8),
-                                              child: Text(
-                                                'Tập ${ep.episode}',
-                                                style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                                textAlign: TextAlign.center,
+                                              child: Stack(
+                                                alignment: Alignment.center,
+                                                children: [
+                                                  Text(
+                                                    'Tập ${ep.episode}',
+                                                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                  if (epSaved != null)
+                                                    Positioned(
+                                                      bottom: 2,
+                                                      left: 4,
+                                                      right: 4,
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(2),
+                                                        child: LinearProgressIndicator(
+                                                          value: epSaved.isInProgress ? epSaved.progressPercent : 1.0,
+                                                          minHeight: 2.5,
+                                                          backgroundColor: Colors.white10,
+                                                          valueColor: AlwaysStoppedAnimation(
+                                                            epSaved.isInProgress ? const Color(0xFF38BDF8) : Colors.emerald,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                ],
                                               ),
                                             ),
                                           );

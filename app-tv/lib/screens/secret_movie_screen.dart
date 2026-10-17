@@ -1,8 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
+import '../models/favorite_item_model.dart';
 import '../models/match_model.dart';
 import '../models/movie_model.dart';
+import '../models/watch_history_model.dart';
+import '../services/favorites_service.dart';
+import '../services/watch_history_service.dart';
+import '../services/sync_service.dart';
+import '../widgets/movie_action_dialog.dart';
+import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -146,6 +153,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
           final uniqueNew = nextResults.where((m) => !existingIds.contains(m.id)).toList();
           if (uniqueNew.isNotEmpty) {
             _movies.addAll(uniqueNew);
+            if (_movies.length > 300) {
+              _movies.removeRange(0, _movies.length - 300);
+            }
           }
         }
       });
@@ -190,10 +200,25 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     _loadMovies();
   }
 
-  void _playMovieAtIndex(int index, {BuildContext? replaceContext}) {
+  void _playMovieAtIndex(int index, {BuildContext? replaceContext}) async {
     if (index < 0 || index >= _movies.length) return;
 
     final movie = _movies[index];
+    final historyId = 'movie:${movie.id}';
+    final saved = WatchHistoryService.instance.getProgress(historyId);
+
+    Duration? startPosition;
+    if (saved != null && saved.isInProgress && replaceContext == null) {
+      final choice = await ResumePlaybackDialog.show(context, saved);
+      if (choice == null) return;
+      if (choice) {
+        startPosition = Duration(milliseconds: saved.positionMs);
+      } else {
+        startPosition = Duration.zero;
+        WatchHistoryService.instance.clearProgress(historyId);
+      }
+    }
+
     final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
     final List<StreamChannel> servers = isViet69
         ? widget.apiService.getViet69Streams(movie.rawId)
@@ -221,6 +246,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         headers: initialServer.headers,
         availableChannels: servers,
         isLive: false,
+        initialPosition: startPosition,
+        mediaId: historyId,
+        mediaCategory: 'secret',
+        mediaPoster: movie.poster,
         onNext: index + 1 < _movies.length
             ? () => _playMovieAtIndex(index + 1, replaceContext: playerCtx)
             : null,
@@ -608,9 +637,68 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
   }
 
+  void _openMovieMenu(MovieModel movie, int index) async {
+    final historyId = 'movie:${movie.id}';
+    final isFav = FavoritesService.instance.isFavorite(historyId);
+    final hasHist = WatchHistoryService.instance.getProgress(historyId) != null;
+
+    final action = await MovieActionDialog.show(
+      context,
+      title: movie.title,
+      poster: movie.poster,
+      isFavorite: isFav,
+      hasHistory: hasHist,
+    );
+
+    if (action == null || action == MovieAction.cancel) return;
+
+    if (action == MovieAction.toggleFavorite) {
+      final nowFav = FavoritesService.instance.toggleFavorite(
+        FavoriteItem(
+          id: historyId,
+          title: movie.title,
+          poster: movie.poster,
+          category: 'secret',
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+      );
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(nowFav ? 'Đã thêm vào danh sách Yêu thích ❤️' : 'Đã xóa khỏi danh sách Yêu thích 💔'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+      }
+    } else if (action == MovieAction.removeHistory) {
+      WatchHistoryService.instance.clearProgress(historyId);
+      SyncService.schedulePush(widget.apiService.baseUrl);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã xóa khỏi lịch sử xem 🗑️'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Color(0xFFD97706),
+          ),
+        );
+      }
+    } else if (action == MovieAction.play) {
+      _playMovieAtIndex(index);
+    }
+  }
+
   Widget _buildMovieCard(MovieModel movie, int index, Color themeColor) {
+    final historyId = 'movie:${movie.id}';
+    final saved = WatchHistoryService.instance.getProgress(historyId);
+    final isFav = FavoritesService.instance.isFavorite(historyId);
+
     return TvFocusableCard(
       onTap: () => _playMovieAtIndex(index),
+      onLongPress: () => _openMovieMenu(movie, index),
       focusBorderColor: themeColor,
       borderRadius: BorderRadius.circular(12),
       child: Container(
@@ -647,6 +735,54 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                           movie.ribbon,
                           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
+                      ),
+                    ),
+                  // Badge icon đồng hồ ở góc trên bên trái avatar nếu phim đã xem
+                  if (saved != null)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.5), width: 0.8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.access_time_rounded, color: Color(0xFF38BDF8), size: 11),
+                            if (saved.isInProgress) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '${(saved.progressPercent * 100).toInt()}%',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Badge icon tim đỏ nếu đã yêu thích
+                  if (isFav)
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE11D48),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 4),
+                          ],
+                        ),
+                        child: const Icon(Icons.favorite, color: Colors.white, size: 12),
                       ),
                     ),
                   Container(

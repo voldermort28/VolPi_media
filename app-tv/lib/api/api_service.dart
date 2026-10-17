@@ -9,8 +9,15 @@ import '../models/iptv_channel_model.dart';
 class ApiService {
   static const String defaultHost = 'https://stremio.laboon.vn';
   final String baseUrl;
+  final http.Client _client;
 
-  ApiService({this.baseUrl = defaultHost});
+  ApiService({this.baseUrl = defaultHost, http.Client? client}) : _client = client ?? http.Client();
+
+  http.Client get client => _client;
+
+  void dispose() {
+    _client.close();
+  }
 
   // =========================================================================
   // =========================================================================
@@ -29,7 +36,7 @@ class ApiService {
         ? '$baseUrl/api/socolive/matches?_t=$timestamp'
         : '$baseUrl/api/matches?_t=$timestamp';
     try {
-      final res = await http.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is List && data.isNotEmpty) {
@@ -49,7 +56,7 @@ class ApiService {
         : '$baseUrl/$catalogPath';
 
     try {
-      final res = await http.get(Uri.parse(catalogUrl)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(catalogUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['metas'] != null) {
@@ -103,7 +110,7 @@ class ApiService {
     final url = '$baseUrl/$streamPath/$matchId.json?_t=$timestamp';
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['streams'] != null) {
@@ -128,7 +135,7 @@ class ApiService {
     }
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['metas'] != null) {
@@ -145,7 +152,7 @@ class ApiService {
   Future<AnimeModel?> getAnimeDetails(String animeId, {String type = 'series'}) async {
     final url = '$baseUrl/meta/$type/$animeId.json';
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['meta'] != null) {
@@ -168,7 +175,7 @@ class ApiService {
     final url = '$baseUrl/stream/$type/$streamId.json';
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['streams'] != null && (data['streams'] as List).isNotEmpty) {
@@ -224,7 +231,7 @@ class ApiService {
     }
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['metas'] != null) {
@@ -278,7 +285,7 @@ class ApiService {
     }
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data['metas'] != null) {
@@ -322,7 +329,7 @@ class ApiService {
         : '$baseUrl/api/iptv/channels';
 
     try {
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is List) {
@@ -340,7 +347,7 @@ class ApiService {
 
   Future<bool> refreshIptvSourceOnServer() async {
     try {
-      final res = await http.post(Uri.parse('$baseUrl/api/iptv/refresh')).timeout(const Duration(seconds: 15));
+      final res = await _client.post(Uri.parse('$baseUrl/api/iptv/refresh')).timeout(const Duration(seconds: 15));
       return res.statusCode == 200;
     } catch (_) {
       return false;

@@ -14,13 +14,13 @@ const manifest = {
     {
       type: 'series',
       id: 'yumei-top',
-      name: '🌟 Thư Viện Yumei (4 Danh Mục Thế Giới)',
+      name: '🌟 Thư Viện Yumei (Toàn Bộ)',
       extra: [
         {
           name: 'genre',
           options: [
             'Tất cả',
-            '🌟 4 Danh Mục Thế Giới',
+            '🌟 Toàn Bộ Danh Mục',
             '🔴 Pokemon (5 Phân Mục)',
             '⚡ Super Sentai (18 Series)',
             '⚡ Power Rangers (2 Nhóm Phim)',

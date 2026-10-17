@@ -270,6 +270,19 @@ function getTopCategoriesItems() {
       description: 'Mighty Morphin Power Rangers Season 1 (60 tập), Season 2 (32 tập) và các phim điện ảnh.',
       genres: ['Power Rangers', 'Tokusatsu'],
     },
+    {
+      id: 'yumei-movies-all',
+      name: 'Phim Lẻ Anime (41+ phim)',
+      cardTitle: 'Phim Lẻ Anime',
+      badge: '41+ phim',
+      subtitle: 'Phim điện ảnh Pokemon, Super Sentai, Power Rangers và Anime.',
+      categoryName: 'Phim Lẻ Anime',
+      genre: 'Phim Lẻ Anime',
+      type: 'series',
+      rawPoster: 'https://cdn.yumei-anime.com/assets/content/images/6a16c0e8edca254fdde17519/M23_poster_4.png',
+      description: 'Tuyển tập 41+ phim điện ảnh Anime: Pokemon The Movies (25), Super Sentai The Movie, Power Rangers và Anime đặc biệt.',
+      genres: ['Phim Lẻ Anime', 'Phim Chiếu Rạp', 'Yumei Anime'],
+    },
   ];
 
   items.forEach(applyCardUrls);

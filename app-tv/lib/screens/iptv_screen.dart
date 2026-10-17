@@ -57,6 +57,14 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   bool _isSearchCardFocused = false;
   bool _isSearchActive = false;
 
+  // TV Performance Caching
+  String? _lastFilterKey;
+  List<IptvChannelModel>? _cachedFilteredChannels;
+  String? _lastGroupsKey;
+  List<String>? _cachedGroups;
+  int? _lastSourceChannelsCount;
+  List<IptvSourceModel>? _cachedSources;
+
   @override
   void initState() {
     super.initState();
@@ -156,6 +164,10 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   List<IptvSourceModel> _getAvailableSources() {
+    if (_lastSourceChannelsCount == _allChannels.length && _cachedSources != null) {
+      return _cachedSources!;
+    }
+
     final Map<String, String> sourceNames = {};
     final Map<String, int> sourceCounts = {};
 
@@ -174,6 +186,8 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       sources.add(IptvSourceModel(id: id, name: name, count: sourceCounts[id] ?? 0));
     });
 
+    _lastSourceChannelsCount = _allChannels.length;
+    _cachedSources = sources;
     return sources;
   }
 
@@ -194,6 +208,11 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   List<String> _getAvailableGroups() {
+    final currentKey = '$_selectedSourceId|$_selectedCategory|${_allChannels.length}';
+    if (_lastGroupsKey == currentKey && _cachedGroups != null) {
+      return _cachedGroups!;
+    }
+
     final Set<String> groups = {};
     for (final c in _allChannels) {
       if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) continue;
@@ -209,10 +228,18 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       }
     }
     final sorted = groups.toList()..sort();
-    return ['ALL', if (_selectedCategory != 'PINNED') '⭐ Yêu Thích', ...sorted];
+    final res = ['ALL', if (_selectedCategory != 'PINNED') '⭐ Yêu Thích', ...sorted];
+    _lastGroupsKey = currentKey;
+    _cachedGroups = res;
+    return res;
   }
 
   List<IptvChannelModel> _getFilteredChannels() {
+    final currentKey = '$_selectedSourceId|$_selectedCategory|$_selectedGroup|$_searchQuery|${_allChannels.length}';
+    if (_lastFilterKey == currentKey && _cachedFilteredChannels != null) {
+      return _cachedFilteredChannels!;
+    }
+
     final list = _allChannels.where((c) {
       // 1. Source / Playlist filter
       if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) {
@@ -297,6 +324,8 @@ class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       return a.name.compareTo(b.name);
     });
 
+    _lastFilterKey = currentKey;
+    _cachedFilteredChannels = list;
     return list;
   }
 

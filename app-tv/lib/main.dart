@@ -3,7 +3,10 @@ import 'package:flutter/services.dart';
 import 'api/api_service.dart';
 import 'layout/adaptive_layout.dart';
 
-void main() {
+import 'services/favorites_service.dart';
+import 'services/watch_history_service.dart';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Low-RAM TV & Device Optimization: limit image cache to prevent GC thrashing & lag
@@ -16,6 +19,12 @@ void main() {
     DeviceOrientation.landscapeRight,
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+  ]);
+
+  // Khởi tạo các service lưu trữ nền song song vào RAM
+  await Future.wait([
+    WatchHistoryService.instance.init(),
+    FavoritesService.instance.init(),
   ]);
 
   final apiService = ApiService();

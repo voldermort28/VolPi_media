@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../models/match_model.dart';
+import '../models/watch_history_model.dart';
+import '../services/watch_history_service.dart';
 import '../widgets/tv_focusable_card.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -17,6 +19,12 @@ class VideoPlayerScreen extends StatefulWidget {
   final bool isLive;
   final VoidCallback? onNext;
   final VoidCallback? onPrevious;
+  final Duration? initialPosition;
+  final String? mediaId;
+  final String? mediaCategory;
+  final String? mediaPoster;
+  final int episode;
+  final int season;
 
   const VideoPlayerScreen({
     super.key,
@@ -28,6 +36,12 @@ class VideoPlayerScreen extends StatefulWidget {
     this.isLive = false,
     this.onNext,
     this.onPrevious,
+    this.initialPosition,
+    this.mediaId,
+    this.mediaCategory = 'anime',
+    this.mediaPoster = '',
+    this.episode = 0,
+    this.season = 0,
   });
 
   @override
@@ -35,6 +49,7 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+  Timer? _saveProgressTimer;
   late VideoPlayerController _controller;
   bool _isInitialized = false;
   bool _hasError = false;
@@ -108,6 +123,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       await _controller.initialize();
       _controller.setVolume(_isMuted ? 0.0 : _volume);
+      if (widget.initialPosition != null && widget.initialPosition! > Duration.zero) {
+        await _controller.seekTo(widget.initialPosition!);
+      }
       _controller.play();
 
       _controller.addListener(_videoListener);
@@ -117,6 +135,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _isInitialized = true;
         });
         _startHideControlsTimer();
+        _saveProgressTimer?.cancel();
+        _saveProgressTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+          _saveCurrentProgress();
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -530,8 +552,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  void _saveCurrentProgress() {
+    if (!mounted || !_isInitialized || widget.isLive || widget.mediaId == null || widget.mediaId!.isEmpty) return;
+    try {
+      final pos = _controller.value.position;
+      final dur = _controller.value.duration;
+      if (pos.inMilliseconds < 1000 || dur.inMilliseconds < 1000) return;
+
+      WatchHistoryService.instance.saveProgress(
+        WatchHistoryItem(
+          id: widget.mediaId!,
+          mediaId: widget.mediaId!,
+          title: widget.title,
+          subtitle: widget.subtitle,
+          poster: widget.mediaPoster ?? '',
+          positionMs: pos.inMilliseconds,
+          durationMs: dur.inMilliseconds,
+          category: widget.mediaCategory ?? 'anime',
+          episode: widget.episode,
+          season: widget.season,
+          updatedAt: DateTime.now().toIso8601String(),
+        ),
+      );
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    _saveProgressTimer?.cancel();
+    _saveCurrentProgress();
+    WatchHistoryService.instance.flush();
     _hideControlsTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();

@@ -3,6 +3,7 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const { getRouter } = require("stremio-addon-sdk");
 
 const config = require("./config");
@@ -576,6 +577,95 @@ app.post("/api/config", authService.requireAuth, (req, res) => {
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
+});
+
+// ============================================================================
+// USER DATA SYNC (Cross-Device)
+// ============================================================================
+const USER_DATA_DIR = path.join(__dirname, "user_data");
+if (!fs.existsSync(USER_DATA_DIR)) fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+
+function getSyncFilePath(syncKey) {
+  const hash = crypto.createHash("sha256").update(String(syncKey)).digest("hex").slice(0, 16);
+  return path.join(USER_DATA_DIR, `sync_${hash}.json`);
+}
+
+function readSyncData(syncKey) {
+  const filePath = getSyncFilePath(syncKey);
+  try {
+    if (fs.existsSync(filePath)) {
+      return JSON.parse(fs.readFileSync(filePath, "utf8"));
+    }
+  } catch (e) {
+    console.error("Error reading sync data:", e.message);
+  }
+  return { history: [], favorites: [], lastSyncAt: null };
+}
+
+function writeSyncData(syncKey, data) {
+  const filePath = getSyncFilePath(syncKey);
+  data.lastSyncAt = new Date().toISOString();
+  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+}
+
+app.get("/api/user/sync", (req, res) => {
+  const syncKey = req.query.key || req.headers["x-sync-key"] || "3105";
+  if (!syncKey || String(syncKey).length < 2) {
+    return res.status(400).json({ success: false, error: "Missing or invalid sync key" });
+  }
+  const data = readSyncData(syncKey);
+  res.json({ success: true, data });
+});
+
+app.post("/api/user/sync", (req, res) => {
+  const syncKey = req.body.key || req.headers["x-sync-key"] || "3105";
+  if (!syncKey || String(syncKey).length < 2) {
+    return res.status(400).json({ success: false, error: "Missing or invalid sync key" });
+  }
+
+  const incoming = req.body || {};
+  const existing = readSyncData(syncKey);
+
+  // Merge history: keep item with latest updatedAt
+  const historyMap = new Map();
+  for (const item of (existing.history || [])) {
+    if (item && item.id) historyMap.set(item.id, item);
+  }
+  for (const item of (incoming.history || [])) {
+    if (item && item.id) {
+      const prev = historyMap.get(item.id);
+      if (!prev || (item.updatedAt || "") >= (prev.updatedAt || "")) {
+        historyMap.set(item.id, item);
+      }
+    }
+  }
+  for (const delId of (incoming.deletedHistoryIds || [])) {
+    historyMap.delete(delId);
+  }
+
+  // Merge favorites: union by id, keep existing or incoming
+  const favMap = new Map();
+  for (const item of (existing.favorites || [])) {
+    if (item && item.id) favMap.set(item.id, item);
+  }
+  for (const item of (incoming.favorites || [])) {
+    if (item && item.id) {
+      if (!favMap.has(item.id)) {
+        favMap.set(item.id, item);
+      }
+    }
+  }
+  for (const delId of (incoming.deletedFavoriteIds || [])) {
+    favMap.delete(delId);
+  }
+
+  const merged = {
+    history: Array.from(historyMap.values()),
+    favorites: Array.from(favMap.values()),
+  };
+
+  writeSyncData(syncKey, merged);
+  res.json({ success: true, data: merged });
 });
 
 app.post("/api/test-domain", authService.requireAuth, async (req, res) => {

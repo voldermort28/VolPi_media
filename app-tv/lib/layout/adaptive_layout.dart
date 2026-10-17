@@ -5,6 +5,7 @@ import '../screens/football_screen.dart';
 import '../screens/anime_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/secret_movie_screen.dart';
+import '../services/sync_service.dart';
 import '../services/update_service.dart';
 import '../widgets/profile_button.dart';
 import '../widgets/tv_focusable_card.dart';
@@ -27,6 +28,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOtaUpdate(silent: true);
+      SyncService.pullFromServer(widget.apiService.baseUrl);
     });
   }
 
