@@ -566,6 +566,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           title: widget.title,
           subtitle: widget.subtitle,
           poster: widget.mediaPoster ?? '',
+          streamUrl: _currentStreamUrl,
           positionMs: pos.inMilliseconds,
           durationMs: dur.inMilliseconds,
           category: widget.mediaCategory ?? 'anime',

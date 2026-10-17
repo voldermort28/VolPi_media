@@ -4,6 +4,7 @@ class WatchHistoryItem {
   final String title; // Tên phim / Anime
   final String subtitle; // Tên tập hoặc chất lượng / server
   final String poster; // URL poster ảnh bìa
+  final String streamUrl; // Link luồng phát trực tiếp
   final int positionMs; // Vị trí đã xem (milliseconds)
   final int durationMs; // Tổng thời lượng (milliseconds)
   final String category; // 'anime' | 'secret'
@@ -17,6 +18,7 @@ class WatchHistoryItem {
     required this.title,
     this.subtitle = '',
     this.poster = '',
+    this.streamUrl = '',
     required this.positionMs,
     required this.durationMs,
     this.category = 'anime',
@@ -24,6 +26,9 @@ class WatchHistoryItem {
     this.season = 0,
     required this.updatedAt,
   });
+
+  int get position => positionMs;
+  int get duration => durationMs;
 
   /// Kiểm tra xem phim có đang ở trạng thái xem dở hay không
   /// - Bỏ qua xem lướt: < 15 giây
@@ -68,6 +73,7 @@ class WatchHistoryItem {
       'title': title,
       'subtitle': subtitle,
       'poster': poster,
+      'streamUrl': streamUrl,
       'positionMs': positionMs,
       'durationMs': durationMs,
       'category': category,
@@ -84,6 +90,7 @@ class WatchHistoryItem {
       title: json['title']?.toString() ?? '',
       subtitle: json['subtitle']?.toString() ?? '',
       poster: json['poster']?.toString() ?? '',
+      streamUrl: json['streamUrl']?.toString() ?? '',
       positionMs: (json['positionMs'] as num?)?.toInt() ?? 0,
       durationMs: (json['durationMs'] as num?)?.toInt() ?? 0,
       category: json['category']?.toString() ?? 'anime',

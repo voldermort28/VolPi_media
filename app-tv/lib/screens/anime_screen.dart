@@ -170,7 +170,7 @@ class _AnimeScreenState extends State<AnimeScreen> {
   }
 
   void _playContinueWatching(WatchHistoryItem item) async {
-    if (item.streamUrl != null && item.streamUrl!.isNotEmpty) {
+    if (item.streamUrl.isNotEmpty) {
       final choice = await ResumePlaybackDialog.show(context, item);
       if (choice == null || !mounted) return;
 
@@ -182,7 +182,7 @@ class _AnimeScreenState extends State<AnimeScreen> {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => VideoPlayerScreen(
-            streamUrl: item.streamUrl!,
+            streamUrl: item.streamUrl,
             title: item.title,
             isLive: false,
             initialPosition: startPos,
@@ -328,7 +328,7 @@ class _AnimeScreenState extends State<AnimeScreen> {
 
     return PopScope(
       canPop: _selectedCategoryIndex == 0,
-      onPopInvokedWithResult: (didPop, result) {
+      onPopInvoked: (didPop) {
         if (didPop) return;
         if (_selectedCategoryIndex != 0) {
           _loadCategory(0);
@@ -544,7 +544,7 @@ class _AnimeScreenState extends State<AnimeScreen> {
                                 ),
                               ),
                               // Episode badge if present
-                              if (item.episode != null && item.episode! > 0)
+                              if (item.episode > 0)
                                 Positioned(
                                   top: 6,
                                   left: 6,
