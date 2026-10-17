@@ -12,7 +12,7 @@ class AnimeModel {
     required this.id,
     required this.name,
     required this.poster,
-    required this.background,
+    this.background = '',
     required this.description,
     this.genres = const [],
     this.type = 'series',

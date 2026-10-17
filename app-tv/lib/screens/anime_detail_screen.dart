@@ -440,7 +440,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                                           minHeight: 2.5,
                                                           backgroundColor: Colors.white10,
                                                           valueColor: AlwaysStoppedAnimation(
-                                                            epSaved.isInProgress ? const Color(0xFF38BDF8) : Colors.emerald,
+                                                            epSaved.isInProgress ? const Color(0xFF38BDF8) : const Color(0xFF10B981),
                                                           ),
                                                         ),
                                                       ),

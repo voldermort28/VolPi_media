@@ -70,10 +70,11 @@ class _AnimeScreenState extends State<AnimeScreen> {
 
     setState(() {
       _items = favs
-          .map((f) => AnimeModel(
+          .map<AnimeModel>((f) => AnimeModel(
                 id: f.id.startsWith('anime:') ? f.id.substring(6) : f.id,
                 name: f.title,
                 poster: f.poster,
+                background: f.poster,
                 description: '',
               ))
           .toList();
@@ -197,9 +198,10 @@ class _AnimeScreenState extends State<AnimeScreen> {
     } else {
       // Fallback
       _openDetail(AnimeModel(
-        id: item.id.replaceAll(RegExp(r'^anime:|:ep:\d+$'), ''),
+        id: item.mediaId.isNotEmpty ? item.mediaId : item.id.replaceAll(RegExp(r'^anime:|:ep:\d+$'), ''),
         name: item.title,
         poster: item.poster,
+        background: item.poster,
         description: '',
       ));
     }
