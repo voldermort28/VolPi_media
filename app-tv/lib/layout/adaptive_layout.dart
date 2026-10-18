@@ -5,11 +5,13 @@ import '../screens/football_screen.dart';
 import '../screens/anime_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/secret_movie_screen.dart';
+import '../services/player_settings_service.dart';
 import '../services/sync_service.dart';
 import '../services/update_service.dart';
 import '../widgets/profile_button.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../widgets/update_dialog.dart';
+import 'netflix_layout.dart';
 
 class AdaptiveLayout extends StatefulWidget {
   final ApiService apiService;
@@ -26,10 +28,23 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
   @override
   void initState() {
     super.initState();
+    PlayerSettingsService.instance.uiChangeNotifier.addListener(_onUiChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOtaUpdate(silent: true);
       SyncService.pullFromServer(widget.apiService.baseUrl);
     });
+  }
+
+  @override
+  void dispose() {
+    PlayerSettingsService.instance.uiChangeNotifier.removeListener(_onUiChanged);
+    super.dispose();
+  }
+
+  void _onUiChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _checkOtaUpdate({bool silent = false}) async {
@@ -74,6 +89,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
 
   @override
   Widget build(BuildContext context) {
+    if (PlayerSettingsService.instance.useNetflixUI) {
+      return NetflixLayout(apiService: widget.apiService);
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final bool isLargeScreen = constraints.maxWidth >= 900;
@@ -139,6 +158,46 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   _buildTvNavTab(index: 3, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
 
                   const Spacer(),
+
+                  // Switch to Netflix UI Beta Button
+                  SizedBox(
+                    height: 38,
+                    child: TvFocusableCard(
+                      onTap: () {
+                        PlayerSettingsService.instance.setUseNetflixUI(true);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã bật Giao diện Netflix (Beta).'),
+                            backgroundColor: Color(0xFFE50914),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      focusBorderColor: const Color(0xFFE50914),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE50914).withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFE50914).withOpacity(0.6), width: 1.0),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.movie_creation_rounded, color: Color(0xFFE50914), size: 16),
+                            SizedBox(width: 6),
+                            Text(
+                              'Netflix UI (Beta)',
+                              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
 
                   // OTA Update Check Button
                   SizedBox(
@@ -276,6 +335,20 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.movie_creation_rounded, color: Color(0xFFE50914), size: 20),
+            tooltip: 'Giao diện Netflix (Beta)',
+            onPressed: () {
+              PlayerSettingsService.instance.setUseNetflixUI(true);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã bật Giao diện Netflix (Beta).'),
+                  backgroundColor: Color(0xFFE50914),
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 20),
             tooltip: 'Kiểm tra cập nhật',

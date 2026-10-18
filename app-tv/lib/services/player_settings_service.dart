@@ -12,13 +12,17 @@ class PlayerSettingsService {
   double _volume = 1.0;
   bool _isMuted = false;
   double _preMuteVolume = 1.0;
+  bool _useNetflixUI = false;
   bool _isInitialized = false;
+
+  final ChangeNotifier uiChangeNotifier = ChangeNotifier();
 
   double get volume => _volume;
   bool get isMuted => _isMuted;
   double get preMuteVolume => _preMuteVolume;
+  bool get useNetflixUI => _useNetflixUI;
 
-  /// Khởi tạo và nạp mức âm lượng đã lưu từ file JSON vào RAM
+  /// Khởi tạo và nạp cài đặt đã lưu từ file JSON vào RAM
   Future<void> init() async {
     if (_isInitialized) return;
     try {
@@ -38,6 +42,9 @@ class PlayerSettingsService {
             if (data['preMuteVolume'] is num) {
               _preMuteVolume = (data['preMuteVolume'] as num).toDouble().clamp(0.0, 1.0);
             }
+            if (data['useNetflixUI'] is bool) {
+              _useNetflixUI = data['useNetflixUI'] as bool;
+            }
           }
         }
       }
@@ -45,6 +52,15 @@ class PlayerSettingsService {
       debugPrint('PlayerSettingsService.init error: $e');
     } finally {
       _isInitialized = true;
+    }
+  }
+
+  /// Cập nhật và lưu cài đặt giao diện (Netflix UI Beta vs Giao diện cũ V1)
+  void setUseNetflixUI(bool value) {
+    if (_useNetflixUI != value) {
+      _useNetflixUI = value;
+      _writeToDisk();
+      uiChangeNotifier.notifyListeners();
     }
   }
 
@@ -66,6 +82,7 @@ class PlayerSettingsService {
         'volume': _volume,
         'isMuted': _isMuted,
         'preMuteVolume': _preMuteVolume,
+        'useNetflixUI': _useNetflixUI,
       };
       await file.writeAsString(jsonEncode(data), flush: true);
     } catch (e) {
