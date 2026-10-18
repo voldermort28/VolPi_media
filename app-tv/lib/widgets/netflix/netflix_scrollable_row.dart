@@ -26,6 +26,7 @@ class _NetflixScrollableRowState extends State<NetflixScrollableRow> {
   final ScrollController _scrollController = ScrollController();
   bool _canScrollLeft = false;
   bool _canScrollRight = false;
+  bool _isRowHovered = false;
 
   @override
   void initState() {
@@ -78,71 +79,92 @@ class _NetflixScrollableRowState extends State<NetflixScrollableRow> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: widget.height,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Horizontal ListView with metrics listener
-          NotificationListener<ScrollMetricsNotification>(
-            onNotification: (notification) {
-              final metrics = notification.metrics;
-              final canLeft = metrics.pixels > 20;
-              final canRight = metrics.maxScrollExtent > 20 &&
-                  metrics.pixels < (metrics.maxScrollExtent - 20);
-              if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    setState(() {
-                      _canScrollLeft = canLeft;
-                      _canScrollRight = canRight;
-                    });
-                  }
-                });
-              }
-              return false;
-            },
-            child: ListView.separated(
-              controller: _scrollController,
-              padding: widget.padding,
-              scrollDirection: Axis.horizontal,
-              cacheExtent: 350,
-              itemCount: widget.itemCount,
-              separatorBuilder: (_, __) => SizedBox(width: widget.itemSpacing),
-              itemBuilder: widget.itemBuilder,
-            ),
-          ),
+    final showLeft = _isRowHovered && _canScrollLeft;
+    final showRight = _isRowHovered && _canScrollRight && widget.itemCount > 1;
 
-          // 2. Left Arrow Button (Nút kéo qua trái)
-          if (_canScrollLeft)
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isRowHovered = true),
+      onExit: (_) => setState(() => _isRowHovered = false),
+      child: SizedBox(
+        height: widget.height,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // 1. Horizontal ListView with metrics listener
+            NotificationListener<ScrollMetricsNotification>(
+              onNotification: (notification) {
+                final metrics = notification.metrics;
+                final canLeft = metrics.pixels > 20;
+                final canRight = metrics.maxScrollExtent > 20 &&
+                    metrics.pixels < (metrics.maxScrollExtent - 20);
+                if (canLeft != _canScrollLeft || canRight != _canScrollRight) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() {
+                        _canScrollLeft = canLeft;
+                        _canScrollRight = canRight;
+                      });
+                    }
+                  });
+                }
+                return false;
+              },
+              child: ListView.separated(
+                controller: _scrollController,
+                padding: widget.padding,
+                scrollDirection: Axis.horizontal,
+                cacheExtent: 350,
+                itemCount: widget.itemCount,
+                separatorBuilder: (_, __) => SizedBox(width: widget.itemSpacing),
+                itemBuilder: widget.itemBuilder,
+              ),
+            ),
+
+            // 2. Left Arrow Button (Mặc định ẩn, chỉ hiện mượt khi hover chuột vào hàng)
             Positioned(
               left: 4,
               top: 0,
               bottom: 0,
               child: Center(
-                child: _NetflixArrowButton(
-                  icon: Icons.chevron_left_rounded,
-                  onTap: () => _scrollBy(-widget.scrollDelta),
-                  isLeft: true,
+                child: AnimatedOpacity(
+                  opacity: showLeft ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: IgnorePointer(
+                    ignoring: !showLeft,
+                    child: _NetflixArrowButton(
+                      icon: Icons.chevron_left_rounded,
+                      onTap: () => _scrollBy(-widget.scrollDelta),
+                      isLeft: true,
+                    ),
+                  ),
                 ),
               ),
             ),
 
-          // 3. Right Arrow Button (Nút kéo qua phải - Chuẩn hình đính kèm 2)
-          if (_canScrollRight && widget.itemCount > 1)
+            // 3. Right Arrow Button (Mặc định ẩn, chỉ hiện mượt khi hover chuột vào hàng)
             Positioned(
               right: 4,
               top: 0,
               bottom: 0,
               child: Center(
-                child: _NetflixArrowButton(
-                  icon: Icons.chevron_right_rounded,
-                  onTap: () => _scrollBy(widget.scrollDelta),
-                  isLeft: false,
+                child: AnimatedOpacity(
+                  opacity: showRight ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: IgnorePointer(
+                    ignoring: !showRight,
+                    child: _NetflixArrowButton(
+                      icon: Icons.chevron_right_rounded,
+                      onTap: () => _scrollBy(widget.scrollDelta),
+                      isLeft: false,
+                    ),
+                  ),
                 ),
               ),
             ),
-        ],
+          ],
+        ),
       ),
     );
   }

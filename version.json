@@ -1,10 +1,10 @@
 {
-  "version": "1.0.43",
-  "build": 44,
-  "tag_name": "v1.0.43",
-  "changelog": "• Nâng cấp trải nghiệm & Tinh chỉnh v1.0.43:\n- macOS: Giảm kích thước cửa sổ tối thiểu về mức nhỏ gọn 480x320 như cũ, giúp bạn tự do thu nhỏ cửa sổ app khi cần xem dạng mini/đa nhiệm.\n- Tab Bóng Đá: Tự động chọn luồng phát đầu tiên để xem ngay khi bấm vào trận đấu mà không cần hiện hộp thoại hỏi; bạn vẫn có thể chuyển bình luận viên dễ dàng trong trình phát.\n- Trình phát (Player): Ghi nhớ bền vững mức âm lượng xuyên suốt mọi video, trận bóng và luồng phát, không còn bị tự động nhảy lại mức âm lượng 100%.",
+  "version": "2.0.1",
+  "build": 47,
+  "tag_name": "v2.0.1",
+  "changelog": "• VolPi Media v2.0.1 - Nâng Cấp Giao Diện Netflix Cinematic UI:\n- Giao diện Netflix Cinematic làm mặc định: Trải nghiệm rạp chiếu phim đỉnh cao trên cả Android TV và Mobile.\n- Nút mũi tên cuộn ngang (Carousel): Mặc định ẩn, chỉ hiện mượt mà khi hover chuột vào hàng để không che nội dung.\n- TV Remote D-Pad Navigation: Duyệt qua lại giữa các thumbnail phim/trận đấu mượt mà 100%, tự động cuộn theo tiêu điểm.\n- Logo Sidebar: Đổi sang biểu tượng gradient xanh dương chính thức của VolPi Media.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-18T16:55:00Z"
+  "published_at": "2026-10-19T02:35:00Z"
 }
