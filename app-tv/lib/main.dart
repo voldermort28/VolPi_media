@@ -4,6 +4,7 @@ import 'api/api_service.dart';
 import 'layout/adaptive_layout.dart';
 
 import 'services/favorites_service.dart';
+import 'services/player_settings_service.dart';
 import 'services/watch_history_service.dart';
 
 void main() async {
@@ -25,6 +26,7 @@ void main() async {
   await Future.wait([
     WatchHistoryService.instance.init(),
     FavoritesService.instance.init(),
+    PlayerSettingsService.instance.init(),
   ]);
 
   final apiService = ApiService();

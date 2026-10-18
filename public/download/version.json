@@ -1,10 +1,10 @@
 {
-  "version": "1.0.42",
-  "build": 43,
-  "tag_name": "v1.0.42",
-  "changelog": "• Tính năng mới & Nâng cấp v1.0.42:\n- macOS: Bổ sung hỗ trợ nhấp chuột phải (Right-Click) trên thumbnail để mở menu Yêu Thích & Lịch Sử xem nhanh chóng, thay cho thao tác giữ chuột; hiển thị con trỏ pointer chuẩn desktop.\n- Lịch sử xem phim: Tự động lưu tiến độ, popup hỏi Xem tiếp / Xem từ đầu khi vào phim dở.\n- Thư viện Anime: Đổi tên filter thành Toàn Bộ, bổ sung Phim lẻ Anime (41+ Phim), click thumbnail vào danh mục hiển thị phân chia season chuẩn.\n- Tab Riêng Tư: Đánh dấu đồng hồ 🕒 ở góc poster phim đã xem, hỗ trợ popup xem tiếp.\n- Yêu Thích: Nhấn giữ nút OK (600ms) trên Remote TV để thêm/xóa Yêu thích hoặc xóa khỏi Lịch sử.\n- Đồng bộ đám mây (Cloud Sync): Tự động đồng bộ lịch sử xem và yêu thích đa thiết bị.\n- Tối ưu hóa hiệu năng TV: Chống lag giật remote và giảm tải RAM.",
+  "version": "1.0.43",
+  "build": 44,
+  "tag_name": "v1.0.43",
+  "changelog": "• Nâng cấp trải nghiệm & Tinh chỉnh v1.0.43:\n- macOS: Giảm kích thước cửa sổ tối thiểu về mức nhỏ gọn 480x320 như cũ, giúp bạn tự do thu nhỏ cửa sổ app khi cần xem dạng mini/đa nhiệm.\n- Tab Bóng Đá: Tự động chọn luồng phát đầu tiên để xem ngay khi bấm vào trận đấu mà không cần hiện hộp thoại hỏi; bạn vẫn có thể chuyển bình luận viên dễ dàng trong trình phát.\n- Trình phát (Player): Ghi nhớ bền vững mức âm lượng xuyên suốt mọi video, trận bóng và luồng phát, không còn bị tự động nhảy lại mức âm lượng 100%.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-18T04:25:00Z"
+  "published_at": "2026-10-18T16:55:00Z"
 }

@@ -160,11 +160,8 @@ class _FootballScreenState extends State<FootballScreen> {
       return;
     }
 
-    if (streams.length == 1) {
-      _playStream(match, streams[0], streams);
-    } else {
-      _showChannelSelector(match, streams);
-    }
+    // Tự động chọn luồng stream đầu tiên để phát ngay mà không cần hỏi (giống bên tab phim)
+    _playStream(match, streams[0], streams);
   }
 
   void _showChannelSelector(MatchModel match, List<StreamChannel> channels) {

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import '../models/match_model.dart';
 import '../models/watch_history_model.dart';
+import '../services/player_settings_service.dart';
 import '../services/watch_history_service.dart';
 import '../widgets/tv_focusable_card.dart';
 
@@ -84,11 +85,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _commitSeekTimer;
   String? _hudSpeedBadge;
 
-  // Volume Control (Remembered across clip and episode transitions)
-  static double _lastVolume = 1.0;
-  static bool _lastIsMuted = false;
-  static double _lastPreMuteVolume = 1.0;
-
+  // Volume Control (Remembered across clips, streams, episodes and app sessions)
   double _volume = 1.0;
   bool _isMuted = false;
   double _preMuteVolume = 1.0;
@@ -101,9 +98,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _currentStreamUrl = widget.streamUrl;
     _currentTitle = widget.title;
     _currentHeaders = widget.headers;
-    _volume = _lastVolume;
-    _isMuted = _lastIsMuted;
-    _preMuteVolume = _lastPreMuteVolume;
+    _volume = PlayerSettingsService.instance.volume;
+    _isMuted = PlayerSettingsService.instance.isMuted;
+    _preMuteVolume = PlayerSettingsService.instance.preMuteVolume;
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _initPlayer();
@@ -122,11 +119,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       );
 
       await _controller.initialize();
-      _controller.setVolume(_isMuted ? 0.0 : _volume);
+      final double targetVol = _isMuted ? 0.0 : _volume;
+      await _controller.setVolume(targetVol);
       if (widget.initialPosition != null && widget.initialPosition! > Duration.zero) {
         await _controller.seekTo(widget.initialPosition!);
       }
-      _controller.play();
+      await _controller.play();
+
+      // Cố định mức âm lượng đã lưu sau khi luồng phát bắt đầu để ngăn native AVPlayer/ExoPlayer tự ý bật lại 100%
+      await _controller.setVolume(targetVol);
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (mounted && _isInitialized) {
+          _controller.setVolume(_isMuted ? 0.0 : _volume);
+        }
+      });
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted && _isInitialized) {
+          _controller.setVolume(_isMuted ? 0.0 : _volume);
+        }
+      });
 
       _controller.addListener(_videoListener);
 
@@ -167,9 +178,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     setState(() {
       _volume = clamped;
       _isMuted = clamped == 0.0;
-      _lastVolume = _volume;
-      _lastIsMuted = _isMuted;
     });
+    PlayerSettingsService.instance.saveVolume(
+      volume: _volume,
+      isMuted: _isMuted,
+      preMuteVolume: _preMuteVolume,
+    );
     if (_isInitialized) {
       _controller.setVolume(_isMuted ? 0.0 : _volume);
     }
@@ -182,7 +196,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _setVolume(_preMuteVolume > 0.0 ? _preMuteVolume : 1.0);
     } else {
       _preMuteVolume = _volume > 0.0 ? _volume : 1.0;
-      _lastPreMuteVolume = _preMuteVolume;
+      PlayerSettingsService.instance.saveVolume(
+        volume: _volume,
+        isMuted: true,
+        preMuteVolume: _preMuteVolume,
+      );
       _setVolume(0.0);
     }
   }

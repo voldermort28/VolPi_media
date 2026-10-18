@@ -19,8 +19,8 @@ class MainFlutterWindow: NSWindow {
       self.setFrame(NSRect(x: 100, y: 100, width: 1440, height: 900), display: true)
     }
 
-    // Đặt kích thước tối thiểu để không bị co hẹp giao diện
-    self.minSize = NSSize(width: 960, height: 600)
+    // Cho phép thu nhỏ cửa sổ linh hoạt về kích thước nhỏ gọn như cũ
+    self.minSize = NSSize(width: 480, height: 320)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
 
