@@ -131,12 +131,22 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 36,
+                        height: 36,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF38BDF8)]),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                        child: const Center(
+                          child: FlutterLogo(size: 22),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       const Text(
@@ -320,12 +330,15 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF38BDF8)]),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+              child: const Center(
+                child: FlutterLogo(size: 18),
+              ),
             ),
             const SizedBox(width: 8),
             const Text(

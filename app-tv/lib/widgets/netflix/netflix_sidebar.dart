@@ -89,21 +89,18 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF0284C7).withOpacity(0.4),
+                            color: Colors.black.withOpacity(0.35),
                             blurRadius: 8,
+                            offset: const Offset(0, 2),
                           ),
                         ],
                       ),
                       child: const Center(
-                        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                        child: FlutterLogo(size: 24),
                       ),
                     ),
                     if (_isExpanded) ...[
