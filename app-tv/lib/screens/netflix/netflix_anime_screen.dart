@@ -244,6 +244,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
           title: item.title,
           poster: item.poster,
           category: 'anime',
+          createdAt: DateTime.now().toIso8601String(),
         ),
       );
       if (mounted) {
@@ -255,7 +256,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
           ),
         );
       }
-    } else if (action == MovieAction.deleteHistory) {
+    } else if (action == MovieAction.removeHistory) {
       WatchHistoryService.instance.clearProgress(item.id);
     }
   }
@@ -281,6 +282,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
           title: anime.name,
           poster: anime.poster,
           category: 'anime',
+          createdAt: DateTime.now().toIso8601String(),
         ),
       );
       if (mounted) {
@@ -600,6 +602,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                             title: anime.name,
                             poster: anime.poster,
                             category: 'anime',
+                            createdAt: DateTime.now().toIso8601String(),
                           ),
                         );
                         setState(() {});
