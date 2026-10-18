@@ -4,6 +4,7 @@ import '../models/update_model.dart';
 import '../screens/anime_screen.dart';
 import '../screens/football_screen.dart';
 import '../screens/iptv_screen.dart';
+import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
 import '../screens/secret_movie_screen.dart';
 import '../services/player_settings_service.dart';
@@ -163,7 +164,14 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                     // Tab 3: Anime & Phim
                     ExcludeFocus(
                       excluding: _currentTabIndex != 3,
-                      child: AnimeScreen(apiService: widget.apiService),
+                      child: NetflixAnimeScreen(
+                        apiService: widget.apiService,
+                        onNavigateTab: (tabIdx) {
+                          setState(() {
+                            _currentTabIndex = tabIdx;
+                          });
+                        },
+                      ),
                     ),
 
                     // Tab 4: Truyền Hình (IPTV)
