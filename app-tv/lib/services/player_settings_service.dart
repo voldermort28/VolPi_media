@@ -12,7 +12,7 @@ class PlayerSettingsService {
   double _volume = 1.0;
   bool _isMuted = false;
   double _preMuteVolume = 1.0;
-  bool _useNetflixUI = false;
+  bool _useNetflixUI = true;
   bool _isInitialized = false;
 
   final ChangeNotifier uiChangeNotifier = ChangeNotifier();
@@ -44,6 +44,8 @@ class PlayerSettingsService {
             }
             if (data['useNetflixUI'] is bool) {
               _useNetflixUI = data['useNetflixUI'] as bool;
+            } else {
+              _useNetflixUI = true;
             }
           }
         }

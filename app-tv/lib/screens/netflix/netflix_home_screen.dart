@@ -7,6 +7,7 @@ import '../../player/video_player_screen.dart';
 import '../../services/watch_history_service.dart';
 import '../../widgets/resume_playback_dialog.dart';
 import '../../widgets/tv_focusable_card.dart';
+import '../../widgets/netflix/netflix_scrollable_row.dart';
 
 class NetflixHomeScreen extends StatefulWidget {
   final ApiService apiService;
@@ -495,15 +496,10 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // CONTINUE WATCHING HORIZONTAL ROW (16:9 ratio + Netflix Red Progress Bar)
   // =========================================================================
   Widget _buildContinueWatchingRow() {
-    return SizedBox(
+    return NetflixScrollableRow(
       height: 140,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        scrollDirection: Axis.horizontal,
-        cacheExtent: 300,
-        itemCount: _continueWatching.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, idx) {
+      itemCount: _continueWatching.length,
+      itemBuilder: (context, idx) {
           final item = _continueWatching[idx];
           return RepaintBoundary(
             child: TvFocusableCard(
@@ -614,7 +610,6 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
             ),
           );
         },
-      ),
     );
   }
 
@@ -622,15 +617,10 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // MATCHES HORIZONTAL ROW (Netflix Card Style)
   // =========================================================================
   Widget _buildMatchesRow(List<MatchModel> matches) {
-    return SizedBox(
+    return NetflixScrollableRow(
       height: 155,
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        scrollDirection: Axis.horizontal,
-        cacheExtent: 300,
-        itemCount: matches.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 14),
-        itemBuilder: (context, idx) {
+      itemCount: matches.length,
+      itemBuilder: (context, idx) {
           final match = matches[idx];
           return RepaintBoundary(
             child: TvFocusableCard(
@@ -718,7 +708,6 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
             ),
           );
         },
-      ),
     );
   }
 

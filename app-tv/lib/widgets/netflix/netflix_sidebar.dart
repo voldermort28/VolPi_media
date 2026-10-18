@@ -89,25 +89,21 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE50914), // Netflix Red
-                        borderRadius: BorderRadius.circular(8),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF0284C7), Color(0xFF38BDF8)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(10),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFFE50914).withOpacity(0.4),
+                            color: const Color(0xFF0284C7).withOpacity(0.4),
                             blurRadius: 8,
                           ),
                         ],
                       ),
                       child: const Center(
-                        child: Text(
-                          'V',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1,
-                          ),
-                        ),
+                        child: Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
                       ),
                     ),
                     if (_isExpanded) ...[
