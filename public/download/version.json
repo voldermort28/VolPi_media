@@ -1,10 +1,10 @@
 {
-  "version": "2.0.2",
-  "build": 48,
-  "tag_name": "v2.0.2",
-  "changelog": "• VolPi Media v2.0.2 - Bộ Nhận Diện Logo Mới (V Media Vibrant 3D Ribbon):\n- Đồng bộ toàn bộ App Launcher Icon (Android TV, iOS, macOS) sang logo dải ruy băng 3D V Media hiện đại, rực rỡ.\n- Cập nhật logo góc trái thanh điều hướng (Sidebar Netflix & Adaptive Header) sang logo chính thức sắc nét.\n- Giữ nguyên trải nghiệm vuốt ngang carousel tự ẩn mượt mà và hỗ trợ D-Pad điều khiển TV hoàn hảo.",
+  "version": "2.0.3",
+  "build": 49,
+  "tag_name": "v2.0.3",
+  "changelog": "• VolPi Media v2.0.3 - Chuẩn Hóa App Icon Bo Tròn Theo Chuẩn Nền Tảng:\n- macOS: Thiết kế lại app icon theo chuẩn Squircle (Apple HIG) bo tròn góc mềm mại kết hợp đổ bóng chiều sâu (depth drop shadow) và viền kính tinh tế.\n- Android: Bổ sung icon bo tròn Squircle (`ic_launcher`) và tròn hoàn toàn (`ic_launcher_round`), đồng thời chuẩn hóa tỷ lệ Android TV Banner (16:9) không bị méo hình.\n- Hoàn thiện diện mạo biểu tượng ứng dụng cao cấp, đồng bộ trên macOS Dock, Android TV và Smartphone.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T02:47:00Z"
+  "published_at": "2026-10-19T02:58:00Z"
 }
