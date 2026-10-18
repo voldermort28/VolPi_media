@@ -1,10 +1,10 @@
 {
-  "version": "2.0.4",
-  "build": 50,
-  "tag_name": "v2.0.4",
-  "changelog": "• VolPi Media v2.0.4 - Giao Diện Netflix Cinematic Cho Tab Anime & Phim:\n- Màn hình Anime & Phim dạng Netflix: Hero Billboard hoành tráng ở đầu trang với hình nền độ phân giải cao và nút xem nhanh.\n- Mỗi Filter là một dòng Category cuộn ngang riêng biệt: Tiếp tục xem, Danh sách yêu thích, Pokemon (29 mùa & Horizons), Super Sentai (18 series), Power Rangers, Anime tuổi thơ và Phim lẻ điện ảnh.\n- Thẻ Poster đứng chuẩn tỷ lệ 2:3: Hiệu ứng focus mượt mà trên TV Remote, tự động căn giữa khi chuyển trang và nút cuộn tự ẩn khi không dùng chuột.\n- Tối ưu bộ nhớ đệm hình ảnh: Tránh tràn RAM trên Android TV và thiết bị cấu hình yếu.",
+  "version": "2.0.5",
+  "build": 51,
+  "tag_name": "v2.0.5",
+  "changelog": "• VolPi Media v2.0.5 - Hero Billboard Banner Tự Động Trượt Ngẫu Nhiên:\n- Banner nổi bật ngẫu nhiên (Random Slide Banner): Tự động chọn 6 phim/anime tiêu biểu từ các danh mục với hình nền chất lượng cao.\n- Tự động chuyển slide mượt mà mỗi 7 giây kèm thanh chấm chỉ số trang (dots indicator).\n- Nút mũi tên điều hướng hai bên xuất hiện khi di chuột và tự ẩn khi không tương tác.\n- Tự động tạm dừng chuyển slide khi người dùng TV Remote focus vào các nút Xem Ngay / Chi Tiết / Yêu Thích hoặc khi hover chuột.\n- Hoạt động mượt mà và tối ưu hóa hiệu năng trên Android TV và thiết bị di động.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T03:45:00Z"
+  "published_at": "2026-10-19T04:05:00Z"
 }

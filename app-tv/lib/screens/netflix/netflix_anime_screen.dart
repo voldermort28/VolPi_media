@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -65,7 +66,11 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
   final Map<String, List<AnimeModel>> _catalogData = {};
   List<WatchHistoryItem> _continueWatching = [];
   List<AnimeModel> _favorites = [];
-  AnimeModel? _featuredAnime;
+  List<AnimeModel> _featuredList = [];
+  int _currentBannerIndex = 0;
+  final PageController _bannerPageController = PageController();
+  Timer? _bannerTimer;
+  bool _isBannerInteracting = false;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -81,6 +86,8 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
 
   @override
   void dispose() {
+    _bannerTimer?.cancel();
+    _bannerPageController.dispose();
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryOrFavoritesChanged);
     FavoritesService.instance.changeNotifier.removeListener(_onHistoryOrFavoritesChanged);
     _billboardPlayFocusNode.dispose();
@@ -136,32 +143,38 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
         _catalogData[_categories[i]['id']!] = results[i];
       }
 
-      // Select Featured Billboard Anime
-      AnimeModel? chosen;
-      final pokemonList = _catalogData['yumei-pokemon'] ?? [];
-      final moviesList = _catalogData['yumei-movies'] ?? [];
-      final sentaiList = _catalogData['yumei-sentai'] ?? [];
-
-      if (moviesList.isNotEmpty) {
-        // Pick a recognizable movie or series with nice background
-        chosen = moviesList.firstWhere(
-          (a) => a.background.isNotEmpty && a.background != a.poster,
-          orElse: () => moviesList.first,
-        );
-      } else if (pokemonList.isNotEmpty) {
-        chosen = pokemonList.first;
-      } else if (sentaiList.isNotEmpty) {
-        chosen = sentaiList.first;
+      // Select Featured Billboard Anime (random pool of 6 items)
+      final pool = <AnimeModel>[];
+      for (final list in _catalogData.values) {
+        for (final anime in list) {
+          if (anime.background.isNotEmpty && anime.background != anime.poster) {
+            pool.add(anime);
+          }
+        }
       }
+      if (pool.length < 6) {
+        for (final list in _catalogData.values) {
+          for (final anime in list) {
+            if (!pool.any((item) => item.id == anime.id)) {
+              pool.add(anime);
+            }
+          }
+        }
+      }
+      pool.shuffle(Random());
+      final featured = pool.take(6).toList();
 
       setState(() {
-        _featuredAnime = chosen;
+        _featuredList = featured;
+        _currentBannerIndex = 0;
         _isLoading = false;
       });
 
+      _startBannerTimer();
+
       // Auto-focus billboard play button for TV Remote
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _featuredAnime != null) {
+        if (mounted && _featuredList.isNotEmpty) {
           _billboardPlayFocusNode.requestFocus();
         }
       });
@@ -173,6 +186,22 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
         });
       }
     }
+  }
+
+  void _startBannerTimer() {
+    _bannerTimer?.cancel();
+    if (_featuredList.length <= 1) return;
+    _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
+      if (!mounted || _isBannerInteracting) return;
+      if (_bannerPageController.hasClients) {
+        final nextIndex = (_currentBannerIndex + 1) % _featuredList.length;
+        _bannerPageController.animateToPage(
+          nextIndex,
+          duration: const Duration(milliseconds: 700),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+    });
   }
 
   void _openDetail(AnimeModel anime) {
@@ -340,7 +369,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 1. HERO BILLBOARD BANNER
-            if (_featuredAnime != null) _buildBillboard(_featuredAnime!),
+            if (_featuredList.isNotEmpty) _buildBillboardSlider(),
 
             const SizedBox(height: 16),
 
@@ -377,7 +406,152 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
   // =========================================================================
   // HERO BILLBOARD BANNER
   // =========================================================================
-  Widget _buildBillboard(AnimeModel anime) {
+  Widget _buildBillboardSlider() {
+    if (_featuredList.isEmpty) return const SizedBox.shrink();
+
+    return Focus(
+      onFocusChange: (hasFocus) {
+        setState(() {
+          _isBannerInteracting = hasFocus;
+        });
+      },
+      child: MouseRegion(
+        onEnter: (_) {
+          setState(() {
+            _isBannerInteracting = true;
+          });
+        },
+        onExit: (_) {
+          setState(() {
+            _isBannerInteracting = false;
+          });
+        },
+        child: SizedBox(
+          height: 330,
+          width: double.infinity,
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _bannerPageController,
+                itemCount: _featuredList.length,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentBannerIndex = index;
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final anime = _featuredList[index];
+                  return _buildBillboardItem(anime, isCurrent: index == _currentBannerIndex);
+                },
+              ),
+
+              // Left Arrow (Hover / Mouse navigation)
+              if (_featuredList.length > 1)
+                Positioned(
+                  left: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _isBannerInteracting ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isBannerInteracting,
+                        child: IconButton(
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black.withOpacity(0.55),
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                          onPressed: () {
+                            final prevIndex = (_currentBannerIndex - 1 + _featuredList.length) % _featuredList.length;
+                            _bannerPageController.animateToPage(
+                              prevIndex,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Right Arrow (Hover / Mouse navigation)
+              if (_featuredList.length > 1)
+                Positioned(
+                  right: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _isBannerInteracting ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isBannerInteracting,
+                        child: IconButton(
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black.withOpacity(0.55),
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
+                          onPressed: () {
+                            final nextIndex = (_currentBannerIndex + 1) % _featuredList.length;
+                            _bannerPageController.animateToPage(
+                              nextIndex,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // Slide Indicator Dots
+              if (_featuredList.length > 1)
+                Positioned(
+                  bottom: 16,
+                  right: 32,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(_featuredList.length, (i) {
+                      final isActive = i == _currentBannerIndex;
+                      return GestureDetector(
+                        onTap: () {
+                          _bannerPageController.animateToPage(
+                            i,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeInOut,
+                          );
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          width: isActive ? 24 : 8,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: isActive ? const Color(0xFFE50914) : Colors.white.withOpacity(0.35),
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBillboardItem(AnimeModel anime, {required bool isCurrent}) {
     final bgUrl = anime.background.isNotEmpty ? anime.background : anime.poster;
     final favId = 'anime:${anime.id}';
     final isFav = FavoritesService.instance.isFavorite(favId);
@@ -526,7 +700,7 @@ class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                   children: [
                     // Button 1: Xem Ngay
                     TvFocusableCard(
-                      focusNode: _billboardPlayFocusNode,
+                      focusNode: isCurrent ? _billboardPlayFocusNode : null,
                       onTap: () => _openDetail(anime),
                       borderRadius: BorderRadius.circular(6),
                       scale: 1.08,
