@@ -148,28 +148,32 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
     );
   }
 
-  void _onContinueWatchingTap(WatchHistoryItem item) {
-    ResumePlaybackDialog.show(
-      context,
-      item,
-      onResume: () => _playHistoryItem(item, resume: true),
-      onRestart: () => _playHistoryItem(item, resume: false),
-    );
-  }
+  void _onContinueWatchingTap(WatchHistoryItem item) async {
+    if (item.streamUrl.isNotEmpty) {
+      final choice = await ResumePlaybackDialog.show(context, item);
+      if (choice == null || !mounted) return;
 
-  void _playHistoryItem(WatchHistoryItem item, {required bool resume}) {
-    // If anime item has episode URL, launch player
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: item.streamUrl ?? '',
-          title: item.title,
-          subtitle: 'Tập ${item.episode}',
-          isLive: false,
-          initialPositionMs: resume ? item.positionMs : 0,
+      final startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
+      if (!choice) {
+        WatchHistoryService.instance.clearProgress(item.id);
+      }
+
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            streamUrl: item.streamUrl,
+            title: item.title,
+            subtitle: 'Tập ${item.episode}',
+            mediaId: item.mediaId,
+            mediaPoster: item.poster,
+            episode: item.episode,
+            season: item.season,
+            initialPosition: startPos,
+            isLive: false,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -598,7 +602,7 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Còn ${item.formattedRemaining}',
+                            '${item.formattedPosition} / ${item.formattedDuration}',
                             style: const TextStyle(color: Color(0xFFE50914), fontSize: 10, fontWeight: FontWeight.w600),
                           ),
                         ],
