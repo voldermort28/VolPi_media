@@ -72,8 +72,11 @@ jobs:
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
           cp android/volpi_release.keystore /tmp/volpi_release.keystore || true
           cp android/key.properties /tmp/key.properties || true
+          mkdir -p /tmp/android_res_backup
+          cp -r android/app/src/main/res/* /tmp/android_res_backup/ 2>/dev/null || true
           flutter create . --platforms=android --org=com.volpi --project-name=volpi_media
-          mkdir -p android/app/src/main
+          mkdir -p android/app/src/main/res
+          cp -r /tmp/android_res_backup/* android/app/src/main/res/ 2>/dev/null || true
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
           cp /tmp/volpi_release.keystore android/volpi_release.keystore || true
@@ -198,8 +201,11 @@ jobs:
           cp pubspec.yaml /tmp/pubspec.yaml || true
           cp ios/Runner/Info.plist /tmp/Info.plist || true
           cp ios/Podfile /tmp/Podfile || true
+          mkdir -p /tmp/ios_assets_backup
+          cp -r ios/Runner/Assets.xcassets/* /tmp/ios_assets_backup/ 2>/dev/null || true
           flutter create . --platforms=ios --org=com.volpi --project-name=volpi_media
-          mkdir -p ios/Runner
+          mkdir -p ios/Runner/Assets.xcassets
+          cp -r /tmp/ios_assets_backup/* ios/Runner/Assets.xcassets/ 2>/dev/null || true
           cp /tmp/Info.plist ios/Runner/Info.plist || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
           cp /tmp/Podfile ios/Podfile || true

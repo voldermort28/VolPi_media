@@ -1,10 +1,10 @@
 {
-  "version": "2.0.1",
-  "build": 47,
-  "tag_name": "v2.0.1",
-  "changelog": "• VolPi Media v2.0.1 - Nâng Cấp Giao Diện Netflix Cinematic UI:\n- Giao diện Netflix Cinematic làm mặc định: Trải nghiệm rạp chiếu phim đỉnh cao trên cả Android TV và Mobile.\n- Nút mũi tên cuộn ngang (Carousel): Mặc định ẩn, chỉ hiện mượt mà khi hover chuột vào hàng để không che nội dung.\n- TV Remote D-Pad Navigation: Duyệt qua lại giữa các thumbnail phim/trận đấu mượt mà 100%, tự động cuộn theo tiêu điểm.\n- Logo Sidebar: Đổi sang biểu tượng gradient xanh dương chính thức của VolPi Media.",
+  "version": "2.0.2",
+  "build": 48,
+  "tag_name": "v2.0.2",
+  "changelog": "• VolPi Media v2.0.2 - Bộ Nhận Diện Logo Mới (V Media Vibrant 3D Ribbon):\n- Đồng bộ toàn bộ App Launcher Icon (Android TV, iOS, macOS) sang logo dải ruy băng 3D V Media hiện đại, rực rỡ.\n- Cập nhật logo góc trái thanh điều hướng (Sidebar Netflix & Adaptive Header) sang logo chính thức sắc nét.\n- Giữ nguyên trải nghiệm vuốt ngang carousel tự ẩn mượt mà và hỗ trợ D-Pad điều khiển TV hoàn hảo.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T02:35:00Z"
+  "published_at": "2026-10-19T02:47:00Z"
 }

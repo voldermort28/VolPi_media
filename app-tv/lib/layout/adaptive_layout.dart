@@ -130,22 +130,12 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   // App Logo & Name
                   Row(
                     children: [
-                      Container(
+                      SizedBox(
                         width: 36,
                         height: 36,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Center(
-                          child: FlutterLogo(size: 22),
+                        child: Image.asset(
+                          'assets/volpi_logo.png',
+                          fit: BoxFit.contain,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -329,15 +319,12 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         elevation: 0,
         title: Row(
           children: [
-            Container(
+            SizedBox(
               width: 30,
               height: 30,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Center(
-                child: FlutterLogo(size: 18),
+              child: Image.asset(
+                'assets/volpi_logo.png',
+                fit: BoxFit.contain,
               ),
             ),
             const SizedBox(width: 8),

@@ -85,22 +85,12 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                 padding: const EdgeInsets.fromLTRB(14, 18, 14, 16),
                 child: Row(
                   children: [
-                    Container(
+                    SizedBox(
                       width: 36,
                       height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.35),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: const Center(
-                        child: FlutterLogo(size: 24),
+                      child: Image.asset(
+                        'assets/volpi_logo.png',
+                        fit: BoxFit.contain,
                       ),
                     ),
                     if (_isExpanded) ...[
