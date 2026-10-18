@@ -73,7 +73,11 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   }
 
   void _handleProfileButton() {
-    PasscodeDialog.show(context, onSuccess: _onProfileUnlocked);
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => PasscodeDialog(onSuccess: _onProfileUnlocked),
+    );
   }
 
   void _switchToOldUI() {
