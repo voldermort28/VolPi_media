@@ -41,7 +41,7 @@ const List<IptvCategoryItem> kIptvCategories = [
 ];
 
 class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
-  Future<void> refresh() => _loadData(forceRefresh: true);
+  Future<void> refresh() => _loadChannels(forceRefresh: true, triggerServerFetch: true);
 
   List<IptvChannelModel> _allChannels = [];
   bool _isLoading = true;
