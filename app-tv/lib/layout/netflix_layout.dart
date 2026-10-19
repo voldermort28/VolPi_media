@@ -46,7 +46,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOtaUpdate(silent: true);
-      SyncService.pullFromServer(widget.apiService.baseUrl);
+      SyncService.init(widget.apiService.baseUrl);
     });
   }
 

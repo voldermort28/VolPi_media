@@ -9,14 +9,41 @@ class SyncService {
   static const String _syncKey = '3105'; // Mã đồng bộ mặc định (PIN chung)
   static Timer? _pushDebounce;
   static bool _isSyncing = false;
+  static String? _configuredBaseUrl;
+  static bool _listenersAttached = false;
+
+  /// Khởi tạo và thiết lập tự động đồng bộ 2 chiều
+  static void init(String baseUrl) {
+    _configuredBaseUrl = baseUrl;
+    if (!_listenersAttached) {
+      _listenersAttached = true;
+      WatchHistoryService.instance.changeNotifier.addListener(_onDataChanged);
+      FavoritesService.instance.changeNotifier.addListener(_onDataChanged);
+    }
+    // Thực hiện đồng bộ 2 chiều ngay khi khởi động
+    syncFull(baseUrl);
+  }
+
+  static void _onDataChanged() {
+    if (_configuredBaseUrl != null && !_isSyncing) {
+      schedulePush(_configuredBaseUrl!);
+    }
+  }
+
+  /// Đồng bộ đầy đủ 2 chiều: Kéo dữ liệu từ server về trước, sau đó đẩy dữ liệu cục bộ lên
+  static Future<void> syncFull(String baseUrl, {http.Client? client}) async {
+    await pullFromServer(baseUrl, client: client);
+    await pushToServer(baseUrl, client: client);
+  }
 
   /// Gọi khi app khởi động để lấy dữ liệu mới nhất từ các thiết bị khác về
-  static Future<void> pullFromServer(String baseUrl, {http.Client? client}) async {
-    if (_isSyncing) return;
+  static Future<void> pullFromServer(String? baseUrl, {http.Client? client}) async {
+    final targetUrl = baseUrl ?? _configuredBaseUrl;
+    if (targetUrl == null || _isSyncing) return;
     _isSyncing = true;
     final httpClient = client ?? http.Client();
     try {
-      final url = Uri.parse('$baseUrl/api/user/sync?key=$_syncKey&_t=${DateTime.now().millisecondsSinceEpoch}');
+      final url = Uri.parse('$targetUrl/api/user/sync?key=$_syncKey&_t=${DateTime.now().millisecondsSinceEpoch}');
       final res = await httpClient.get(url).timeout(const Duration(seconds: 8));
 
       if (res.statusCode == 200) {
@@ -44,15 +71,19 @@ class SyncService {
   }
 
   /// Gom các thay đổi để đồng bộ lên server sau 3 giây (debounce)
-  static void schedulePush(String baseUrl, {http.Client? client}) {
+  static void schedulePush(String? baseUrl, {http.Client? client}) {
+    final targetUrl = baseUrl ?? _configuredBaseUrl;
+    if (targetUrl == null) return;
     _pushDebounce?.cancel();
     _pushDebounce = Timer(const Duration(seconds: 3), () {
-      pushToServer(baseUrl, client: client);
+      pushToServer(targetUrl, client: client);
     });
   }
 
   /// Gửi dữ liệu cục bộ lên server để hợp nhất và chia sẻ với các thiết bị khác
-  static Future<void> pushToServer(String baseUrl, {http.Client? client}) async {
+  static Future<void> pushToServer(String? baseUrl, {http.Client? client}) async {
+    final targetUrl = baseUrl ?? _configuredBaseUrl;
+    if (targetUrl == null) return;
     final httpClient = client ?? http.Client();
     try {
       final historyPayload = WatchHistoryService.instance.exportForSync();
@@ -68,7 +99,7 @@ class SyncService {
         'deletedHistoryIds': deletedHistoryIds,
       };
 
-      final url = Uri.parse('$baseUrl/api/user/sync');
+      final url = Uri.parse('$targetUrl/api/user/sync');
       final res = await httpClient
           .post(
             url,

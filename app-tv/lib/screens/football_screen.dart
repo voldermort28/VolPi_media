@@ -65,27 +65,63 @@ class FootballScreenState extends State<FootballScreen> {
     }
     final leagueLower = m.league.toLowerCase();
     if (filterId == 'epl') {
-      return leagueLower.contains('ngoại hạng') ||
-          leagueLower.contains('premier') ||
-          leagueLower.contains('epl') ||
-          leagueLower.contains('england');
+      if (leagueLower.contains('ngoại hạng anh') ||
+          leagueLower.contains('english premier league') ||
+          leagueLower.contains('epl')) {
+        return true;
+      }
+      if (leagueLower.contains('premier league') || leagueLower.contains('ngoại hạng')) {
+        final otherLeagues = [
+          'kuwait', 'ai cập', 'egypt', 'belarus', 'nga', 'russia',
+          'scotland', 'israel', 'ukraine', 'ireland', 'wales', 'canada',
+          'úc', 'australia', 'kazakhstan', 'singapore', 'thái', 'thai',
+          'indo', 'ấn độ', 'india', 'nam phi', 'hàn quốc', 'korea', 'qatar',
+          'uae', 'saudi', 'iraq', 'armenia', 'georgia', 'azerbaijan'
+        ];
+        return !otherLeagues.any((c) => leagueLower.contains(c));
+      }
+      if (leagueLower.contains('premier') && (leagueLower.contains('anh') || leagueLower.contains('england'))) {
+        return true;
+      }
+      return false;
     }
     if (filterId == 'c1') {
-      return leagueLower.contains('champions league') ||
-          leagueLower.contains('cúp c1') ||
-          leagueLower.contains('uefa champions');
+      return (leagueLower.contains('champions league') ||
+              leagueLower.contains('cúp c1') ||
+              leagueLower.contains('uefa champions')) &&
+          !leagueLower.contains('afc') &&
+          !leagueLower.contains('châu á') &&
+          !leagueLower.contains('nữ') &&
+          !leagueLower.contains('women');
     }
     if (filterId == 'laliga') {
-      return leagueLower.contains('la liga') || leagueLower.contains('laliga') || leagueLower.contains('spain');
+      return (leagueLower.contains('la liga') ||
+              leagueLower.contains('laliga') ||
+              leagueLower.contains('tây ban nha')) &&
+          !leagueLower.contains('hạng 2') &&
+          !leagueLower.contains('segunda');
     }
     if (filterId == 'seriea') {
-      return leagueLower.contains('serie a') || leagueLower.contains('italy') || leagueLower.contains('ý');
+      return (leagueLower.contains('serie a') ||
+              leagueLower.contains('vđqg ý') ||
+              leagueLower.contains('italia') ||
+              leagueLower.contains('vđqg italia')) &&
+          !leagueLower.contains('serie b') &&
+          !leagueLower.contains('hạng 2');
     }
     if (filterId == 'bundesliga') {
-      return leagueLower.contains('bundesliga') || leagueLower.contains('germany') || leagueLower.contains('đức');
+      return (leagueLower.contains('bundesliga') ||
+              leagueLower.contains('vđqg đức')) &&
+          !leagueLower.contains('bundesliga 2') &&
+          !leagueLower.contains('2. bundesliga') &&
+          !leagueLower.contains('hạng 2');
     }
     if (filterId == 'vietnam') {
-      return m.isVietnam || leagueLower.contains('v-league') || leagueLower.contains('việt nam');
+      return m.isVietnam ||
+          leagueLower.contains('v-league') ||
+          leagueLower.contains('vleague') ||
+          leagueLower.contains('v.league') ||
+          leagueLower.contains('việt nam');
     }
     return true;
   }

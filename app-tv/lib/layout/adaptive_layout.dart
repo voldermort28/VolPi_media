@@ -31,7 +31,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     PlayerSettingsService.instance.uiChangeNotifier.addListener(_onUiChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkOtaUpdate(silent: true);
-      SyncService.pullFromServer(widget.apiService.baseUrl);
+      SyncService.init(widget.apiService.baseUrl);
     });
   }
 

@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import '../models/match_model.dart';
 import '../models/watch_history_model.dart';
 import '../services/player_settings_service.dart';
+import '../services/sync_service.dart';
 import '../services/watch_history_service.dart';
 import '../widgets/tv_focusable_card.dart';
 
@@ -677,6 +678,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _saveProgressTimer?.cancel();
     _saveCurrentProgress();
     WatchHistoryService.instance.flush();
+    SyncService.pushToServer(null);
     _hideControlsTimer?.cancel();
     _nextCountdownTimer?.cancel();
     _hudFadeTimer?.cancel();

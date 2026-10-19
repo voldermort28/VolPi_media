@@ -1,10 +1,10 @@
 {
-  "version": "2.1.0",
-  "build": 56,
-  "tag_name": "v2.1.0",
-  "changelog": "• VolPi Media v2.1.0 - Bản Nâng Cấp Lớn & Sửa Lỗi Android TV:\n- Sửa lỗi điều hướng Remote TV: Khắc phục triệt để lỗi bấm xuống ở sidebar bị nhảy sang bảng bên phải, điều hướng chính xác đến nút Giao diện Cũ và Tài khoản; khóa phím sang trái tránh mất focus.\n- Sửa lỗi cuộn Hero Banner trên Android TV: Bấm phím Lên trên Remote hoặc focus cụm nút Phát Ngay tự động cuộn mượt lên đỉnh để hiển thị trọn vẹn toàn bộ Hero Banner.\n- Bộ lọc giải đấu bóng đá theo Chip: Lọc nhanh Ngoại Hạng Anh, Cúp C1, La Liga, Serie A, Bundesliga, Việt Nam, Đang đá, Tâm điểm.\n- Bỏ qua Intro (+85s) trong trình phát video: Một chạm tua nhanh 85s mở đầu bài hát anime/phim.\n- Tự động đếm ngược chuyển tập kế tiếp: Đếm ngược 8s khi còn 15s cuối phim với tùy chọn Phát Ngay hoặc Hủy.\n- Nút Tiếp Tục Xem Nhanh: Hiển thị ngay trên trang chi tiết phim/anime kèm thông tin tập và thời lượng đang xem dở.",
+  "version": "2.1.1",
+  "build": 57,
+  "tag_name": "v2.1.1",
+  "changelog": "• VolPi Media v2.1.1 - Sửa Bộ Lọc Giải Đấu & Nâng Cấp Hệ Thống Đồng Bộ 2 Chiều:\n- Chuẩn hóa bộ lọc giải đấu bóng đá: Khắc phục triệt để lỗi giải Ngoại Hạng Anh bị lẫn các giải khác (Kuwait, Ai Cập, Belarus...); lọc chính xác Ngoại Hạng Anh đích thực.\n- Tự động hóa đồng bộ 2 chiều (Lịch sử xem & Yêu thích): Tự động lắng nghe mọi tiến trình xem phim/anime và đẩy lên server; đồng bộ 2 chiều tức thì khi mở app và khi thoát trình phát video.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T14:52:00Z"
+  "published_at": "2026-10-19T15:31:00Z"
 }
