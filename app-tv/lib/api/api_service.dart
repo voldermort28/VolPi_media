@@ -345,6 +345,25 @@ class ApiService {
     return [];
   }
 
+  Future<List<IptvSourceModel>> getIptvSources() async {
+    final url = '$baseUrl/api/iptv/sources';
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is List) {
+          return data
+              .where((item) => item is Map<String, dynamic> || item is Map)
+              .map<IptvSourceModel>((item) => IptvSourceModel.fromJson(Map<String, dynamic>.from(item as Map)))
+              .toList();
+        }
+      }
+    } catch (_) {
+      // Log error
+    }
+    return [];
+  }
+
   Future<bool> refreshIptvSourceOnServer() async {
     try {
       final res = await _client.post(Uri.parse('$baseUrl/api/iptv/refresh')).timeout(const Duration(seconds: 15));

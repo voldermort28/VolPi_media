@@ -4,18 +4,35 @@ class IptvSourceModel {
   final String id;
   final String name;
   final int count;
+  final String? type;
+  final bool enabled;
+  final bool isError;
+  final String? errorMessage;
 
   const IptvSourceModel({
     required this.id,
     required this.name,
     this.count = 0,
+    this.type,
+    this.enabled = true,
+    this.isError = false,
+    this.errorMessage,
   });
 
   factory IptvSourceModel.fromJson(Map<String, dynamic> json) {
+    final rawCount = json['count'];
+    final int count = rawCount is int ? rawCount : (int.tryParse(rawCount?.toString() ?? '0') ?? 0);
+    final String id = json['id']?.toString() ?? '';
+    final bool isErr = json['isError'] == true || (count == 0 && id != 'ALL');
+
     return IptvSourceModel(
-      id: json['id']?.toString() ?? '',
+      id: id,
       name: json['name']?.toString() ?? 'Nguồn',
-      count: json['count'] is int ? json['count'] : 0,
+      count: count,
+      type: json['type']?.toString(),
+      enabled: json['enabled'] != false,
+      isError: isErr,
+      errorMessage: json['errorMessage']?.toString(),
     );
   }
 }

@@ -1,10 +1,10 @@
 {
-  "version": "2.1.1",
-  "build": 57,
-  "tag_name": "v2.1.1",
-  "changelog": "• VolPi Media v2.1.1 - Sửa Bộ Lọc Giải Đấu & Nâng Cấp Hệ Thống Đồng Bộ 2 Chiều:\n- Chuẩn hóa bộ lọc giải đấu bóng đá: Khắc phục triệt để lỗi giải Ngoại Hạng Anh bị lẫn các giải khác (Kuwait, Ai Cập, Belarus...); lọc chính xác Ngoại Hạng Anh đích thực.\n- Tự động hóa đồng bộ 2 chiều (Lịch sử xem & Yêu thích): Tự động lắng nghe mọi tiến trình xem phim/anime và đẩy lên server; đồng bộ 2 chiều tức thì khi mở app và khi thoát trình phát video.",
+  "version": "2.1.2",
+  "build": 58,
+  "tag_name": "v2.1.2",
+  "changelog": "• VolPi Media v2.1.2 - Nâng Cấp Quản Lý Nguồn IPTV & Tự Động Nhận Diện Danh Mục:\n- Web Admin: Kiểm tra trực tiếp đường link M3U khi thêm, cảnh báo ngay nếu link lỗi 404 hoặc không có kênh; hiển thị nhãn cảnh báo đỏ đối với nguồn bị hỏng.\n- App TV / Mobile / macOS: Đồng bộ danh sách nguồn đầy đủ từ server, hiển thị rõ nguồn lỗi kèm cảnh báo thay vì bị ẩn mất; tự động chuyển tab sang 'Tất cả' hoặc 'Truyền hình' khi chọn nguồn không có bóng đá, tránh tình trạng màn hình trống.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T15:31:00Z"
+  "published_at": "2026-10-19T18:35:00Z"
 }

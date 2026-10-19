@@ -44,6 +44,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   Future<void> refresh() => _loadChannels(forceRefresh: true, triggerServerFetch: true);
 
   List<IptvChannelModel> _allChannels = [];
+  List<IptvSourceModel> _serverSources = [];
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
@@ -135,10 +136,16 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
         await widget.apiService.refreshIptvSourceOnServer();
       }
 
-      final channels = await widget.apiService.getIptvChannels(forceRefresh: forceRefresh);
+      final channelsFuture = widget.apiService.getIptvChannels(forceRefresh: forceRefresh);
+      final sourcesFuture = widget.apiService.getIptvSources();
+      final results = await Future.wait([channelsFuture, sourcesFuture]);
+      final channels = results[0] as List<IptvChannelModel>;
+      final sources = results[1] as List<IptvSourceModel>;
+
       if (mounted) {
         setState(() {
           _allChannels = channels;
+          _serverSources = sources;
           _isLoading = false;
           _isRefreshing = false;
           final hasFootball = _allChannels.any((c) => c.category == 'FOOTBALL');
@@ -172,12 +179,23 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
     final Map<String, String> sourceNames = {};
     final Map<String, int> sourceCounts = {};
+    final Map<String, bool> sourceErrors = {};
 
+    // 1. Thêm danh sách nguồn từ máy chủ (bao gồm cả nguồn có 0 kênh do lỗi)
+    for (final s in _serverSources) {
+      if (s.id == 'ALL') continue;
+      sourceNames[s.id] = s.name;
+      sourceCounts[s.id] = s.count;
+      sourceErrors[s.id] = s.isError || s.count == 0;
+    }
+
+    // 2. Gom nhóm đếm số lượng kênh thực tế hiện có trong _allChannels
+    final Map<String, int> actualCounts = {};
     for (final c in _allChannels) {
       final sId = c.sourceId.isNotEmpty ? c.sourceId : 'pl-default';
       final sName = c.sourceName.isNotEmpty ? c.sourceName : 'Kênh Quốc Gia';
       sourceNames[sId] = sName;
-      sourceCounts[sId] = (sourceCounts[sId] ?? 0) + 1;
+      actualCounts[sId] = (actualCounts[sId] ?? 0) + 1;
     }
 
     final List<IptvSourceModel> sources = [
@@ -185,7 +203,14 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
     ];
 
     sourceNames.forEach((id, name) {
-      sources.add(IptvSourceModel(id: id, name: name, count: sourceCounts[id] ?? 0));
+      final count = actualCounts[id] ?? sourceCounts[id] ?? 0;
+      final isErr = (sourceErrors[id] ?? false) || count == 0;
+      sources.add(IptvSourceModel(
+        id: id,
+        name: name,
+        count: count,
+        isError: isErr,
+      ));
     });
 
     _lastSourceChannelsCount = _allChannels.length;
@@ -361,7 +386,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
             ],
           ),
           content: SizedBox(
-            width: 420,
+            width: 440,
             child: ListView.separated(
               shrinkWrap: true,
               itemCount: sources.length,
@@ -369,55 +394,113 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
               itemBuilder: (ctx, index) {
                 final source = sources[index];
                 final isSelected = _selectedSourceId == source.id;
+                final isDead = source.isError || (source.count == 0 && source.id != 'ALL');
 
                 return TvFocusableCard(
                   onTap: () {
                     setState(() {
                       _selectedSourceId = source.id;
                       _selectedGroup = 'ALL';
+
+                      // Nếu nguồn được chọn có kênh, nhưng không có kênh nào thuộc danh mục hiện tại -> tự động chuyển sang tab phù hợp
+                      if (source.id != 'ALL') {
+                        final sourceChannels = _allChannels.where((c) => c.sourceId == source.id).toList();
+                        if (sourceChannels.isNotEmpty) {
+                          final countInCurrent = sourceChannels.where((c) {
+                            if (_selectedCategory == 'PINNED') return c.isPinned;
+                            if (_selectedCategory == 'ALL') return true;
+                            return c.category == _selectedCategory;
+                          }).length;
+
+                          if (countInCurrent == 0) {
+                            final hasFixedTv = sourceChannels.any((c) => c.category == 'FIXED_TV');
+                            final hasFootball = sourceChannels.any((c) => c.category == 'FOOTBALL');
+                            if (hasFixedTv && !hasFootball) {
+                              _selectedCategory = 'FIXED_TV';
+                            } else {
+                              _selectedCategory = 'ALL';
+                            }
+                          }
+                        }
+                      }
                     });
                     Navigator.of(dialogCtx).pop();
+
+                    if (isDead) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Nguồn "${source.name}" hiện không có kênh nào hoạt động (Link lỗi 404 hoặc đã hết hạn).'),
+                          backgroundColor: Colors.redAccent.shade700,
+                          duration: const Duration(seconds: 4),
+                        ),
+                      );
+                    }
                   },
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF0284C7).withOpacity(0.25) : const Color(0xFF0F172A),
+                      color: isSelected
+                          ? const Color(0xFF0284C7).withOpacity(0.25)
+                          : (isDead ? Colors.red.withOpacity(0.08) : const Color(0xFF0F172A)),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: isSelected ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                        color: isSelected
+                            ? const Color(0xFF38BDF8)
+                            : (isDead ? Colors.redAccent.withOpacity(0.4) : const Color(0xFF334155)),
                         width: isSelected ? 1.5 : 1.0,
                       ),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white38,
+                          isSelected
+                              ? Icons.radio_button_checked_rounded
+                              : (isDead ? Icons.error_outline_rounded : Icons.radio_button_off_rounded),
+                          color: isSelected
+                              ? const Color(0xFF38BDF8)
+                              : (isDead ? Colors.redAccent : Colors.white38),
                           size: 20,
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: Text(
-                            source.name,
-                            style: TextStyle(
-                              color: isSelected ? Colors.white : Colors.white70,
-                              fontSize: 13,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                            ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                source.name,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : (isDead ? Colors.white70 : Colors.white70),
+                                  fontSize: 13,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                ),
+                              ),
+                              if (isDead)
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: Text(
+                                    'Link không phản hồi (404 / Hết hạn)',
+                                    style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
+                        const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF1E293B),
+                            color: isDead ? Colors.red.withOpacity(0.2) : const Color(0xFF1E293B),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: const Color(0xFF334155)),
+                            border: Border.all(
+                              color: isDead ? Colors.redAccent.withOpacity(0.5) : const Color(0xFF334155),
+                            ),
                           ),
                           child: Text(
-                            '${source.count} kênh',
-                            style: const TextStyle(
-                              color: Color(0xFF38BDF8),
+                            isDead ? '0 kênh' : '${source.count} kênh',
+                            style: TextStyle(
+                              color: isDead ? Colors.redAccent : const Color(0xFF38BDF8),
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                             ),
@@ -1057,12 +1140,40 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                     children: [
                       const Icon(Icons.tv_off_rounded, color: Colors.white24, size: 56),
                       const SizedBox(height: 12),
-                      Text(
-                        _searchQuery.isNotEmpty
-                            ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
-                            : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
-                        style: const TextStyle(color: Colors.white60, fontSize: 13),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          _searchQuery.isNotEmpty
+                              ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
+                              : (_selectedSourceId != 'ALL' && _allChannels.where((c) => c.sourceId == _selectedSourceId).isEmpty)
+                                  ? 'Nguồn này hiện có 0 kênh khả dụng (Link lỗi hoặc đã hết hạn).'
+                                  : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white60, fontSize: 13),
+                        ),
                       ),
+                      if (_selectedSourceId != 'ALL') ...[
+                        const SizedBox(height: 14),
+                        TvFocusableCard(
+                          onTap: () {
+                            setState(() {
+                              _selectedSourceId = 'ALL';
+                              _selectedCategory = 'ALL';
+                              _selectedGroup = 'ALL';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF38BDF8)),
+                            ),
+                            child: const Text('Xem tất cả các nguồn', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 )
@@ -1096,12 +1207,22 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                   color: const Color(0xFF1E293B),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.playlist_play_rounded, color: Color(0xFF38BDF8), size: 16),
-                      SizedBox(width: 4),
-                      Text('Nguồn', style: TextStyle(color: Colors.white70, fontSize: 11)),
+                      const Icon(Icons.playlist_play_rounded, color: Color(0xFF38BDF8), size: 16),
+                      const SizedBox(width: 4),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        child: Text(
+                          _selectedSourceId == 'ALL'
+                              ? 'Nguồn'
+                              : sources.firstWhere((s) => s.id == _selectedSourceId, orElse: () => sources.first).name,
+                          style: const TextStyle(color: Colors.white70, fontSize: 11),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -1118,9 +1239,46 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
         Expanded(
           child: filteredChannels.isEmpty
               ? Center(
-                  child: Text(
-                    'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
-                    style: const TextStyle(color: Colors.white60, fontSize: 13),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.tv_off_rounded, color: Colors.white24, size: 48),
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          _searchQuery.isNotEmpty
+                              ? 'Không tìm thấy kênh nào khớp với "$_searchQuery"'
+                              : (_selectedSourceId != 'ALL' && _allChannels.where((c) => c.sourceId == _selectedSourceId).isEmpty)
+                                  ? 'Nguồn này hiện có 0 kênh khả dụng (Link lỗi hoặc đã hết hạn).'
+                                  : 'Không có kênh nào trong mục ${_getCategoryTitle(_selectedCategory)}.',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white60, fontSize: 13),
+                        ),
+                      ),
+                      if (_selectedSourceId != 'ALL') ...[
+                        const SizedBox(height: 12),
+                        TvFocusableCard(
+                          onTap: () {
+                            setState(() {
+                              _selectedSourceId = 'ALL';
+                              _selectedCategory = 'ALL';
+                              _selectedGroup = 'ALL';
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFF38BDF8)),
+                            ),
+                            child: const Text('Xem tất cả các nguồn', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 )
               : _buildTieredChannelGrid(filteredChannels, crossAxisCount),

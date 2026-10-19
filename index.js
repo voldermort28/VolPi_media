@@ -478,9 +478,9 @@ app.get("/api/iptv/sources", async (req, res) => {
   }
 });
 
-app.post("/api/iptv/sources/add", authService.requireAuth, (req, res) => {
+app.post("/api/iptv/sources/add", authService.requireAuth, async (req, res) => {
   try {
-    const result = iptvService.addPlaylist(req.body);
+    const result = await iptvService.addPlaylist(req.body);
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

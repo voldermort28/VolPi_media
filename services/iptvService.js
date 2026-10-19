@@ -1065,12 +1065,21 @@ async function getSources() {
   const config = loadConfig();
   const channels = await getChannels();
   const sourceStats = new Map();
-  sourceStats.set('ALL', { id: 'ALL', name: 'Tất Cả Các Nguồn', count: channels.length });
+  sourceStats.set('ALL', { id: 'ALL', name: 'Tất Cả Các Nguồn', count: channels.length, enabled: true, isError: false });
 
   if (Array.isArray(config.playlists)) {
     config.playlists.forEach((p) => {
       const count = channels.filter(c => c.sourceId === p.id).length;
-      sourceStats.set(p.id, { id: p.id, name: p.name, type: p.type, enabled: p.enabled !== false, count });
+      const isError = count === 0 && p.enabled !== false;
+      sourceStats.set(p.id, {
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        enabled: p.enabled !== false,
+        count,
+        isError,
+        errorMessage: isError ? 'Link không thể truy cập (404/hết hạn) hoặc không có kênh khả dụng' : null,
+      });
     });
   }
 
@@ -1078,14 +1087,63 @@ async function getSources() {
 }
 
 /**
- * Add a new playlist
+ * Add a new playlist with pre-validation
  */
-function addPlaylist({ name, type = 'url', url = '', content = '', filename = '' }) {
+async function addPlaylist({ name, type = 'url', url = '', content = '', filename = '' }) {
   const config = loadConfig();
   if (!Array.isArray(config.playlists)) config.playlists = [];
 
   const cleanUrl = (url || '').trim();
   const cleanName = (name || '').trim();
+
+  let parsedCount = 0;
+
+  if (type === 'url') {
+    if (!cleanUrl) {
+      return { success: false, error: 'Vui lòng nhập đường link URL của playlist M3U' };
+    }
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      return { success: false, error: 'Đường dẫn M3U phải bắt đầu bằng http:// hoặc https://' };
+    }
+
+    try {
+      console.log(`[IPTV Service] Validating M3U playlist from ${cleanUrl}...`);
+      const res = await axios.get(cleanUrl, {
+        timeout: 12000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (SmartTV; VolPiMedia/1.0.10)',
+          'Accept': '*/*',
+        },
+      });
+      const m3uText = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+      const testChannels = parseM3U(m3uText);
+      if (!testChannels || testChannels.length === 0) {
+        return {
+          success: false,
+          error: 'Link M3U kết nối được nhưng không tìm thấy kênh nào (danh sách rỗng hoặc sai định dạng M3U).',
+        };
+      }
+      parsedCount = testChannels.length;
+    } catch (err) {
+      const statusText = err.response ? `HTTP ${err.response.status}` : (err.code || err.message);
+      return {
+        success: false,
+        error: `Không thể kết nối đến link M3U (${statusText}). Vui lòng kiểm tra lại URL hoặc máy chủ phát!`,
+      };
+    }
+  } else if (type === 'file') {
+    if (!content || typeof content !== 'string') {
+      return { success: false, error: 'Nội dung file M3U không hợp lệ hoặc bị rỗng' };
+    }
+    const testChannels = parseM3U(content);
+    if (!testChannels || testChannels.length === 0) {
+      return {
+        success: false,
+        error: 'File tải lên không có kênh nào hoặc không đúng định dạng chuẩn M3U (#EXTM3U).',
+      };
+    }
+    parsedCount = testChannels.length;
+  }
 
   // If url already exists in playlists, update/enable it
   if (type === 'url' && cleanUrl) {
@@ -1095,7 +1153,7 @@ function addPlaylist({ name, type = 'url', url = '', content = '', filename = ''
       existing.enabled = true;
       saveConfig(config);
       clearCache();
-      return { success: true, playlist: existing, config, updated: true };
+      return { success: true, count: parsedCount, playlist: existing, config, updated: true };
     }
   }
 
@@ -1122,7 +1180,7 @@ function addPlaylist({ name, type = 'url', url = '', content = '', filename = ''
   config.playlists.push(newPl);
   saveConfig(config);
   clearCache();
-  return { success: true, playlist: newPl, config };
+  return { success: true, count: parsedCount, playlist: newPl, config };
 }
 
 /**
