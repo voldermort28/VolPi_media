@@ -1,10 +1,10 @@
 {
-  "version": "2.0.5",
-  "build": 51,
-  "tag_name": "v2.0.5",
-  "changelog": "• VolPi Media v2.0.5 - Hero Billboard Banner Tự Động Trượt Ngẫu Nhiên:\n- Banner nổi bật ngẫu nhiên (Random Slide Banner): Tự động chọn 6 phim/anime tiêu biểu từ các danh mục với hình nền chất lượng cao.\n- Tự động chuyển slide mượt mà mỗi 7 giây kèm thanh chấm chỉ số trang (dots indicator).\n- Nút mũi tên điều hướng hai bên xuất hiện khi di chuột và tự ẩn khi không tương tác.\n- Tự động tạm dừng chuyển slide khi người dùng TV Remote focus vào các nút Xem Ngay / Chi Tiết / Yêu Thích hoặc khi hover chuột.\n- Hoạt động mượt mà và tối ưu hóa hiệu năng trên Android TV và thiết bị di động.",
+  "version": "2.0.6",
+  "build": 52,
+  "tag_name": "v2.0.6",
+  "changelog": "• VolPi Media v2.0.6 - Tối Ưu Android TV Remote & Giao Diện Mobile:\n- Sửa lỗi điều hướng Android TV Remote: Khắc phục focus trap giữa Sidebar và nội dung bên phải, chuyển sang kiến trúc Overlay Stack z-index chuẩn Netflix giúp di chuyển con trỏ qua lại mượt mà 100% bằng remote.\n- Giao diện Điện thoại (iOS / Android Mobile): Ẩn thanh Sidebar cố định, bổ sung thanh tiêu đề với nút Menu Hamburger (☰) mở Drawer trượt hiện đại, trả lại 100% không gian hiển thị phim & bóng đá.\n- Màn hình Chi tiết Anime trên Mobile: Thu nhỏ poster đại diện phim (104x148) giúp bảng danh sách số tập mở rộng thành 3-4 cột dễ bấm, không còn bị chật chội 2 cột.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T04:05:00Z"
+  "published_at": "2026-10-19T09:55:00Z"
 }

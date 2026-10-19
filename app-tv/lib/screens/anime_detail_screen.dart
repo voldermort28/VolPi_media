@@ -141,6 +141,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     final anime = _detailedAnime ?? widget.anime;
     final episodes = anime.episodes;
 
+    final bool isNarrow = MediaQuery.of(context).size.width < 600;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
@@ -148,7 +150,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
           children: [
             // Top Bar
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 20, vertical: isNarrow ? 8 : 12),
               child: Row(
                 children: [
                   TvFocusableCard(
@@ -165,7 +167,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                   Expanded(
                     child: Text(
                       anime.name,
-                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: Colors.white, fontSize: isNarrow ? 16 : 18, fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -244,53 +246,53 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Poster & Description Card (Left Column)
+                  // Poster & Description Card (Left Column - compact on mobile)
                   Container(
-                    width: 260,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    width: isNarrow ? 120 : 260,
+                    padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 20),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(isNarrow ? 8 : 12),
                             child: CachedNetworkImage(
                               imageUrl: anime.poster,
-                              width: 220,
-                              height: 310,
-                              memCacheWidth: 220,
-                              memCacheHeight: 310,
+                              width: isNarrow ? 104 : 220,
+                              height: isNarrow ? 148 : 310,
+                              memCacheWidth: isNarrow ? 130 : 220,
+                              memCacheHeight: isNarrow ? 180 : 310,
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) => Container(
-                                width: 220,
-                                height: 310,
+                                width: isNarrow ? 104 : 220,
+                                height: isNarrow ? 148 : 310,
                                 color: const Color(0xFF1E293B),
-                                child: const Icon(Icons.movie_outlined, size: 48, color: Colors.white30),
+                                child: Icon(Icons.movie_outlined, size: isNarrow ? 32 : 48, color: Colors.white30),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 12),
+                          SizedBox(height: isNarrow ? 8 : 12),
                           if (anime.genres.isNotEmpty)
                             Wrap(
-                              spacing: 6,
-                              runSpacing: 6,
+                              spacing: isNarrow ? 4 : 6,
+                              runSpacing: isNarrow ? 4 : 6,
                               children: anime.genres.map((g) {
                                 return Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 5 : 8, vertical: isNarrow ? 2 : 3),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF1E293B),
-                                    borderRadius: BorderRadius.circular(6),
+                                    borderRadius: BorderRadius.circular(4),
                                   ),
-                                  child: Text(g, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                                  child: Text(g, style: TextStyle(color: const Color(0xFF38BDF8), fontSize: isNarrow ? 9 : 10)),
                                 );
                               }).toList(),
                             ),
-                          const SizedBox(height: 10),
+                          SizedBox(height: isNarrow ? 6 : 10),
                           if (anime.description.isNotEmpty)
                             Text(
                               anime.description,
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.4),
-                              maxLines: 6,
+                              style: TextStyle(color: const Color(0xFF94A3B8), fontSize: isNarrow ? 11 : 12, height: 1.3),
+                              maxLines: isNarrow ? 4 : 6,
                               overflow: TextOverflow.ellipsis,
                             ),
                         ],
@@ -301,25 +303,30 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                   // Episodes Grid (Right Column)
                   Expanded(
                     child: Container(
-                      padding: const EdgeInsets.only(right: 20, bottom: 20),
+                      padding: EdgeInsets.only(right: isNarrow ? 10 : 20, bottom: isNarrow ? 12 : 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 8,
+                            runSpacing: 6,
                             children: [
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.list_alt_rounded, color: Color(0xFF38BDF8), size: 18),
-                                  const SizedBox(width: 8),
+                                  const Icon(Icons.list_alt_rounded, color: Color(0xFF38BDF8), size: 16),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    'Danh Sách Tập (${episodes.length} tập)',
-                                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                                    isNarrow ? 'Tập (${episodes.length})' : 'Danh Sách Tập (${episodes.length} tập)',
+                                    style: TextStyle(color: Colors.white, fontSize: isNarrow ? 13 : 15, fontWeight: FontWeight.bold),
                                   ),
                                 ],
                               ),
                               // Folder Switchers: Thuyet Minh & Phu De
                               Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
                                   TvFocusableCard(
                                     onTap: () {
@@ -327,24 +334,24 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                         _selectedVariant = 'DUB';
                                       });
                                     },
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 12, vertical: isNarrow ? 4 : 6),
                                       color: _selectedVariant == 'DUB' ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
                                             Icons.record_voice_over_rounded,
-                                            size: 14,
+                                            size: isNarrow ? 12 : 14,
                                             color: _selectedVariant == 'DUB' ? Colors.white : Colors.white70,
                                           ),
-                                          const SizedBox(width: 5),
+                                          const SizedBox(width: 4),
                                           Text(
-                                            '🎙️ Thuyết Minh',
+                                            isNarrow ? 'TM' : '🎙️ Thuyết Minh',
                                             style: TextStyle(
                                               color: _selectedVariant == 'DUB' ? Colors.white : Colors.white70,
-                                              fontSize: 12,
+                                              fontSize: isNarrow ? 11 : 12,
                                               fontWeight: _selectedVariant == 'DUB' ? FontWeight.bold : FontWeight.normal,
                                             ),
                                           ),
@@ -352,31 +359,31 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 6),
                                   TvFocusableCard(
                                     onTap: () {
                                       setState(() {
                                         _selectedVariant = 'SUB';
                                       });
                                     },
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(6),
                                     child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 12, vertical: isNarrow ? 4 : 6),
                                       color: _selectedVariant == 'SUB' ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Icon(
                                             Icons.subtitles_rounded,
-                                            size: 14,
+                                            size: isNarrow ? 12 : 14,
                                             color: _selectedVariant == 'SUB' ? Colors.white : Colors.white70,
                                           ),
-                                          const SizedBox(width: 5),
+                                          const SizedBox(width: 4),
                                           Text(
-                                            '📝 Phụ Đề',
+                                            isNarrow ? 'Sub' : '📝 Phụ Đề',
                                             style: TextStyle(
                                               color: _selectedVariant == 'SUB' ? Colors.white : Colors.white70,
-                                              fontSize: 12,
+                                              fontSize: isNarrow ? 11 : 12,
                                               fontWeight: _selectedVariant == 'SUB' ? FontWeight.bold : FontWeight.normal,
                                             ),
                                           ),
@@ -388,7 +395,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Expanded(
                             child: _isLoading
                                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
@@ -402,11 +409,11 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                     : GridView.builder(
                                         cacheExtent: 250,
                                         addAutomaticKeepAlives: true,
-                                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                          maxCrossAxisExtent: 110,
-                                          crossAxisSpacing: 10,
-                                          mainAxisSpacing: 10,
-                                          mainAxisExtent: 52,
+                                        gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                                          maxCrossAxisExtent: isNarrow ? 76 : 110,
+                                          crossAxisSpacing: isNarrow ? 6 : 10,
+                                          mainAxisSpacing: isNarrow ? 6 : 10,
+                                          mainAxisExtent: isNarrow ? 42 : 52,
                                         ),
                                         itemCount: episodes.length,
                                         itemBuilder: (context, idx) {
@@ -415,11 +422,11 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                           final epSaved = WatchHistoryService.instance.getProgress(epHistoryId);
                                           return TvFocusableCard(
                                             onTap: () => _playEpisodeAtIndex(idx),
-                                            borderRadius: BorderRadius.circular(10),
+                                            borderRadius: BorderRadius.circular(isNarrow ? 8 : 10),
                                             child: Container(
                                               color: const Color(0xFF1E293B),
                                               alignment: Alignment.center,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                                              padding: const EdgeInsets.symmetric(horizontal: 4),
                                               child: Stack(
                                                 alignment: Alignment.center,
                                                 children: [

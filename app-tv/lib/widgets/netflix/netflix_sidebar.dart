@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../tv_focusable_card.dart';
 
 class NetflixSidebar extends StatefulWidget {
@@ -6,7 +7,8 @@ class NetflixSidebar extends StatefulWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback onSwitchToOldUI;
   final VoidCallback onProfilePressed;
-  final FocusNode? firstFocusNode;
+  final List<FocusNode>? focusNodes;
+  final VoidCallback? onMoveToContent;
 
   const NetflixSidebar({
     super.key,
@@ -14,7 +16,8 @@ class NetflixSidebar extends StatefulWidget {
     required this.onTabSelected,
     required this.onSwitchToOldUI,
     required this.onProfilePressed,
-    this.firstFocusNode,
+    this.focusNodes,
+    this.onMoveToContent,
   });
 
   @override
@@ -49,11 +52,22 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    return FocusScope(
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
       onFocusChange: (hasFocus) {
         setState(() {
           _isExpanded = hasFocus;
         });
+      },
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          if (widget.onMoveToContent != null) {
+            widget.onMoveToContent!();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
       },
       child: MouseRegion(
         onEnter: (_) => setState(() => _isExpanded = true),
@@ -140,11 +154,12 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                   itemBuilder: (context, idx) {
                     final item = _menuItems[idx];
                     final isSelected = widget.selectedIndex == idx;
+                    final itemFocusNode = (widget.focusNodes != null && idx < widget.focusNodes!.length)
+                        ? widget.focusNodes![idx]
+                        : null;
 
                     return TvFocusableCard(
-                      focusNode: (idx == 0 && widget.firstFocusNode != null)
-                          ? widget.firstFocusNode
-                          : null,
+                      focusNode: itemFocusNode,
                       onTap: () => widget.onTabSelected(idx),
                       borderRadius: BorderRadius.circular(8),
                       focusBorderColor: Colors.white,
@@ -211,6 +226,9 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                   children: [
                     // Switch back to V1
                     TvFocusableCard(
+                      focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 5)
+                          ? widget.focusNodes![5]
+                          : null,
                       onTap: widget.onSwitchToOldUI,
                       borderRadius: BorderRadius.circular(8),
                       focusBorderColor: const Color(0xFF38BDF8),
@@ -256,6 +274,9 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
 
                     // Profile / Secret
                     TvFocusableCard(
+                      focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 6)
+                          ? widget.focusNodes![6]
+                          : null,
                       onTap: widget.onProfilePressed,
                       borderRadius: BorderRadius.circular(8),
                       focusBorderColor: Colors.white,

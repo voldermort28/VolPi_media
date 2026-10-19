@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../api/api_service.dart';
 import '../models/update_model.dart';
-import '../screens/anime_screen.dart';
 import '../screens/football_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
@@ -24,7 +24,12 @@ class NetflixLayout extends StatefulWidget {
 }
 
 class _NetflixLayoutState extends State<NetflixLayout> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Socolive, 3: Anime, 4: IPTV
+
+  // TV Remote navigation FocusNodes for sidebar (5 tabs + V1 switch + Profile = 7)
+  final List<FocusNode> _sidebarFocusNodes = List.generate(7, (_) => FocusNode());
+  final FocusScopeNode _contentFocusScopeNode = FocusScopeNode();
 
   @override
   void initState() {
@@ -33,6 +38,15 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       _checkOtaUpdate(silent: true);
       SyncService.pullFromServer(widget.apiService.baseUrl);
     });
+  }
+
+  @override
+  void dispose() {
+    for (final node in _sidebarFocusNodes) {
+      node.dispose();
+    }
+    _contentFocusScopeNode.dispose();
+    super.dispose();
   }
 
   Future<void> _checkOtaUpdate({bool silent = false}) async {
@@ -94,99 +108,443 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
+
     return PopScope(
-      canPop: _currentTabIndex == 0,
+      canPop: false,
       onPopInvoked: (didPop) {
-        if (!didPop && _currentTabIndex != 0) {
-          // TV Remote Back button: Return to Netflix Home tab first instead of quitting
+        if (didPop) return;
+
+        // If on mobile: close drawer if open
+        if (isMobile && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
+          Navigator.of(context).pop();
+          return;
+        }
+
+        // On TV: If content has focus, move focus to sidebar first
+        final sidebarHasFocus = _sidebarFocusNodes.any((n) => n.hasFocus);
+        if (!sidebarHasFocus && !isMobile) {
+          _sidebarFocusNodes[_currentTabIndex].requestFocus();
+          return;
+        }
+
+        // If on non-home tab: return to tab 0
+        if (_currentTabIndex != 0) {
           setState(() {
             _currentTabIndex = 0;
           });
+          if (!isMobile) {
+            _sidebarFocusNodes[0].requestFocus();
+          }
+          return;
         }
+
+        // Tab 0 & in sidebar: quit app
+        SystemNavigator.pop();
       },
       child: Scaffold(
+        key: _scaffoldKey,
         backgroundColor: const Color(0xFF0F0F0F),
+        drawer: isMobile ? _buildMobileDrawer() : null,
         body: SafeArea(
-          child: Row(
-            children: [
-              // 1. Netflix Left Rail Sidebar (Interactive D-Pad & Hover)
-              NetflixSidebar(
-                selectedIndex: _currentTabIndex,
-                onTabSelected: (idx) {
-                  setState(() {
-                    _currentTabIndex = idx;
-                  });
-                },
-                onSwitchToOldUI: _switchToOldUI,
-                onProfilePressed: _handleProfileButton,
-              ),
-
-              // 2. Main Content Area with IndexedStack & ExcludeFocus (Trap Door #1 & #3 Avoided)
-              Expanded(
-                child: IndexedStack(
-                  index: _currentTabIndex,
+          child: isMobile
+              ? Column(
                   children: [
-                    // Tab 0: Netflix Home (Billboard + Horizontal Carousels)
-                    ExcludeFocus(
-                      excluding: _currentTabIndex != 0,
-                      child: NetflixHomeScreen(
-                        apiService: widget.apiService,
-                        onNavigateTab: (tabIdx) {
+                    _buildMobileHeader(),
+                    Expanded(
+                      child: _buildIndexedTabContent(),
+                    ),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    // 1. Main Content Area (Offset by 68px for the collapsed rail)
+                    Positioned.fill(
+                      left: 68,
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                            // Check if primary focus has nowhere left to go inside content
+                            final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.left) ?? false;
+                            if (!moved) {
+                              // Reached left edge of content: jump directly to active sidebar item!
+                              _sidebarFocusNodes[_currentTabIndex].requestFocus();
+                              return KeyEventResult.handled;
+                            }
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: FocusScope(
+                          node: _contentFocusScopeNode,
+                          child: _buildIndexedTabContent(),
+                        ),
+                      ),
+                    ),
+
+                    // 2. Left Rail Sidebar (Stack overlay on top - highest z-index)
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: NetflixSidebar(
+                        selectedIndex: _currentTabIndex,
+                        focusNodes: _sidebarFocusNodes,
+                        onMoveToContent: () {
+                          _contentFocusScopeNode.requestFocus();
+                        },
+                        onTabSelected: (idx) {
                           setState(() {
-                            _currentTabIndex = tabIdx;
+                            _currentTabIndex = idx;
                           });
                         },
-                      ),
-                    ),
-
-                    // Tab 1: Xôi Lạc TV
-                    ExcludeFocus(
-                      excluding: _currentTabIndex != 1,
-                      child: FootballScreen(
-                        apiService: widget.apiService,
-                        source: 'xoilac',
-                        title: 'Xôi Lạc TV',
-                        isActive: _currentTabIndex == 1,
-                      ),
-                    ),
-
-                    // Tab 2: Socolive TV
-                    ExcludeFocus(
-                      excluding: _currentTabIndex != 2,
-                      child: FootballScreen(
-                        apiService: widget.apiService,
-                        source: 'socolive',
-                        title: 'Socolive TV',
-                        isActive: _currentTabIndex == 2,
-                      ),
-                    ),
-
-                    // Tab 3: Anime & Phim
-                    ExcludeFocus(
-                      excluding: _currentTabIndex != 3,
-                      child: NetflixAnimeScreen(
-                        apiService: widget.apiService,
-                        onNavigateTab: (tabIdx) {
-                          setState(() {
-                            _currentTabIndex = tabIdx;
-                          });
-                        },
-                      ),
-                    ),
-
-                    // Tab 4: Truyền Hình (IPTV)
-                    ExcludeFocus(
-                      excluding: _currentTabIndex != 4,
-                      child: IptvScreen(
-                        apiService: widget.apiService,
-                        isActive: _currentTabIndex == 4,
+                        onSwitchToOldUI: _switchToOldUI,
+                        onProfilePressed: _handleProfileButton,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+        ),
+      ),
+    );
+  }
+
+  // =========================================================================
+  // SHARED INDEXED TAB CONTENT
+  // =========================================================================
+  Widget _buildIndexedTabContent() {
+    return IndexedStack(
+      index: _currentTabIndex,
+      children: [
+        // Tab 0: Netflix Home (Billboard + Horizontal Carousels)
+        ExcludeFocus(
+          excluding: _currentTabIndex != 0,
+          child: NetflixHomeScreen(
+            apiService: widget.apiService,
+            onNavigateTab: (tabIdx) {
+              setState(() {
+                _currentTabIndex = tabIdx;
+              });
+            },
           ),
+        ),
+
+        // Tab 1: Xôi Lạc TV
+        ExcludeFocus(
+          excluding: _currentTabIndex != 1,
+          child: FootballScreen(
+            apiService: widget.apiService,
+            source: 'xoilac',
+            title: 'Xôi Lạc TV',
+            isActive: _currentTabIndex == 1,
+          ),
+        ),
+
+        // Tab 2: Socolive TV
+        ExcludeFocus(
+          excluding: _currentTabIndex != 2,
+          child: FootballScreen(
+            apiService: widget.apiService,
+            source: 'socolive',
+            title: 'Socolive TV',
+            isActive: _currentTabIndex == 2,
+          ),
+        ),
+
+        // Tab 3: Anime & Phim
+        ExcludeFocus(
+          excluding: _currentTabIndex != 3,
+          child: NetflixAnimeScreen(
+            apiService: widget.apiService,
+            onNavigateTab: (tabIdx) {
+              setState(() {
+                _currentTabIndex = tabIdx;
+              });
+            },
+          ),
+        ),
+
+        // Tab 4: Truyền Hình (IPTV)
+        ExcludeFocus(
+          excluding: _currentTabIndex != 4,
+          child: IptvScreen(
+            apiService: widget.apiService,
+            isActive: _currentTabIndex == 4,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // =========================================================================
+  // MOBILE TOP BAR (HAMBURGER BUTTON + LOGO + TITLE + PROFILE)
+  // =========================================================================
+  Widget _buildMobileHeader() {
+    final titles = [
+      'Trang chủ',
+      'Xôi Lạc TV',
+      'Socolive TV',
+      'Anime & Phim',
+      'Truyền Hình (IPTV)',
+    ];
+    final currentTitle = _currentTabIndex < titles.length ? titles[_currentTabIndex] : 'VolPi Media';
+
+    return Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF141414),
+        border: Border(bottom: BorderSide(color: Color(0xFF262626), width: 1.0)),
+      ),
+      child: Row(
+        children: [
+          // ☰ Hamburger Button
+          IconButton(
+            icon: const Icon(Icons.menu_rounded, color: Colors.white, size: 24),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          ),
+          const SizedBox(width: 8),
+
+          // Logo
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Image.asset('assets/volpi_logo.png', fit: BoxFit.contain),
+          ),
+          const SizedBox(width: 8),
+
+          // Title
+          Expanded(
+            child: Text(
+              currentTitle,
+              style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          // Check OTA
+          IconButton(
+            icon: const Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: 'Kiểm tra cập nhật',
+            onPressed: () => _checkOtaUpdate(silent: false),
+          ),
+
+          const SizedBox(width: 6),
+
+          // Profile / Secret Passcode
+          GestureDetector(
+            onTap: _handleProfileButton,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: const Color(0xFF0284C7),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Center(
+                child: Text(
+                  'VP',
+                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
+  // MOBILE SLIDE-OUT DRAWER
+  // =========================================================================
+  Widget _buildMobileDrawer() {
+    final menuItems = [
+      {'icon': Icons.home_rounded, 'label': 'Trang chủ'},
+      {'icon': Icons.sports_soccer_rounded, 'label': 'Xôi Lạc TV'},
+      {'icon': Icons.sports_rounded, 'label': 'Socolive TV'},
+      {'icon': Icons.auto_awesome_rounded, 'label': 'Anime & Phim'},
+      {'icon': Icons.live_tv_rounded, 'label': 'Truyền Hình (IPTV)'},
+    ];
+
+    return Drawer(
+      backgroundColor: const Color(0xFF141414),
+      width: 280,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Drawer Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Image.asset('assets/volpi_logo.png', fit: BoxFit.contain),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'VOLPI MEDIA',
+                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                        ),
+                        Text(
+                          'NETFLIX CINEMA',
+                          style: TextStyle(color: Color(0xFFE50914), fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(color: Color(0xFF262626), height: 1),
+
+            const SizedBox(height: 10),
+
+            // Navigation Items
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: menuItems.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (context, idx) {
+                  final item = menuItems[idx];
+                  final isSelected = _currentTabIndex == idx;
+                  return InkWell(
+                    onTap: () {
+                      setState(() {
+                        _currentTabIndex = idx;
+                      });
+                      Navigator.of(context).pop();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: isSelected ? const Color(0xFF262626) : Colors.transparent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: isSelected
+                            ? const Border(left: BorderSide(color: Color(0xFFE50914), width: 3.5))
+                            : null,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            item['icon'] as IconData,
+                            size: 22,
+                            color: isSelected ? const Color(0xFFE50914) : Colors.white70,
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Text(
+                              item['label'] as String,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.white70,
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const Divider(color: Color(0xFF262626), height: 1),
+
+            // Bottom Actions
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  // Switch to V1
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _switchToOldUI();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.restore_page_rounded, size: 18, color: Color(0xFF38BDF8)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Giao diện Cũ (V1)',
+                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // Profile
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _handleProfileButton();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF171717),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Center(
+                              child: Text('VP', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Tài khoản & Phim riêng tư',
+                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
