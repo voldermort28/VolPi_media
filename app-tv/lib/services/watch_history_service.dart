@@ -56,6 +56,19 @@ class WatchHistoryService {
   /// Truy vấn O(1) tiến trình xem từ RAM — hoàn toàn đồng bộ, không bao giờ gây giật lag UI
   WatchHistoryItem? getProgress(String id) => _cache[id];
 
+  /// Lấy tiến trình xem gần nhất của một phim/anime theo mediaId
+  WatchHistoryItem? getLatestProgressForMedia(String mediaId) {
+    final matches = _cache.values.where((item) =>
+      item.mediaId == mediaId ||
+      item.id == mediaId ||
+      item.id.startsWith('anime:$mediaId:') ||
+      item.id.startsWith('$mediaId:')
+    ).toList();
+    if (matches.isEmpty) return null;
+    matches.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return matches.first;
+  }
+
   /// Lấy danh sách các phim/tập đang xem dở, sắp xếp mới xem nhất lên đầu
   List<WatchHistoryItem> getContinueWatching({String? excludeCategory, String? category}) {
     return _cache.values

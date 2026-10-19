@@ -36,6 +36,60 @@ class FootballScreenState extends State<FootballScreen> {
   String? _errorMessage;
   final FocusNode _firstMatchFocusNode = FocusNode();
 
+  String _selectedFilterId = 'all';
+
+  final List<Map<String, String>> _leagueFilters = const [
+    {'id': 'all', 'label': 'Tất cả'},
+    {'id': 'major', 'label': '⭐ Tâm Điểm'},
+    {'id': 'live', 'label': '🔴 Đang Đá'},
+    {'id': 'epl', 'label': '🏴󠁧󠁢󠁥󠁮󠁧󠁿 Ngoại Hạng Anh'},
+    {'id': 'c1', 'label': '🏆 Cúp C1'},
+    {'id': 'laliga', 'label': '🇪🇸 La Liga'},
+    {'id': 'seriea', 'label': '🇮🇹 Serie A'},
+    {'id': 'bundesliga', 'label': '🇩🇪 Bundesliga'},
+    {'id': 'vietnam', 'label': '🇻🇳 Việt Nam'},
+    {'id': 'finished', 'label': '🏁 Đã Xong'},
+  ];
+
+  bool _matchPassesFilter(MatchModel m, String filterId) {
+    if (filterId == 'all') return true;
+    if (filterId == 'major') {
+      return !m.isFinishedMatch &&
+          (m.isFamous || m.isVietnam || m.isFavorite || m.isHot || m.isPremierLeagueOrC1);
+    }
+    if (filterId == 'live') {
+      return m.isOngoingNow && !m.isFinishedMatch;
+    }
+    if (filterId == 'finished') {
+      return m.isFinishedMatch;
+    }
+    final leagueLower = m.league.toLowerCase();
+    if (filterId == 'epl') {
+      return leagueLower.contains('ngoại hạng') ||
+          leagueLower.contains('premier') ||
+          leagueLower.contains('epl') ||
+          leagueLower.contains('england');
+    }
+    if (filterId == 'c1') {
+      return leagueLower.contains('champions league') ||
+          leagueLower.contains('cúp c1') ||
+          leagueLower.contains('uefa champions');
+    }
+    if (filterId == 'laliga') {
+      return leagueLower.contains('la liga') || leagueLower.contains('laliga') || leagueLower.contains('spain');
+    }
+    if (filterId == 'seriea') {
+      return leagueLower.contains('serie a') || leagueLower.contains('italy') || leagueLower.contains('ý');
+    }
+    if (filterId == 'bundesliga') {
+      return leagueLower.contains('bundesliga') || leagueLower.contains('germany') || leagueLower.contains('đức');
+    }
+    if (filterId == 'vietnam') {
+      return m.isVietnam || leagueLower.contains('v-league') || leagueLower.contains('việt nam');
+    }
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -342,6 +396,56 @@ class FootballScreenState extends State<FootballScreen> {
           ),
         ),
 
+        // League Filter Chips Bar
+        SizedBox(
+          height: isMobile ? 32 : 36,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 20),
+            itemCount: _leagueFilters.length,
+            itemBuilder: (context, idx) {
+              final filter = _leagueFilters[idx];
+              final isSelected = filter['id'] == _selectedFilterId;
+              return Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: TvFocusableCard(
+                  onTap: () {
+                    setState(() {
+                      _selectedFilterId = filter['id']!;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  focusBorderColor: const Color(0xFF38BDF8),
+                  scale: 1.05,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 10 : 14,
+                      vertical: isMobile ? 4 : 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF38BDF8) : Colors.white12,
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      filter['label']!,
+                      style: TextStyle(
+                        color: isSelected ? Colors.white : Colors.white70,
+                        fontSize: isMobile ? 11 : 12,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        SizedBox(height: isMobile ? 4 : 8),
+
         // Main List or Loading / Error
         Expanded(
           child: _isLoading
@@ -390,10 +494,10 @@ class FootballScreenState extends State<FootballScreen> {
                             crossAxisCount = 2;
                           }
 
-                          final major = _majorMatches;
-                          final ongoing = _otherOngoingMatches;
-                          final others = _upcomingOtherMatches;
-                          final finished = _finishedMatches;
+                          final major = _majorMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList();
+                          final ongoing = _otherOngoingMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList();
+                          final others = _upcomingOtherMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList();
+                          final finished = _finishedMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList();
 
                           return CustomScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -455,17 +559,49 @@ class FootballScreenState extends State<FootballScreen> {
                                 _buildMatchGrid(finished, crossAxisCount, isFirstSection: false, isMobile: isMobile),
                               ],
 
-                              // Fallback nếu không chia được mục nào
+                              // Fallback nếu không chia được mục nào hoặc lọc không có trận
                               if (major.isEmpty && ongoing.isEmpty && others.isEmpty && finished.isEmpty && _matches.isNotEmpty) ...[
-                                SliverToBoxAdapter(
-                                  child: _buildSectionHeader(
-                                    title: '⚽ Tất Cả Trận Đấu Hôm Nay',
-                                    count: _matches.length.toString(),
-                                    color: const Color(0xFF38BDF8),
-                                    isMobile: isMobile,
+                                if (_selectedFilterId == 'all') ...[
+                                  SliverToBoxAdapter(
+                                    child: _buildSectionHeader(
+                                      title: '⚽ Tất Cả Trận Đấu Hôm Nay',
+                                      count: _matches.length.toString(),
+                                      color: const Color(0xFF38BDF8),
+                                      isMobile: isMobile,
+                                    ),
                                   ),
-                                ),
-                                _buildMatchGrid(_matches, crossAxisCount, isFirstSection: true, isMobile: isMobile),
+                                  _buildMatchGrid(_matches, crossAxisCount, isFirstSection: true, isMobile: isMobile),
+                                ] else ...[
+                                  SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.sports_soccer_outlined, color: Colors.white24, size: 48),
+                                          const SizedBox(height: 12),
+                                          const Text(
+                                            'Không có trận đấu nào thuộc giải này hôm nay.',
+                                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                                          ),
+                                          const SizedBox(height: 14),
+                                          TvFocusableCard(
+                                            onTap: () {
+                                              setState(() {
+                                                _selectedFilterId = 'all';
+                                              });
+                                            },
+                                            child: Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                              color: const Color(0xFF0284C7),
+                                              child: const Text('Xem tất cả trận đấu', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
 
                               const SliverToBoxAdapter(

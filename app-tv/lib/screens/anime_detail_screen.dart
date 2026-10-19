@@ -43,7 +43,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     }
   }
 
-  void _playEpisodeAtIndex(int index, {BuildContext? replaceContext}) async {
+  void _playEpisodeAtIndex(int index, {BuildContext? replaceContext, bool resumeDirectly = false}) async {
     final anime = _detailedAnime ?? widget.anime;
     final episodes = anime.episodes;
     if (index < 0 || index >= episodes.length) return;
@@ -55,14 +55,18 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     final saved = WatchHistoryService.instance.getProgress(historyId);
 
     Duration? startPosition;
-    if (saved != null && saved.isInProgress && replaceContext == null) {
-      final choice = await ResumePlaybackDialog.show(context, saved);
-      if (choice == null) return; // Hủy
-      if (choice) {
+    if (saved != null && saved.isInProgress) {
+      if (resumeDirectly) {
         startPosition = Duration(milliseconds: saved.positionMs);
-      } else {
-        startPosition = Duration.zero;
-        WatchHistoryService.instance.clearProgress(historyId);
+      } else if (replaceContext == null) {
+        final choice = await ResumePlaybackDialog.show(context, saved);
+        if (choice == null) return; // Hủy
+        if (choice) {
+          startPosition = Duration(milliseconds: saved.positionMs);
+        } else {
+          startPosition = Duration.zero;
+          WatchHistoryService.instance.clearProgress(historyId);
+        }
       }
     }
 
@@ -396,6 +400,78 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                             ],
                           ),
                           const SizedBox(height: 10),
+                          ValueListenableBuilder<int>(
+                            valueListenable: WatchHistoryService.instance.changeNotifier,
+                            builder: (context, _, __) {
+                              final latestProgress = WatchHistoryService.instance.getLatestProgressForMedia(widget.anime.id);
+                              if (latestProgress == null || !latestProgress.isInProgress || episodes.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
+                              final targetIdx = episodes.indexWhere((e) => e.episode == latestProgress.episode);
+                              final playIdx = targetIdx != -1 ? targetIdx : 0;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: TvFocusableCard(
+                                  onTap: () => _playEpisodeAtIndex(playIdx, resumeDirectly: true),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: isNarrow ? 10 : 14,
+                                      vertical: isNarrow ? 8 : 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [Color(0xFF0284C7), Color(0xFF0369A1)],
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0284C7).withOpacity(0.3),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(Icons.play_circle_filled_rounded, color: Colors.white, size: 22),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Text(
+                                                latestProgress.episode > 0
+                                                    ? 'Tiếp tục xem: Tập ${latestProgress.episode}'
+                                                    : 'Tiếp tục xem phim',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: isNarrow ? 12 : 13,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                'Đang dừng ở ${latestProgress.formattedPosition} / ${latestProgress.formattedDuration} (bấm để xem tiếp)',
+                                                style: TextStyle(
+                                                  color: Colors.white.withOpacity(0.85),
+                                                  fontSize: isNarrow ? 10 : 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 12),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                           Expanded(
                             child: _isLoading
                                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))

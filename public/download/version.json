@@ -1,10 +1,10 @@
 {
-  "version": "2.0.9",
-  "build": 55,
-  "tag_name": "v2.0.9",
-  "changelog": "• VolPi Media v2.0.9 - Tối Ưu Lưới 2 Cột Cho iPhone 13 Pro Max & Điện Thoại Di Động:\n- Hỗ trợ hiển thị 2 cột trận đấu bóng đá cho iPhone 13 Pro Max (428px) và tất cả smartphone màn hình >= 360px ở chế độ dọc.\n- Tối ưu kích thước card trận đấu, co giãn khoảng cách gọn gàng, team logo 20px, nhãn Chủ/Khách tinh tế, chống tràn chữ và hiển thị được nhiều trận đấu hơn trên một khung hình.",
+  "version": "2.1.0",
+  "build": 56,
+  "tag_name": "v2.1.0",
+  "changelog": "• VolPi Media v2.1.0 - Bản Nâng Cấp Lớn & Sửa Lỗi Android TV:\n- Sửa lỗi điều hướng Remote TV: Khắc phục triệt để lỗi bấm xuống ở sidebar bị nhảy sang bảng bên phải, điều hướng chính xác đến nút Giao diện Cũ và Tài khoản; khóa phím sang trái tránh mất focus.\n- Sửa lỗi cuộn Hero Banner trên Android TV: Bấm phím Lên trên Remote hoặc focus cụm nút Phát Ngay tự động cuộn mượt lên đỉnh để hiển thị trọn vẹn toàn bộ Hero Banner.\n- Bộ lọc giải đấu bóng đá theo Chip: Lọc nhanh Ngoại Hạng Anh, Cúp C1, La Liga, Serie A, Bundesliga, Việt Nam, Đang đá, Tâm điểm.\n- Bỏ qua Intro (+85s) trong trình phát video: Một chạm tua nhanh 85s mở đầu bài hát anime/phim.\n- Tự động đếm ngược chuyển tập kế tiếp: Đếm ngược 8s khi còn 15s cuối phim với tùy chọn Phát Ngay hoặc Hủy.\n- Nút Tiếp Tục Xem Nhanh: Hiển thị ngay trên trang chi tiết phim/anime kèm thông tin tập và thời lượng đang xem dở.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T10:52:00Z"
+  "published_at": "2026-10-19T14:52:00Z"
 }

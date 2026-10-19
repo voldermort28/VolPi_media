@@ -76,6 +76,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  final ScrollController _scrollController = ScrollController();
   final FocusNode _billboardPlayFocusNode = FocusNode();
 
   @override
@@ -90,10 +91,21 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
   void dispose() {
     _bannerTimer?.cancel();
     _bannerPageController.dispose();
+    _scrollController.dispose();
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryOrFavoritesChanged);
     FavoritesService.instance.changeNotifier.removeListener(_onHistoryOrFavoritesChanged);
     _billboardPlayFocusNode.dispose();
     super.dispose();
+  }
+
+  void _scrollToTopOnBillboardFocus() {
+    if (_scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _onHistoryOrFavoritesChanged() {
@@ -367,6 +379,8 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: SingleChildScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -698,115 +712,133 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                   const SizedBox(height: 12),
 
                 // Action Buttons
-                Row(
-                  children: [
-                    // Button 1: Xem Ngay
-                    TvFocusableCard(
-                      focusNode: isCurrent ? _billboardPlayFocusNode : null,
-                      onTap: () => _openDetail(anime),
-                      borderRadius: BorderRadius.circular(6),
-                      scale: 1.08,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE50914),
-                          borderRadius: BorderRadius.circular(6),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFE50914).withOpacity(0.4),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
-                            SizedBox(width: 6),
-                            Text(
-                              'Xem Ngay',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                Focus(
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _scrollToTopOnBillboardFocus();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: Row(
+                    children: [
+                      // Button 1: Xem Ngay
+                      TvFocusableCard(
+                        focusNode: isCurrent ? _billboardPlayFocusNode : null,
+                        onFocusChange: (hasFocus) {
+                          if (hasFocus) _scrollToTopOnBillboardFocus();
+                        },
+                        onTap: () => _openDetail(anime),
+                        borderRadius: BorderRadius.circular(6),
+                        scale: 1.08,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE50914),
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFE50914).withOpacity(0.4),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Button 2: Thông tin chi tiết
-                    TvFocusableCard(
-                      onTap: () => _openDetail(anime),
-                      borderRadius: BorderRadius.circular(6),
-                      scale: 1.08,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'Chi Tiết',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.play_arrow_rounded, color: Colors.white, size: 20),
+                              SizedBox(width: 6),
+                              Text(
+                                'Xem Ngay',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
 
-                    // Button 3: Yêu Thích
-                    TvFocusableCard(
-                      onTap: () {
-                        final nowFav = FavoritesService.instance.toggleFavorite(
-                          FavoriteItem(
-                            id: favId,
-                            title: anime.name,
-                            poster: anime.poster,
-                            category: 'anime',
-                            createdAt: DateTime.now().toIso8601String(),
+                      // Button 2: Thông tin chi tiết
+                      TvFocusableCard(
+                        onFocusChange: (hasFocus) {
+                          if (hasFocus) _scrollToTopOnBillboardFocus();
+                        },
+                        onTap: () => _openDetail(anime),
+                        borderRadius: BorderRadius.circular(6),
+                        scale: 1.08,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white24),
                           ),
-                        );
-                        setState(() {});
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(nowFav ? 'Đã thêm vào Yêu thích' : 'Đã xóa khỏi Yêu thích'),
-                            backgroundColor: nowFav ? const Color(0xFFE50914) : Colors.grey[800],
-                            duration: const Duration(seconds: 2),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'Chi Tiết',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(6),
-                      scale: 1.08,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Icon(
-                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                          color: isFav ? const Color(0xFFE50914) : Colors.white,
-                          size: 18,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+
+                      // Button 3: Yêu Thích
+                      TvFocusableCard(
+                        onFocusChange: (hasFocus) {
+                          if (hasFocus) _scrollToTopOnBillboardFocus();
+                        },
+                        onTap: () {
+                          final nowFav = FavoritesService.instance.toggleFavorite(
+                            FavoriteItem(
+                              id: favId,
+                              title: anime.name,
+                              poster: anime.poster,
+                              category: 'anime',
+                              createdAt: DateTime.now().toIso8601String(),
+                            ),
+                          );
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(nowFav ? 'Đã thêm vào Yêu thích' : 'Đã xóa khỏi Yêu thích'),
+                              backgroundColor: nowFav ? const Color(0xFFE50914) : Colors.grey[800],
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(6),
+                        scale: 1.08,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: Icon(
+                            isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: isFav ? const Color(0xFFE50914) : Colors.white,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),

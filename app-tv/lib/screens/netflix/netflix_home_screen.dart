@@ -33,6 +33,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  final ScrollController _scrollController = ScrollController();
   final FocusNode _billboardPlayFocusNode = FocusNode();
 
   @override
@@ -45,8 +46,19 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   @override
   void dispose() {
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryChanged);
+    _scrollController.dispose();
     _billboardPlayFocusNode.dispose();
     super.dispose();
+  }
+
+  void _scrollToTopOnBillboardFocus() {
+    if (_scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(
+        0.0,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   void _onHistoryChanged() {
@@ -222,6 +234,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     final featuredMatch = _majorMatches.isNotEmpty ? _majorMatches.first : (_matches.isNotEmpty ? _matches.first : null);
 
     return SingleChildScrollView(
+      controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,71 +392,86 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                 const SizedBox(height: 16),
 
                 // Actions: Netflix White "PHÁT NGAY" button + Info
-                Row(
-                  children: [
-                    TvFocusableCard(
-                      focusNode: _billboardPlayFocusNode,
-                      onTap: () => _onMatchSelected(match),
-                      borderRadius: BorderRadius.circular(6),
-                      scale: 1.05,
-                      focusBorderColor: Colors.white,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
-                            SizedBox(width: 6),
-                            Text(
-                              'PHÁT NGAY',
-                              style: TextStyle(
-                                color: Colors.black,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.5,
+                Focus(
+                  onKeyEvent: (node, event) {
+                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      _scrollToTopOnBillboardFocus();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: Row(
+                    children: [
+                      TvFocusableCard(
+                        focusNode: _billboardPlayFocusNode,
+                        onFocusChange: (hasFocus) {
+                          if (hasFocus) _scrollToTopOnBillboardFocus();
+                        },
+                        onTap: () => _onMatchSelected(match),
+                        borderRadius: BorderRadius.circular(6),
+                        scale: 1.05,
+                        focusBorderColor: Colors.white,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
+                              SizedBox(width: 6),
+                              Text(
+                                'PHÁT NGAY',
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
 
-                    TvFocusableCard(
-                      onTap: () => _onMatchSelected(match),
-                      borderRadius: BorderRadius.circular(6),
-                      scale: 1.05,
-                      focusBorderColor: Colors.white,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF333333).withOpacity(0.8),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
-                            SizedBox(width: 6),
-                            Text(
-                              'CHỌN LUỒNG & BLV',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
+                      TvFocusableCard(
+                        onFocusChange: (hasFocus) {
+                          if (hasFocus) _scrollToTopOnBillboardFocus();
+                        },
+                        onTap: () => _onMatchSelected(match),
+                        borderRadius: BorderRadius.circular(6),
+                        scale: 1.05,
+                        focusBorderColor: Colors.white,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF333333).withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.white24),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
+                              SizedBox(width: 6),
+                              Text(
+                                'CHỌN LUỒNG & BLV',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),

@@ -85,6 +85,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _commitSeekTimer;
   String? _hudSpeedBadge;
 
+  // Auto-play Next Episode Countdown
+  int _nextCountdownSeconds = 0;
+  Timer? _nextCountdownTimer;
+  bool _hasTriggeredNextCountdown = false;
+
   // Volume Control (Remembered across clips, streams, episodes and app sessions)
   double _volume = 1.0;
   bool _isMuted = false;
@@ -163,12 +168,83 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _videoListener() {
     if (!mounted || !_isInitialized) return;
+
+    // Check auto-play next episode when near end (last 15 seconds) or ended
+    if (widget.onNext != null && !widget.isLive && !_hasTriggeredNextCountdown) {
+      final pos = _controller.value.position;
+      final dur = _controller.value.duration;
+      if (dur > const Duration(seconds: 30) && (pos >= dur - const Duration(seconds: 15) || (!dur.isNegative && pos >= dur && dur > Duration.zero))) {
+        _startNextEpisodeCountdown();
+      }
+    }
+
     // Performance optimization for low-end hardware:
-    // Only rebuild UI if controls are currently visible.
-    // When watching video (controls hidden), avoid rebuilding the entire screen 10 times per second!
-    if (_showControls) {
+    // Only rebuild UI if controls or countdown are currently visible.
+    if (_showControls || _nextCountdownSeconds > 0) {
       setState(() {});
     }
+  }
+
+  void _startNextEpisodeCountdown() {
+    if (_hasTriggeredNextCountdown || widget.onNext == null) return;
+    _hasTriggeredNextCountdown = true;
+    _nextCountdownSeconds = 8;
+    _nextCountdownTimer?.cancel();
+    _nextCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_nextCountdownSeconds <= 1) {
+        timer.cancel();
+        _playNextEpisodeImmediately();
+      } else {
+        setState(() {
+          _nextCountdownSeconds--;
+        });
+      }
+    });
+    setState(() {});
+  }
+
+  void _playNextEpisodeImmediately() {
+    _nextCountdownTimer?.cancel();
+    _nextCountdownTimer = null;
+    setState(() {
+      _nextCountdownSeconds = 0;
+    });
+    widget.onNext?.call();
+  }
+
+  void _cancelNextCountdown() {
+    setState(() {
+      _nextCountdownTimer?.cancel();
+      _nextCountdownTimer = null;
+      _nextCountdownSeconds = 0;
+    });
+  }
+
+  void _seekDirectOffset(int seconds, {String? customHudText}) {
+    if (!_isInitialized || widget.isLive) return;
+    final currentPos = _controller.value.position;
+    final totalDuration = _controller.value.duration;
+    final targetSeconds = (currentPos.inSeconds + seconds).clamp(0, totalDuration.inSeconds);
+    final target = Duration(seconds: targetSeconds);
+    _controller.seekTo(target);
+    _hudFadeTimer?.cancel();
+    setState(() {
+      _hudIcon = seconds >= 0 ? 'FORWARD' : 'REWIND';
+      _hudText = customHudText ?? '${seconds >= 0 ? '+' : ''}${seconds}s';
+    });
+    _hudFadeTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+        });
+      }
+    });
+    _showControlsBriefly();
   }
 
   void _setVolume(double newVol) {
@@ -602,6 +678,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _saveCurrentProgress();
     WatchHistoryService.instance.flush();
     _hideControlsTimer?.cancel();
+    _nextCountdownTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
     _commitSeekTimer?.cancel();
@@ -1322,6 +1399,35 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 26),
                                       ),
                                     ),
+                                    const SizedBox(width: 12),
+                                    TvFocusableCard(
+                                      onTap: () => _seekDirectOffset(85, customHudText: '+85s (Bỏ qua Intro)'),
+                                      scale: 1.05,
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF38BDF8).withOpacity(0.15),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 0.8),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.fast_forward_rounded, color: Color(0xFF38BDF8), size: 16),
+                                            SizedBox(width: 4),
+                                            Text(
+                                              '+85s Intro',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
                                   ],
                                   if (widget.onNext != null) ...[
                                     const SizedBox(width: 18),
@@ -1349,6 +1455,86 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
               ),
+
+              // 6. NEXT EPISODE COUNTDOWN OVERLAY
+              if (_nextCountdownSeconds > 0)
+                Positioned(
+                  bottom: _showControls ? 140 : 36,
+                  right: 24,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F172A).withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.7),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'TẬP TIẾP THEO',
+                              style: TextStyle(
+                                color: Color(0xFF38BDF8),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Tự động phát sau ${_nextCountdownSeconds}s...',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        TvFocusableCard(
+                          onTap: _playNextEpisodeImmediately,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                                SizedBox(width: 2),
+                                Text('Phát Ngay', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        TvFocusableCard(
+                          onTap: _cancelNextCountdown,
+                          borderRadius: BorderRadius.circular(6),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white12,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text('Hủy', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
