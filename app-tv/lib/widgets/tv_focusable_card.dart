@@ -16,6 +16,7 @@ class TvFocusableCard extends StatefulWidget {
   final BorderRadius borderRadius;
   final FocusNode? focusNode;
   final bool autoFocus;
+  final ValueChanged<bool>? onFocusChange;
 
   const TvFocusableCard({
     super.key,
@@ -28,6 +29,7 @@ class TvFocusableCard extends StatefulWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.focusNode,
     this.autoFocus = false,
+    this.onFocusChange,
   });
 
   @override
@@ -70,6 +72,7 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
         _isFocused = hasFocus;
       });
       updateKeepAlive();
+      widget.onFocusChange?.call(hasFocus);
 
       if (hasFocus) {
         // Auto scroll viewport so the focused item is fully visible on TV screen
