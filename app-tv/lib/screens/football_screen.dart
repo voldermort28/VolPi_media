@@ -272,7 +272,7 @@ class FootballScreenState extends State<FootballScreen> {
         // Action Bar (Header row in FootballScreen)
         Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: isMobile ? 12 : 20,
+            horizontal: isMobile ? 8 : 20,
             vertical: isMobile ? 6 : 10,
           ),
           child: Row(
@@ -380,13 +380,13 @@ class FootballScreenState extends State<FootballScreen> {
                       color: const Color(0xFF38BDF8),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          // Grid columns adaptive: Widescreen >=1200 (4 cols), Tablet/TV >=840 (3 cols), Window/Foldable >=480 (2 cols), Phone portrait (1 col)
+                          // Grid columns adaptive: Widescreen >=1200 (4 cols), Tablet/TV >=720 (3 cols), Phone & Window >=360 (2 cols), Ultra-narrow <360 (1 col)
                           int crossAxisCount = 1;
                           if (constraints.maxWidth >= 1200) {
                             crossAxisCount = 4;
-                          } else if (constraints.maxWidth >= 840) {
+                          } else if (constraints.maxWidth >= 720) {
                             crossAxisCount = 3;
-                          } else if (constraints.maxWidth >= 480) {
+                          } else if (constraints.maxWidth >= 360) {
                             crossAxisCount = 2;
                           }
 
@@ -490,9 +490,9 @@ class FootballScreenState extends State<FootballScreen> {
   }) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isMobile ? 12 : 20,
-        isMobile ? 10 : 14,
-        isMobile ? 12 : 20,
+        isMobile ? 8 : 20,
+        isMobile ? 8 : 14,
+        isMobile ? 8 : 20,
         isMobile ? 4 : 8,
       ),
       child: Row(
@@ -551,15 +551,15 @@ class FootballScreenState extends State<FootballScreen> {
   }
 
   Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount, {bool isFirstSection = false, bool isMobile = false}) {
-    final double extent = isMobile ? 108.0 : 136.0;
+    final double extent = isMobile ? 106.0 : 136.0;
 
     return SliverPadding(
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 8 : 20),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: isMobile ? 8 : 14,
-          mainAxisSpacing: isMobile ? 8 : 14,
+          crossAxisSpacing: isMobile ? 6 : 14,
+          mainAxisSpacing: isMobile ? 6 : 14,
           mainAxisExtent: extent,
         ),
         delegate: SliverChildBuilderDelegate(
@@ -614,27 +614,67 @@ class FootballScreenState extends State<FootballScreen> {
       focusBorder = const Color(0xFF64748B);
     }
 
-    final double footerFontSize = isMobile ? 8.5 : 10.0;
+    final double footerFontSize = isMobile ? 8.0 : 10.0;
     Widget footerWidget;
     if (isOngoing) {
-      footerWidget = Text('🔴 ĐANG THI ĐẤU TRỰC TIẾP (TRONG 90\') 🔴', style: TextStyle(color: const Color(0xFFF43F5E), fontSize: footerFontSize, fontWeight: FontWeight.bold));
+      footerWidget = Text(
+        isMobile ? '🔴 ĐANG TRỰC TIẾP' : '🔴 ĐANG THI ĐẤU TRỰC TIẾP (TRONG 90\') 🔴',
+        style: TextStyle(color: const Color(0xFFF43F5E), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isVietnam) {
-      footerWidget = Text('⭐ BÓNG ĐÁ VIỆT NAM ⭐', style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold));
+      footerWidget = Text(
+        '⭐ BÓNG ĐÁ VIỆT NAM ⭐',
+        style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isMuFavorite) {
-      footerWidget = Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold));
+      footerWidget = Text(
+        '⭐ MANCHESTER UNITED ⭐',
+        style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isFavorite && match.favoriteBadgeText.isNotEmpty) {
-      footerWidget = Text('⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐', style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold));
+      footerWidget = Text(
+        '⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐',
+        style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isFamous) {
-      footerWidget = Text('🔥 ${match.league.toUpperCase()} 🔥', style: TextStyle(color: const Color(0xFF38BDF8), fontSize: footerFontSize, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis);
+      footerWidget = Text(
+        '🔥 ${match.league.toUpperCase()} 🔥',
+        style: TextStyle(color: const Color(0xFF38BDF8), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isHot) {
-      footerWidget = Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold));
+      footerWidget = Text(
+        '🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥',
+        style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else if (match.isFinishedMatch) {
-      footerWidget = Text('Đã thi đấu xong • Xem lại diễn biến', style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize));
+      footerWidget = Text(
+        isMobile ? 'Đã kết thúc' : 'Đã thi đấu xong • Xem lại diễn biến',
+        style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     } else {
-      footerWidget = Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize));
+      footerWidget = Text(
+        isMobile ? 'BL Tiếng Việt • HD' : 'Bình luận tiếng Việt • Full HD',
+        style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
     }
 
-    final double logoSize = isMobile ? 22.0 : 28.0;
+    final double logoSize = isMobile ? 20.0 : 28.0;
 
     return TvFocusableCard(
       focusNode: focusNode,
@@ -648,7 +688,7 @@ class FootballScreenState extends State<FootballScreen> {
           border: Border.all(color: borderColor, width: 1),
         ),
         padding: isMobile
-            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 7)
+            ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
             : const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -662,17 +702,17 @@ class FootballScreenState extends State<FootballScreen> {
                     match.league,
                     style: TextStyle(
                       color: const Color(0xFF94A3B8),
-                      fontSize: isMobile ? 10 : 11,
+                      fontSize: isMobile ? 9.5 : 11,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Container(
                   padding: EdgeInsets.symmetric(
-                    horizontal: isMobile ? 5 : 8,
+                    horizontal: isMobile ? 4 : 8,
                     vertical: isMobile ? 1.5 : 3,
                   ),
                   decoration: BoxDecoration(
@@ -689,14 +729,14 @@ class FootballScreenState extends State<FootballScreen> {
                       Icon(
                         isLiveBadge ? Icons.fiber_manual_record : (match.isFinishedMatch ? Icons.check_circle_outline_rounded : Icons.access_time_rounded),
                         color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
-                        size: isMobile ? 8.5 : 10,
+                        size: isMobile ? 8.0 : 10,
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 3),
                       Text(
                         isOngoing ? 'TRỰC TIẾP • ${match.liveMinuteLabel}' : (match.isLive ? 'TRỰC TIẾP' : (match.isFinishedMatch ? 'HẾT GIỜ' : match.time)),
                         style: TextStyle(
                           color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
-                          fontSize: isMobile ? 9.0 : 11,
+                          fontSize: isMobile ? 8.5 : 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -713,23 +753,23 @@ class FootballScreenState extends State<FootballScreen> {
                 Row(
                   children: [
                     _buildTeamLogo(match.homeLogo, teamName: match.homeTeam, size: logoSize),
-                    SizedBox(width: isMobile ? 6 : 8),
+                    SizedBox(width: isMobile ? 5 : 8),
                     Expanded(
                       child: Text(
                         match.homeTeam,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isMobile ? 12 : 13,
+                          fontSize: isMobile ? 11.5 : 13,
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 4 : 5,
+                        horizontal: isMobile ? 3 : 5,
                         vertical: isMobile ? 1 : 1.5,
                       ),
                       decoration: BoxDecoration(
@@ -740,35 +780,35 @@ class FootballScreenState extends State<FootballScreen> {
                         'Chủ',
                         style: TextStyle(
                           color: Colors.white60,
-                          fontSize: isMobile ? 8.5 : 9,
+                          fontSize: isMobile ? 8.0 : 9,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
-                SizedBox(height: isMobile ? 3 : 6),
+                SizedBox(height: isMobile ? 2.5 : 6),
                 // Away Team
                 Row(
                   children: [
                     _buildTeamLogo(match.awayLogo, teamName: match.awayTeam, size: logoSize),
-                    SizedBox(width: isMobile ? 6 : 8),
+                    SizedBox(width: isMobile ? 5 : 8),
                     Expanded(
                       child: Text(
                         match.awayTeam,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: isMobile ? 12 : 13,
+                          fontSize: isMobile ? 11.5 : 13,
                           fontWeight: FontWeight.bold,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 3),
                     Container(
                       padding: EdgeInsets.symmetric(
-                        horizontal: isMobile ? 4 : 5,
+                        horizontal: isMobile ? 3 : 5,
                         vertical: isMobile ? 1 : 1.5,
                       ),
                       decoration: BoxDecoration(
@@ -779,7 +819,7 @@ class FootballScreenState extends State<FootballScreen> {
                         'Khách',
                         style: TextStyle(
                           color: Colors.white60,
-                          fontSize: isMobile ? 8.5 : 9,
+                          fontSize: isMobile ? 8.0 : 9,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
