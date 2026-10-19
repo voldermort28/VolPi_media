@@ -17,7 +17,7 @@ class IptvScreen extends StatefulWidget {
   });
 
   @override
-  State<IptvScreen> createState() => _IptvScreenState();
+  IptvScreenState createState() => IptvScreenState();
 }
 
 class IptvCategoryItem {
@@ -40,7 +40,9 @@ const List<IptvCategoryItem> kIptvCategories = [
   IptvCategoryItem(id: 'ALL', title: 'Tất cả', icon: Icons.public_rounded),
 ];
 
-class _IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
+class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
+  Future<void> refresh() => _loadData(forceRefresh: true);
+
   List<IptvChannelModel> _allChannels = [];
   bool _isLoading = true;
   bool _isRefreshing = false;

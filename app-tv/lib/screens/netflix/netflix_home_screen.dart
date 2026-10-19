@@ -20,10 +20,12 @@ class NetflixHomeScreen extends StatefulWidget {
   });
 
   @override
-  State<NetflixHomeScreen> createState() => _NetflixHomeScreenState();
+  NetflixHomeScreenState createState() => NetflixHomeScreenState();
 }
 
-class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
+class NetflixHomeScreenState extends State<NetflixHomeScreen> {
+  Future<void> refresh() => _loadData(forceRefresh: true);
+
   List<MatchModel> _matches = [];
   List<MatchModel> _majorMatches = [];
   List<MatchModel> _liveMatches = [];
@@ -55,14 +57,14 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
     }
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final results = await widget.apiService.getLiveMatches(forceRefresh: false, source: 'xoilac');
+      final results = await widget.apiService.getLiveMatches(forceRefresh: forceRefresh, source: 'xoilac');
       if (!mounted) return;
 
       final nonEsports = results.where((m) => !m.isEsports).toList();
@@ -455,21 +457,30 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // SECTION TITLE
   // =========================================================================
   Widget _buildSectionTitle(String title, {VoidCallback? onSeeAll}) {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 14 : 24,
+        vertical: isMobile ? 4 : 6,
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.5,
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isMobile ? 13 : 14,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 0.5,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (onSeeAll != null)
+          if (onSeeAll != null) ...[
+            const SizedBox(width: 8),
             TvFocusableCard(
               onTap: onSeeAll,
               borderRadius: BorderRadius.circular(4),
@@ -487,6 +498,7 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -617,132 +629,163 @@ class _NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // MATCHES HORIZONTAL ROW (Netflix Card Style)
   // =========================================================================
   Widget _buildMatchesRow(List<MatchModel> matches) {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
+    final double cardWidth = isMobile ? 195 : 250;
+    final double rowHeight = isMobile ? 112 : 155;
+
     return NetflixScrollableRow(
-      height: 155,
+      height: rowHeight,
       itemCount: matches.length,
       itemBuilder: (context, idx) {
-          final match = matches[idx];
-          return RepaintBoundary(
-            child: TvFocusableCard(
-              onTap: () => _onMatchSelected(match),
-              borderRadius: BorderRadius.circular(6),
-              scale: 1.05,
-              focusBorderColor: Colors.white,
-              child: Container(
-                width: 250,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF181818),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border(
-                    left: BorderSide(
-                      color: match.isOngoingNow ? const Color(0xFFE50914) : (match.isPremierLeagueOrC1 ? const Color(0xFF38BDF8) : Colors.transparent),
-                      width: 3.5,
-                    ),
-                    top: BorderSide(color: Colors.white.withOpacity(0.06)),
-                    right: BorderSide(color: Colors.white.withOpacity(0.06)),
-                    bottom: BorderSide(color: Colors.white.withOpacity(0.06)),
+        final match = matches[idx];
+        return RepaintBoundary(
+          child: TvFocusableCard(
+            onTap: () => _onMatchSelected(match),
+            borderRadius: BorderRadius.circular(6),
+            scale: 1.05,
+            focusBorderColor: Colors.white,
+            child: Container(
+              width: cardWidth,
+              padding: isMobile
+                  ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+                  : const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF181818),
+                borderRadius: BorderRadius.circular(6),
+                border: Border(
+                  left: BorderSide(
+                    color: match.isOngoingNow
+                        ? const Color(0xFFE50914)
+                        : (match.isPremierLeagueOrC1 ? const Color(0xFF38BDF8) : Colors.transparent),
+                    width: 3.5,
                   ),
+                  top: BorderSide(color: Colors.white.withOpacity(0.06)),
+                  right: BorderSide(color: Colors.white.withOpacity(0.06)),
+                  bottom: BorderSide(color: Colors.white.withOpacity(0.06)),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Header: League & Status
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            match.league,
-                            style: const TextStyle(color: Color(0xFFA3A3A3), fontSize: 10.5, fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Header: League & Status
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          match.league,
+                          style: TextStyle(
+                            color: const Color(0xFFA3A3A3),
+                            fontSize: isMobile ? 10 : 10.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isMobile ? 5 : 6,
+                          vertical: isMobile ? 1.5 : 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: match.isOngoingNow
+                              ? const Color(0xFFE50914).withOpacity(0.2)
+                              : Colors.white.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          match.isOngoingNow ? 'LIVE ${match.liveMinuteLabel}' : match.time,
+                          style: TextStyle(
+                            color: match.isOngoingNow ? const Color(0xFFE50914) : const Color(0xFF38BDF8),
+                            fontSize: isMobile ? 9.5 : 10,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: match.isOngoingNow ? const Color(0xFFE50914).withOpacity(0.2) : Colors.white.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            match.isOngoingNow ? 'LIVE ${match.liveMinuteLabel}' : match.time,
-                            style: TextStyle(
-                              color: match.isOngoingNow ? const Color(0xFFE50914) : const Color(0xFF38BDF8),
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
+                  ),
 
-                    // Teams
-                    Column(
-                      children: [
-                        _buildTeamRow(match.homeTeam, match.homeLogo),
-                        const SizedBox(height: 6),
-                        _buildTeamRow(match.awayTeam, match.awayLogo),
-                      ],
-                    ),
+                  // Teams
+                  Column(
+                    children: [
+                      _buildTeamRow(match.homeTeam, match.homeLogo, isMobile: isMobile),
+                      SizedBox(height: isMobile ? 3 : 6),
+                      _buildTeamRow(match.awayTeam, match.awayLogo, isMobile: isMobile),
+                    ],
+                  ),
 
-                    // Footer
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
+                  // Footer
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
                           match.isOngoingNow ? '🔴 Đang trực tiếp' : 'Full HD • BLV Tiếng Việt',
                           style: TextStyle(
                             color: match.isOngoingNow ? const Color(0xFFE50914) : const Color(0xFF737373),
-                            fontSize: 10,
+                            fontSize: isMobile ? 9.5 : 10,
                             fontWeight: FontWeight.w600,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const Icon(Icons.play_circle_fill_rounded, color: Colors.white70, size: 16),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                      Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: Colors.white70,
+                        size: isMobile ? 14 : 16,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildTeamRow(String teamName, String logoUrl) {
+  Widget _buildTeamRow(String teamName, String logoUrl, {bool isMobile = false}) {
+    final double logoSize = isMobile ? 17 : 20;
     return Row(
       children: [
         if (logoUrl.isNotEmpty)
           ClipOval(
             child: CachedNetworkImage(
               imageUrl: logoUrl,
-              width: 20,
-              height: 20,
+              width: logoSize,
+              height: logoSize,
               fit: BoxFit.cover,
               memCacheWidth: 40,
               memCacheHeight: 40,
               errorWidget: (_, __, ___) => Container(
-                width: 20,
-                height: 20,
+                width: logoSize,
+                height: logoSize,
                 color: const Color(0xFF262626),
-                child: const Icon(Icons.shield_rounded, size: 12, color: Colors.white38),
+                child: Icon(Icons.shield_rounded, size: isMobile ? 10 : 12, color: Colors.white38),
               ),
             ),
           )
         else
           Container(
-            width: 20,
-            height: 20,
+            width: logoSize,
+            height: logoSize,
             decoration: const BoxDecoration(color: Color(0xFF262626), shape: BoxShape.circle),
-            child: const Icon(Icons.shield_rounded, size: 12, color: Colors.white38),
+            child: Icon(Icons.shield_rounded, size: isMobile ? 10 : 12, color: Colors.white38),
           ),
-        const SizedBox(width: 8),
+        SizedBox(width: isMobile ? 6 : 8),
         Expanded(
           child: Text(
             teamName,
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: isMobile ? 11.5 : 12,
+              fontWeight: FontWeight.bold,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),

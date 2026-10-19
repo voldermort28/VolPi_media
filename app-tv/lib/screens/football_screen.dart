@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
@@ -20,10 +21,12 @@ class FootballScreen extends StatefulWidget {
   });
 
   @override
-  State<FootballScreen> createState() => _FootballScreenState();
+  FootballScreenState createState() => FootballScreenState();
 }
 
-class _FootballScreenState extends State<FootballScreen> {
+class FootballScreenState extends State<FootballScreen> {
+  Future<void> reloadMatches() => _loadMatches(forceRefresh: true);
+
   List<MatchModel> _matches = [];
   List<MatchModel> _majorMatches = [];
   List<MatchModel> _otherOngoingMatches = [];
@@ -261,60 +264,80 @@ class _FootballScreenState extends State<FootballScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDrawerMode = Platform.isIOS || MediaQuery.of(context).size.width < 750;
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
+
     return Column(
       children: [
-        // Action Bar (Header with Refresh Button for TV Remote)
+        // Action Bar (Header row in FootballScreen)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 12 : 20,
+            vertical: isMobile ? 6 : 10,
+          ),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Text('⚽', style: TextStyle(fontSize: 20)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${widget.title} - Trực Tiếp Hôm Nay',
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              Text('⚽', style: TextStyle(fontSize: isMobile ? 16 : 20)),
+              SizedBox(width: isMobile ? 6 : 8),
+              Flexible(
+                child: Text(
+                  '${widget.title} - Trực Tiếp Hôm Nay',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isMobile ? 14.5 : 18,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 10),
-                  if (_matches.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7).withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
-                      ),
-                      child: Text(
-                        '${_matches.length} trận',
-                        style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              // Dedicated Refresh Button for Remote D-Pad Focus
-              SizedBox(
-                height: 38,
-                child: TvFocusableCard(
-                  onTap: () => _loadMatches(forceRefresh: true),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    color: const Color(0xFF1E293B),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Làm Mới',
-                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                        ),
-                      ],
+              const SizedBox(width: 8),
+              if (_matches.isNotEmpty)
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 6 : 8,
+                    vertical: isMobile ? 1.5 : 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
+                  ),
+                  child: Text(
+                    '${_matches.length} trận',
+                    style: TextStyle(
+                      color: const Color(0xFF38BDF8),
+                      fontSize: isMobile ? 10 : 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
+
+              // On TV / large desktop without top mobile header, keep a focusable refresh button on the right
+              if (!isDrawerMode) ...[
+                const Spacer(),
+                SizedBox(
+                  height: 38,
+                  child: TvFocusableCard(
+                    onTap: () => _loadMatches(forceRefresh: true),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      color: const Color(0xFF1E293B),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Làm Mới',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -338,7 +361,7 @@ class _FootballScreenState extends State<FootballScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.wifi_off_rounded, color: Colors.amber, size: 48),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(_errorMessage!, style: const TextStyle(color: Colors.white70, fontSize: 13)),
                           const SizedBox(height: 16),
                           TvFocusableCard(
@@ -382,9 +405,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     count: major.length.toString(),
                                     color: const Color(0xFFF59E0B),
                                     subtitle: 'Trận Hot • Việt Nam • Ngoại Hạng Anh • Cúp C1 • La Liga • Serie A • Bundesliga...',
+                                    isMobile: isMobile,
                                   ),
                                 ),
-                                _buildMatchGrid(major, crossAxisCount, isFirstSection: true),
+                                _buildMatchGrid(major, crossAxisCount, isFirstSection: true, isMobile: isMobile),
                               ],
 
                               // Khu vực 2: 🔴 Đang Diễn Ra (Trong 90') - Dưới nhóm tâm điểm
@@ -395,9 +419,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     count: ongoing.length.toString(),
                                     color: const Color(0xFFEF4444),
                                     subtitle: 'Các trận đấu đang trực tiếp thi đấu trên sân cỏ ngay lúc này',
+                                    isMobile: isMobile,
                                   ),
                                 ),
-                                _buildMatchGrid(ongoing, crossAxisCount, isFirstSection: major.isEmpty),
+                                _buildMatchGrid(ongoing, crossAxisCount, isFirstSection: major.isEmpty, isMobile: isMobile),
                               ],
 
                               // Khu vực 3: 🌐 Các Trận Đấu & Giải Đấu Khác (Sắp diễn ra)
@@ -408,9 +433,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     count: others.length.toString(),
                                     color: const Color(0xFF38BDF8),
                                     subtitle: 'Các giải đấu phụ và trận đấu sắp diễn ra hôm nay',
+                                    isMobile: isMobile,
                                   ),
                                 ),
-                                _buildMatchGrid(others, crossAxisCount, isFirstSection: major.isEmpty && ongoing.isEmpty),
+                                _buildMatchGrid(others, crossAxisCount, isFirstSection: major.isEmpty && ongoing.isEmpty, isMobile: isMobile),
                               ],
 
                               // Khu vực 4: 🏁 Trận Đấu Đã Kết Thúc (đặt ở cuối cùng để không chắn trận mới)
@@ -421,9 +447,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     count: finished.length.toString(),
                                     color: const Color(0xFF64748B),
                                     subtitle: 'Các trận đấu đã diễn ra hơn 90-100 phút trước',
+                                    isMobile: isMobile,
                                   ),
                                 ),
-                                _buildMatchGrid(finished, crossAxisCount, isFirstSection: false),
+                                _buildMatchGrid(finished, crossAxisCount, isFirstSection: false, isMobile: isMobile),
                               ],
 
                               // Fallback nếu không chia được mục nào
@@ -433,9 +460,10 @@ class _FootballScreenState extends State<FootballScreen> {
                                     title: '⚽ Tất Cả Trận Đấu Hôm Nay',
                                     count: _matches.length.toString(),
                                     color: const Color(0xFF38BDF8),
+                                    isMobile: isMobile,
                                   ),
                                 ),
-                                _buildMatchGrid(_matches, crossAxisCount, isFirstSection: true),
+                                _buildMatchGrid(_matches, crossAxisCount, isFirstSection: true, isMobile: isMobile),
                               ],
 
                               const SliverToBoxAdapter(
@@ -456,27 +484,44 @@ class _FootballScreenState extends State<FootballScreen> {
     required String count,
     required Color color,
     String? subtitle,
+    bool isMobile = false,
   }) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+      padding: EdgeInsets.fromLTRB(
+        isMobile ? 12 : 20,
+        isMobile ? 10 : 14,
+        isMobile ? 12 : 20,
+        isMobile ? 4 : 8,
+      ),
       child: Row(
         children: [
           Container(
-            width: 4,
-            height: 18,
+            width: isMobile ? 3 : 4,
+            height: isMobile ? 14 : 18,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+          SizedBox(width: isMobile ? 6 : 8),
+          Flexible(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isMobile ? 13 : 15,
+                fontWeight: FontWeight.bold,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 5 : 7,
+              vertical: isMobile ? 1.5 : 2,
+            ),
             decoration: BoxDecoration(
               color: color.withOpacity(0.2),
               borderRadius: BorderRadius.circular(10),
@@ -484,10 +529,10 @@ class _FootballScreenState extends State<FootballScreen> {
             ),
             child: Text(
               '$count trận',
-              style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
+              style: TextStyle(color: color, fontSize: isMobile ? 9 : 10, fontWeight: FontWeight.bold),
             ),
           ),
-          if (subtitle != null) ...[
+          if (subtitle != null && !isMobile) ...[
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -503,19 +548,22 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount, {bool isFirstSection = false}) {
+  Widget _buildMatchGrid(List<MatchModel> matches, int crossAxisCount, {bool isFirstSection = false, bool isMobile = false}) {
+    final double extent = isMobile ? 108.0 : 136.0;
+
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 20),
       sliver: SliverGrid(
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 14,
-          mainAxisSpacing: 14,
-          mainAxisExtent: 168,
+          crossAxisSpacing: isMobile ? 8 : 14,
+          mainAxisSpacing: isMobile ? 8 : 14,
+          mainAxisExtent: extent,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, idx) => _buildMatchCard(
             matches[idx],
+            isMobile: isMobile,
             focusNode: (isFirstSection && idx == 0) ? _firstMatchFocusNode : null,
           ),
           childCount: matches.length,
@@ -526,7 +574,7 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildMatchCard(MatchModel match, {FocusNode? focusNode}) {
+  Widget _buildMatchCard(MatchModel match, {bool isMobile = false, FocusNode? focusNode}) {
     final bool isOngoing = match.isOngoingNow;
     final bool isLiveBadge = isOngoing || match.isLive;
 
@@ -564,37 +612,42 @@ class _FootballScreenState extends State<FootballScreen> {
       focusBorder = const Color(0xFF64748B);
     }
 
+    final double footerFontSize = isMobile ? 8.5 : 10.0;
     Widget footerWidget;
     if (isOngoing) {
-      footerWidget = const Text('🔴 ĐANG THI ĐẤU TRỰC TIẾP (TRONG 90\') 🔴', style: TextStyle(color: Color(0xFFF43F5E), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = Text('🔴 ĐANG THI ĐẤU TRỰC TIẾP (TRONG 90\') 🔴', style: TextStyle(color: const Color(0xFFF43F5E), fontSize: footerFontSize, fontWeight: FontWeight.bold));
     } else if (match.isVietnam) {
-      footerWidget = const Text('⭐ BÓNG ĐÁ VIỆT NAM ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = Text('⭐ BÓNG ĐÁ VIỆT NAM ⭐', style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold));
     } else if (match.isMuFavorite) {
-      footerWidget = const Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: Color(0xFFFDE047), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = Text('⭐ MANCHESTER UNITED ⭐', style: TextStyle(color: const Color(0xFFFDE047), fontSize: footerFontSize, fontWeight: FontWeight.bold));
     } else if (match.isFavorite && match.favoriteBadgeText.isNotEmpty) {
-      footerWidget = Text('⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐', style: const TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = Text('⭐ TÂM ĐIỂM: ${match.favoriteBadgeText} ⭐', style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold));
     } else if (match.isFamous) {
-      footerWidget = Text('🔥 ${match.league.toUpperCase()} 🔥', style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis);
+      footerWidget = Text('🔥 ${match.league.toUpperCase()} 🔥', style: TextStyle(color: const Color(0xFF38BDF8), fontSize: footerFontSize, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis);
     } else if (match.isHot) {
-      footerWidget = const Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 10, fontWeight: FontWeight.bold));
+      footerWidget = Text('🔥 TRẬN ĐẤU TÂM ĐIỂM 🔥', style: TextStyle(color: const Color(0xFFFDBA74), fontSize: footerFontSize, fontWeight: FontWeight.bold));
     } else if (match.isFinishedMatch) {
-      footerWidget = const Text('Đã thi đấu xong • Xem lại diễn biến', style: TextStyle(color: Color(0xFF64748B), fontSize: 10));
+      footerWidget = Text('Đã thi đấu xong • Xem lại diễn biến', style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize));
     } else {
-      footerWidget = const Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: Color(0xFF64748B), fontSize: 10));
+      footerWidget = Text('Bình luận tiếng Việt • Full HD', style: TextStyle(color: const Color(0xFF64748B), fontSize: footerFontSize));
     }
+
+    final double logoSize = isMobile ? 22.0 : 28.0;
 
     return TvFocusableCard(
       focusNode: focusNode,
       onTap: () => _onMatchSelected(match),
       focusBorderColor: focusBorder,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
       child: Container(
         decoration: BoxDecoration(
           color: cardBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(isMobile ? 10 : 14),
           border: Border.all(color: borderColor, width: 1),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: isMobile
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 7)
+            : const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -605,16 +658,24 @@ class _FootballScreenState extends State<FootballScreen> {
                 Expanded(
                   child: Text(
                     match.league,
-                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: const Color(0xFF94A3B8),
+                      fontSize: isMobile ? 10 : 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 5 : 8,
+                    vertical: isMobile ? 1.5 : 3,
+                  ),
                   decoration: BoxDecoration(
                     color: isLiveBadge ? Colors.redAccent.withOpacity(0.2) : const Color(0xFF0284C7).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(isMobile ? 4 : 6),
                     border: Border.all(
                       color: isLiveBadge ? Colors.redAccent.withOpacity(0.6) : const Color(0xFF38BDF8).withOpacity(0.3),
                       width: 0.8,
@@ -626,14 +687,14 @@ class _FootballScreenState extends State<FootballScreen> {
                       Icon(
                         isLiveBadge ? Icons.fiber_manual_record : (match.isFinishedMatch ? Icons.check_circle_outline_rounded : Icons.access_time_rounded),
                         color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
-                        size: 10,
+                        size: isMobile ? 8.5 : 10,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         isOngoing ? 'TRỰC TIẾP • ${match.liveMinuteLabel}' : (match.isLive ? 'TRỰC TIẾP' : (match.isFinishedMatch ? 'HẾT GIỜ' : match.time)),
                         style: TextStyle(
                           color: isLiveBadge ? Colors.redAccent : (match.isFinishedMatch ? const Color(0xFF94A3B8) : const Color(0xFF38BDF8)),
-                          fontSize: 11,
+                          fontSize: isMobile ? 9.0 : 11,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -649,49 +710,77 @@ class _FootballScreenState extends State<FootballScreen> {
                 // Home Team
                 Row(
                   children: [
-                    _buildTeamLogo(match.homeLogo, teamName: match.homeTeam),
-                    const SizedBox(width: 8),
+                    _buildTeamLogo(match.homeLogo, teamName: match.homeTeam, size: logoSize),
+                    SizedBox(width: isMobile ? 6 : 8),
                     Expanded(
                       child: Text(
                         match.homeTeam,
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isMobile ? 12 : 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 4 : 5,
+                        vertical: isMobile ? 1 : 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('Chủ', style: TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Chủ',
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: isMobile ? 8.5 : 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: isMobile ? 3 : 6),
                 // Away Team
                 Row(
                   children: [
-                    _buildTeamLogo(match.awayLogo, teamName: match.awayTeam),
-                    const SizedBox(width: 8),
+                    _buildTeamLogo(match.awayLogo, teamName: match.awayTeam, size: logoSize),
+                    SizedBox(width: isMobile ? 6 : 8),
                     Expanded(
                       child: Text(
                         match.awayTeam,
-                        style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isMobile ? 12 : 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 4 : 5,
+                        vertical: isMobile ? 1 : 1.5,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('Khách', style: TextStyle(color: Colors.white60, fontSize: 9, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        'Khách',
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: isMobile ? 8.5 : 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -702,7 +791,7 @@ class _FootballScreenState extends State<FootballScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                footerWidget,
+                Flexible(child: footerWidget),
               ],
             ),
           ],
@@ -711,12 +800,12 @@ class _FootballScreenState extends State<FootballScreen> {
     );
   }
 
-  Widget _buildTeamLogo(String url, {String teamName = ''}) {
+  Widget _buildTeamLogo(String url, {String teamName = '', double size = 30}) {
     final String initial = teamName.trim().isNotEmpty ? teamName.trim().substring(0, 1).toUpperCase() : '?';
 
     Widget placeholder = Container(
-      width: 32,
-      height: 32,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFF334155),
@@ -725,7 +814,7 @@ class _FootballScreenState extends State<FootballScreen> {
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+        style: TextStyle(color: Colors.white, fontSize: size * 0.45, fontWeight: FontWeight.bold),
       ),
     );
 
@@ -734,8 +823,8 @@ class _FootballScreenState extends State<FootballScreen> {
     }
 
     return Container(
-      width: 32,
-      height: 32,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.white.withOpacity(0.06),
@@ -744,8 +833,8 @@ class _FootballScreenState extends State<FootballScreen> {
       child: ClipOval(
         child: CachedNetworkImage(
           imageUrl: url,
-          width: 32,
-          height: 32,
+          width: size,
+          height: size,
           memCacheWidth: 64,
           memCacheHeight: 64,
           maxWidthDiskCache: 120,

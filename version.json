@@ -1,10 +1,10 @@
 {
-  "version": "2.0.6",
-  "build": 52,
-  "tag_name": "v2.0.6",
-  "changelog": "• VolPi Media v2.0.6 - Tối Ưu Android TV Remote & Giao Diện Mobile:\n- Sửa lỗi điều hướng Android TV Remote: Khắc phục focus trap giữa Sidebar và nội dung bên phải, chuyển sang kiến trúc Overlay Stack z-index chuẩn Netflix giúp di chuyển con trỏ qua lại mượt mà 100% bằng remote.\n- Giao diện Điện thoại (iOS / Android Mobile): Ẩn thanh Sidebar cố định, bổ sung thanh tiêu đề với nút Menu Hamburger (☰) mở Drawer trượt hiện đại, trả lại 100% không gian hiển thị phim & bóng đá.\n- Màn hình Chi tiết Anime trên Mobile: Thu nhỏ poster đại diện phim (104x148) giúp bảng danh sách số tập mở rộng thành 3-4 cột dễ bấm, không còn bị chật chội 2 cột.",
+  "version": "2.0.7",
+  "build": 53,
+  "tag_name": "v2.0.7",
+  "changelog": "• VolPi Media v2.0.7 - Tối Ưu Giao Diện Trận Đấu & Menu iPad:\n- Tối ưu Thumbnail Trận đấu trên Mobile (iPhone & Android): Thu gọn chiều cao thẻ trận đấu (giảm 36%), loại bỏ khoảng trống thừa, hiển thị cùng lúc 5-6 trận đấu trên màn hình thay vì chỉ 2-3 trận như trước.\n- Đưa nút 'Làm Mới' lên thanh Header trên Mobile & iPad: Khắc phục lỗi nút Làm Mới bị đẩy ra khỏi hàng gây vỡ giao diện; tích hợp trực tiếp nút Làm Mới trên thanh Header trên cùng với hiệu ứng tải mượt mà cho từng tab.\n- Hỗ trợ Giao diện Menu Hamburger (☰) cho iPad: Toàn bộ thiết bị iPad hiện nay cũng sử dụng thanh tiêu đề và Menu Hamburger Drawer trượt tiện lợi tương tự iPhone, tối ưu hóa 100% diện tích xem video và danh sách trận đấu.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T09:55:00Z"
+  "published_at": "2026-10-19T10:20:00Z"
 }

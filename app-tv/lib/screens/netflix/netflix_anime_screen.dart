@@ -26,10 +26,12 @@ class NetflixAnimeScreen extends StatefulWidget {
   });
 
   @override
-  State<NetflixAnimeScreen> createState() => _NetflixAnimeScreenState();
+  NetflixAnimeScreenState createState() => NetflixAnimeScreenState();
 }
 
-class _NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
+class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
+  Future<void> refresh() => _loadAllData();
+
   final List<Map<String, String>> _categories = const [
     {
       'id': 'yumei-pokemon',

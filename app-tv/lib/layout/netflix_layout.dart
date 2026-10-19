@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../api/api_service.dart';
@@ -26,6 +27,15 @@ class NetflixLayout extends StatefulWidget {
 class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Socolive, 3: Anime, 4: IPTV
+
+  // Tab GlobalKeys to trigger reloads from Header bar
+  final GlobalKey<NetflixHomeScreenState> _homeKey = GlobalKey<NetflixHomeScreenState>();
+  final GlobalKey<FootballScreenState> _xoilacKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<FootballScreenState> _socoliveKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<NetflixAnimeScreenState> _animeKey = GlobalKey<NetflixAnimeScreenState>();
+  final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
+
+  bool _isRefreshingHeader = false;
 
   // TV Remote navigation FocusNodes for sidebar (5 tabs + V1 switch + Profile = 7)
   final List<FocusNode> _sidebarFocusNodes = List.generate(7, (_) => FocusNode());
@@ -106,24 +116,77 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     );
   }
 
+  Future<void> _refreshActiveTab() async {
+    if (_isRefreshingHeader) return;
+    setState(() {
+      _isRefreshingHeader = true;
+    });
+
+    try {
+      switch (_currentTabIndex) {
+        case 0:
+          await _homeKey.currentState?.refresh();
+          break;
+        case 1:
+          await _xoilacKey.currentState?.reloadMatches();
+          break;
+        case 2:
+          await _socoliveKey.currentState?.reloadMatches();
+          break;
+        case 3:
+          await _animeKey.currentState?.refresh();
+          break;
+        case 4:
+          await _iptvKey.currentState?.refresh();
+          break;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã cập nhật dữ liệu mới nhất!'),
+            backgroundColor: Color(0xFF0284C7),
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi cập nhật: $e'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(milliseconds: 2000),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshingHeader = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = MediaQuery.of(context).size.width < 700;
+    // iPad and iPhone both run on iOS and use the clean Hamburger Drawer mode
+    final bool isDrawerMode = Platform.isIOS || MediaQuery.of(context).size.width < 750;
 
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
 
-        // If on mobile: close drawer if open
-        if (isMobile && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
+        // If in drawer mode: close drawer if open
+        if (isDrawerMode && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
           Navigator.of(context).pop();
           return;
         }
 
         // On TV: If content has focus, move focus to sidebar first
         final sidebarHasFocus = _sidebarFocusNodes.any((n) => n.hasFocus);
-        if (!sidebarHasFocus && !isMobile) {
+        if (!sidebarHasFocus && !isDrawerMode) {
           _sidebarFocusNodes[_currentTabIndex].requestFocus();
           return;
         }
@@ -133,7 +196,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           setState(() {
             _currentTabIndex = 0;
           });
-          if (!isMobile) {
+          if (!isDrawerMode) {
             _sidebarFocusNodes[0].requestFocus();
           }
           return;
@@ -145,9 +208,9 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: const Color(0xFF0F0F0F),
-        drawer: isMobile ? _buildMobileDrawer() : null,
+        drawer: isDrawerMode ? _buildMobileDrawer() : null,
         body: SafeArea(
-          child: isMobile
+          child: isDrawerMode
               ? Column(
                   children: [
                     _buildMobileHeader(),
@@ -219,6 +282,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         ExcludeFocus(
           excluding: _currentTabIndex != 0,
           child: NetflixHomeScreen(
+            key: _homeKey,
             apiService: widget.apiService,
             onNavigateTab: (tabIdx) {
               setState(() {
@@ -232,6 +296,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         ExcludeFocus(
           excluding: _currentTabIndex != 1,
           child: FootballScreen(
+            key: _xoilacKey,
             apiService: widget.apiService,
             source: 'xoilac',
             title: 'Xôi Lạc TV',
@@ -243,6 +308,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         ExcludeFocus(
           excluding: _currentTabIndex != 2,
           child: FootballScreen(
+            key: _socoliveKey,
             apiService: widget.apiService,
             source: 'socolive',
             title: 'Socolive TV',
@@ -254,6 +320,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         ExcludeFocus(
           excluding: _currentTabIndex != 3,
           child: NetflixAnimeScreen(
+            key: _animeKey,
             apiService: widget.apiService,
             onNavigateTab: (tabIdx) {
               setState(() {
@@ -267,6 +334,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         ExcludeFocus(
           excluding: _currentTabIndex != 4,
           child: IptvScreen(
+            key: _iptvKey,
             apiService: widget.apiService,
             isActive: _currentTabIndex == 4,
           ),
@@ -323,6 +391,23 @@ class _NetflixLayoutState extends State<NetflixLayout> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+
+          // 🔄 Làm Mới Button
+          IconButton(
+            icon: _isRefreshingHeader
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                  )
+                : const Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 21),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: 'Làm mới',
+            onPressed: _refreshActiveTab,
+          ),
+
+          const SizedBox(width: 4),
 
           // Check OTA
           IconButton(
