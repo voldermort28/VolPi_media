@@ -1,10 +1,10 @@
 {
-  "version": "2.0.7",
-  "build": 53,
-  "tag_name": "v2.0.7",
-  "changelog": "• VolPi Media v2.0.7 - Tối Ưu Giao Diện Trận Đấu & Menu iPad:\n- Tối ưu Thumbnail Trận đấu trên Mobile (iPhone & Android): Thu gọn chiều cao thẻ trận đấu (giảm 36%), loại bỏ khoảng trống thừa, hiển thị cùng lúc 5-6 trận đấu trên màn hình thay vì chỉ 2-3 trận như trước.\n- Đưa nút 'Làm Mới' lên thanh Header trên Mobile & iPad: Khắc phục lỗi nút Làm Mới bị đẩy ra khỏi hàng gây vỡ giao diện; tích hợp trực tiếp nút Làm Mới trên thanh Header trên cùng với hiệu ứng tải mượt mà cho từng tab.\n- Hỗ trợ Giao diện Menu Hamburger (☰) cho iPad: Toàn bộ thiết bị iPad hiện nay cũng sử dụng thanh tiêu đề và Menu Hamburger Drawer trượt tiện lợi tương tự iPhone, tối ưu hóa 100% diện tích xem video và danh sách trận đấu.",
+  "version": "2.0.8",
+  "build": 54,
+  "tag_name": "v2.0.8",
+  "changelog": "• VolPi Media v2.0.8 - Tối Ưu Lưới Trận Đấu Đa Cột (Multi-Column Grid):\n- Cải thiện điểm ngắt hiển thị cột (Responsive Breakpoints): Giảm ngưỡng 2 cột từ 650px xuống 480px, giúp cửa sổ macOS cỡ vừa (~500-600px), iPad Split View và màn hình xoay ngang hiển thị 2 cột trận đấu trực quan thay vì bị kéo giãn thành 1 cột đơn.\n- Hỗ trợ hiển thị lên tới 3 cột (từ 840px trở lên) và 4 cột (từ 1200px trở lên) cho màn hình máy tính và Smart TV.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T10:20:00Z"
+  "published_at": "2026-10-19T10:37:00Z"
 }

@@ -380,11 +380,13 @@ class FootballScreenState extends State<FootballScreen> {
                       color: const Color(0xFF38BDF8),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          // Grid columns adaptive: TV (>1100px: 3 cols, Tablet >650px: 2 cols, Phone: 1 col)
+                          // Grid columns adaptive: Widescreen >=1200 (4 cols), Tablet/TV >=840 (3 cols), Window/Foldable >=480 (2 cols), Phone portrait (1 col)
                           int crossAxisCount = 1;
-                          if (constraints.maxWidth > 1100) {
+                          if (constraints.maxWidth >= 1200) {
+                            crossAxisCount = 4;
+                          } else if (constraints.maxWidth >= 840) {
                             crossAxisCount = 3;
-                          } else if (constraints.maxWidth > 650) {
+                          } else if (constraints.maxWidth >= 480) {
                             crossAxisCount = 2;
                           }
 
