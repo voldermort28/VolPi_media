@@ -250,6 +250,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                 name: 'Server 1',
                 title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
                 url: item.streamUrl,
+                headers: const {},
               ),
             ],
             isLive: false,

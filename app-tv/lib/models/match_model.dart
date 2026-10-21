@@ -554,7 +554,7 @@ class StreamChannel {
     required this.name,
     required this.title,
     required this.url,
-    required this.headers,
+    this.headers = const {},
   });
 
   factory StreamChannel.fromJson(Map<String, dynamic> json) {

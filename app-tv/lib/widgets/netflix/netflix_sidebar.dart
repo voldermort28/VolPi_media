@@ -302,7 +302,7 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                           focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 5)
                               ? widget.focusNodes![5]
                               : null,
-                          onTap: widget.onRefresh,
+                          onTap: widget.onRefresh ?? () {},
                           borderRadius: BorderRadius.circular(8),
                           focusBorderColor: const Color(0xFF38BDF8),
                           scale: 1.02,
@@ -362,7 +362,7 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                           focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 6)
                               ? widget.focusNodes![6]
                               : null,
-                          onTap: widget.onCheckUpdate,
+                          onTap: widget.onCheckUpdate ?? () {},
                           borderRadius: BorderRadius.circular(8),
                           focusBorderColor: const Color(0xFF38BDF8),
                           scale: 1.02,

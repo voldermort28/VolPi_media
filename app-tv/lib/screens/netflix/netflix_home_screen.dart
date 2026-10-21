@@ -250,6 +250,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                 name: 'Server 1',
                 title: 'Tập ${item.episode}',
                 url: item.streamUrl,
+                headers: const {},
               ),
             ],
             initialPosition: startPos,
