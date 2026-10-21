@@ -230,47 +230,193 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
     );
   }
 
-  void _playContinueWatching(WatchHistoryItem item) async {
-    if (item.streamUrl.isNotEmpty) {
+  void _openDetailWithPlaylist(List<AnimeModel> playlist, int index) {
+    if (index < 0 || index >= playlist.length) return;
+    final anime = playlist[index];
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AnimeDetailScreen(
+          anime: anime,
+          apiService: widget.apiService,
+          onNextMovie: index + 1 < playlist.length
+              ? () => _openDetailWithPlaylist(playlist, index + 1)
+              : null,
+          onPreviousMovie: index > 0
+              ? () => _openDetailWithPlaylist(playlist, index - 1)
+              : null,
+        ),
+      ),
+    );
+  }
+
+  void _playContinueWatching(WatchHistoryItem item) {
+    final idx = _continueWatching.indexWhere((h) => h.id == item.id);
+    if (idx != -1) {
+      _playContinueWatchingAtIndex(idx);
+    }
+  }
+
+  void _playContinueWatchingAtIndex(int index, {BuildContext? replaceContext}) async {
+    if (index < 0 || index >= _continueWatching.length) return;
+    final item = _continueWatching[index];
+    final targetContext = replaceContext ?? context;
+
+    Duration startPos = Duration(milliseconds: item.positionMs);
+    if (replaceContext == null) {
       final choice = await ResumePlaybackDialog.show(context, item);
       if (choice == null || !mounted) return;
-
-      final startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
+      startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
       if (!choice) {
         WatchHistoryService.instance.clearProgress(item.id);
       }
+    }
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => VideoPlayerScreen(
-            streamUrl: item.streamUrl,
-            title: item.title,
-            availableChannels: [
-              StreamChannel(
-                name: 'Server 1',
-                title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
-                url: item.streamUrl,
-                headers: const {},
-              ),
-            ],
-            isLive: false,
-            initialPosition: startPos,
-            mediaId: item.id,
-            mediaCategory: item.category,
-            mediaPoster: item.poster,
-            episode: item.episode,
-            season: item.season,
+    final hasNextItem = index + 1 < _continueWatching.length;
+    final hasPrevItem = index > 0;
+    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:')) && item.episode > 0 && item.mediaId.isNotEmpty;
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: item.streamUrl,
+        title: item.title,
+        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : null,
+        availableChannels: [
+          StreamChannel(
+            name: 'Server 1',
+            title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+            url: item.streamUrl,
+            headers: const {},
           ),
-        ),
-      );
+        ],
+        isLive: false,
+        initialPosition: startPos,
+        mediaId: item.id,
+        mediaCategory: item.category,
+        mediaPoster: item.poster,
+        episode: item.episode,
+        season: item.season,
+        onNext: isAnimeSeries
+            ? () => _loadAndPlayEpisode(
+                  animeId: item.mediaId,
+                  animeTitle: item.title,
+                  poster: item.poster,
+                  season: item.season > 0 ? item.season : 1,
+                  episode: item.episode + 1,
+                  continueIndex: index,
+                  replaceContext: playerCtx,
+                )
+            : (hasNextItem ? () => _playContinueWatchingAtIndex(index + 1, replaceContext: playerCtx) : null),
+        onPrevious: isAnimeSeries && item.episode > 1
+            ? () => _loadAndPlayEpisode(
+                  animeId: item.mediaId,
+                  animeTitle: item.title,
+                  poster: item.poster,
+                  season: item.season > 0 ? item.season : 1,
+                  episode: item.episode - 1,
+                  continueIndex: index,
+                  replaceContext: playerCtx,
+                )
+            : (hasPrevItem ? () => _playContinueWatchingAtIndex(index - 1, replaceContext: playerCtx) : null),
+      ),
+    );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
     } else {
-      _openDetail(AnimeModel(
-        id: item.mediaId.isNotEmpty ? item.mediaId : item.id.replaceAll(RegExp(r'^anime:|:ep:\d+$'), ''),
-        name: item.title,
-        poster: item.poster,
-        background: item.poster,
-        description: '',
-      ));
+      Navigator.of(context).push(playerRoute);
+    }
+  }
+
+  void _loadAndPlayEpisode({
+    required String animeId,
+    required String animeTitle,
+    required String poster,
+    required int season,
+    required int episode,
+    required int continueIndex,
+    BuildContext? replaceContext,
+  }) async {
+    final targetContext = replaceContext ?? context;
+
+    showDialog(
+      context: targetContext,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFE50914)),
+      ),
+    );
+
+    final streams = await widget.apiService.getAnimeEpisodeStreams(
+      animeId,
+      season,
+      episode,
+    );
+
+    if (!mounted) return;
+    Navigator.of(targetContext).pop();
+
+    if (streams.isEmpty) {
+      if (continueIndex + 1 < _continueWatching.length) {
+        _playContinueWatchingAtIndex(continueIndex + 1, replaceContext: replaceContext);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã hết các tập của $animeTitle!')),
+        );
+      }
+      return;
+    }
+
+    final playStream = streams.first;
+    final historyId = 'anime:$animeId:ep:$episode';
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: playStream.url,
+        title: animeTitle,
+        subtitle: 'Tập $episode',
+        headers: playStream.headers,
+        availableChannels: streams,
+        mediaId: historyId,
+        mediaCategory: 'anime',
+        mediaPoster: poster,
+        episode: episode,
+        season: season,
+        isLive: false,
+        onNext: () {
+          _loadAndPlayEpisode(
+            animeId: animeId,
+            animeTitle: animeTitle,
+            poster: poster,
+            season: season,
+            episode: episode + 1,
+            continueIndex: continueIndex,
+            replaceContext: playerCtx,
+          );
+        },
+        onPrevious: episode > 1
+            ? () {
+                _loadAndPlayEpisode(
+                  animeId: animeId,
+                  animeTitle: animeTitle,
+                  poster: poster,
+                  season: season,
+                  episode: episode - 1,
+                  continueIndex: continueIndex,
+                  replaceContext: playerCtx,
+                );
+              }
+            : (continueIndex > 0
+                ? () {
+                    _playContinueWatchingAtIndex(continueIndex - 1, replaceContext: playerCtx);
+                  }
+                : null),
+      ),
+    );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
     }
   }
 
@@ -912,7 +1058,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
         final item = _continueWatching[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
-            onTap: () => _playContinueWatching(item),
+            onTap: () => _playContinueWatchingAtIndex(idx),
             onLongPress: () => _openContinueWatchingMenu(item),
             borderRadius: BorderRadius.circular(8),
             scale: 1.05,
@@ -1060,7 +1206,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
         final anime = items[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
-            onTap: () => _openDetail(anime),
+            onTap: () => _openDetailWithPlaylist(items, idx),
             onLongPress: () => _openAnimeCardMenu(anime),
             borderRadius: BorderRadius.circular(8),
             scale: 1.06,

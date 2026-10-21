@@ -15,8 +15,16 @@ import '../player/video_player_screen.dart';
 class AnimeDetailScreen extends StatefulWidget {
   final AnimeModel anime;
   final ApiService apiService;
+  final VoidCallback? onNextMovie;
+  final VoidCallback? onPreviousMovie;
 
-  const AnimeDetailScreen({super.key, required this.anime, required this.apiService});
+  const AnimeDetailScreen({
+    super.key,
+    required this.anime,
+    required this.apiService,
+    this.onNextMovie,
+    this.onPreviousMovie,
+  });
 
   @override
   State<AnimeDetailScreen> createState() => _AnimeDetailScreenState();
@@ -126,10 +134,20 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         season: ep.season,
         onNext: index + 1 < episodes.length
             ? () => _playEpisodeAtIndex(index + 1, replaceContext: playerCtx)
-            : null,
+            : (widget.onNextMovie != null
+                ? () {
+                    Navigator.of(playerCtx).pop();
+                    widget.onNextMovie!();
+                  }
+                : null),
         onPrevious: index > 0
             ? () => _playEpisodeAtIndex(index - 1, replaceContext: playerCtx)
-            : null,
+            : (widget.onPreviousMovie != null
+                ? () {
+                    Navigator.of(playerCtx).pop();
+                    widget.onPreviousMovie!();
+                  }
+                : null),
       ),
     );
 

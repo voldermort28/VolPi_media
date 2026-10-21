@@ -1,10 +1,10 @@
 {
-  "version": "2.1.7",
-  "build": 63,
-  "tag_name": "v2.1.7",
-  "changelog": "• VolPi Media v2.1.7 - Nâng Cấp Hero Banner, Nút Cập Nhật & Làm Mới, Tối Ưu Stream Selector & Nhớ Cửa Sổ macOS:\n- Bổ sung nút 'Cập nhật ứng dụng' và 'Làm mới dữ liệu' dễ tiếp cận trên Sidebar và Drawer của giao diện Netflix cũng như thanh điều hướng V1.\n- Chuẩn hóa chữ thông báo khởi động thành 'Loading...'.\n- Hero Banner Trang Chủ: Hiển thị logo 2 đội bóng cạnh nhau với huy hiệu 'VS' phát sáng thẩm mỹ; bổ sung nút mũi tên trái/phải điều hướng slide trận đấu tâm điểm.\n- Trình phát Video: Đảm bảo nút 'Chọn Luồng' (Stream Selector) luôn hiển thị đầy đủ cho các trận đấu từ Hero Banner, Anime và Phim riêng tư.\n- macOS: Tự động ghi nhớ kích thước và vị trí cửa sổ người dùng tùy chỉnh từ lần sử dụng trước.",
+  "version": "2.1.8",
+  "build": 64,
+  "tag_name": "v2.1.8",
+  "changelog": "• VolPi Media v2.1.8 - Điều Hướng Tiếp Tục Xem & Danh Sách Yêu Thích, Phóng To Logo Hero Banner:\n- Bổ sung nút Next / Previous và tính năng tự động chuyển tập / phim tiếp theo khi xem từ mục 'Tiếp tục xem' hoặc 'Danh sách yêu thích'.\n- Hỗ trợ chuyển tập kế tiếp tự động cho Anime bộ và chuyển phim liên tục trong danh sách phát yêu thích.\n- Phóng to logo 2 đội bóng trên Hero Banner trang chủ rõ nét, nổi bật và dễ nhìn hơn rất nhiều trên màn hình TV lớn.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-22T01:25:00Z"
+  "published_at": "2026-10-22T02:08:00Z"
 }

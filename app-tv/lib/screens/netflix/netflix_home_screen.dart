@@ -225,39 +225,173 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     );
   }
 
-  void _onContinueWatchingTap(WatchHistoryItem item) async {
-    if (item.streamUrl.isNotEmpty) {
+  void _onContinueWatchingTap(WatchHistoryItem item) {
+    final idx = _continueWatching.indexWhere((h) => h.id == item.id);
+    if (idx != -1) {
+      _playContinueWatchingAtIndex(idx);
+    }
+  }
+
+  void _playContinueWatchingAtIndex(int index, {BuildContext? replaceContext}) async {
+    if (index < 0 || index >= _continueWatching.length) return;
+    final item = _continueWatching[index];
+    final targetContext = replaceContext ?? context;
+
+    Duration startPos = Duration(milliseconds: item.positionMs);
+    if (replaceContext == null) {
       final choice = await ResumePlaybackDialog.show(context, item);
       if (choice == null || !mounted) return;
-
-      final startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
+      startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
       if (!choice) {
         WatchHistoryService.instance.clearProgress(item.id);
       }
+    }
 
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => VideoPlayerScreen(
-            streamUrl: item.streamUrl,
-            title: item.title,
-            subtitle: 'Tập ${item.episode}',
-            mediaId: item.mediaId,
-            mediaPoster: item.poster,
-            episode: item.episode,
-            season: item.season,
-            availableChannels: [
-              StreamChannel(
-                name: 'Server 1',
-                title: 'Tập ${item.episode}',
-                url: item.streamUrl,
-                headers: const {},
-              ),
-            ],
-            initialPosition: startPos,
-            isLive: false,
+    final hasNextItem = index + 1 < _continueWatching.length;
+    final hasPrevItem = index > 0;
+    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:')) && item.episode > 0 && item.mediaId.isNotEmpty;
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: item.streamUrl,
+        title: item.title,
+        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : null,
+        mediaId: item.mediaId.isNotEmpty ? item.mediaId : item.id,
+        mediaPoster: item.poster,
+        episode: item.episode,
+        season: item.season,
+        availableChannels: [
+          StreamChannel(
+            name: 'Server 1',
+            title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+            url: item.streamUrl,
+            headers: const {},
           ),
-        ),
-      );
+        ],
+        initialPosition: startPos,
+        isLive: false,
+        onNext: isAnimeSeries
+            ? () => _loadAndPlayEpisode(
+                  animeId: item.mediaId,
+                  animeTitle: item.title,
+                  poster: item.poster,
+                  season: item.season > 0 ? item.season : 1,
+                  episode: item.episode + 1,
+                  continueIndex: index,
+                  replaceContext: playerCtx,
+                )
+            : (hasNextItem ? () => _playContinueWatchingAtIndex(index + 1, replaceContext: playerCtx) : null),
+        onPrevious: isAnimeSeries && item.episode > 1
+            ? () => _loadAndPlayEpisode(
+                  animeId: item.mediaId,
+                  animeTitle: item.title,
+                  poster: item.poster,
+                  season: item.season > 0 ? item.season : 1,
+                  episode: item.episode - 1,
+                  continueIndex: index,
+                  replaceContext: playerCtx,
+                )
+            : (hasPrevItem ? () => _playContinueWatchingAtIndex(index - 1, replaceContext: playerCtx) : null),
+      ),
+    );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
+    }
+  }
+
+  void _loadAndPlayEpisode({
+    required String animeId,
+    required String animeTitle,
+    required String poster,
+    required int season,
+    required int episode,
+    required int continueIndex,
+    BuildContext? replaceContext,
+  }) async {
+    final targetContext = replaceContext ?? context;
+
+    showDialog(
+      context: targetContext,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFE50914)),
+      ),
+    );
+
+    final streams = await widget.apiService.getAnimeEpisodeStreams(
+      animeId,
+      season,
+      episode,
+    );
+
+    if (!mounted) return;
+    Navigator.of(targetContext).pop();
+
+    if (streams.isEmpty) {
+      if (continueIndex + 1 < _continueWatching.length) {
+        _playContinueWatchingAtIndex(continueIndex + 1, replaceContext: replaceContext);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Đã hết các tập của $animeTitle!')),
+        );
+      }
+      return;
+    }
+
+    final playStream = streams.first;
+    final historyId = 'anime:$animeId:ep:$episode';
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: playStream.url,
+        title: animeTitle,
+        subtitle: 'Tập $episode',
+        headers: playStream.headers,
+        availableChannels: streams,
+        mediaId: historyId,
+        mediaCategory: 'anime',
+        mediaPoster: poster,
+        episode: episode,
+        season: season,
+        isLive: false,
+        onNext: () {
+          _loadAndPlayEpisode(
+            animeId: animeId,
+            animeTitle: animeTitle,
+            poster: poster,
+            season: season,
+            episode: episode + 1,
+            continueIndex: continueIndex,
+            replaceContext: playerCtx,
+          );
+        },
+        onPrevious: episode > 1
+            ? () {
+                _loadAndPlayEpisode(
+                  animeId: animeId,
+                  animeTitle: animeTitle,
+                  poster: poster,
+                  season: season,
+                  episode: episode - 1,
+                  continueIndex: continueIndex,
+                  replaceContext: playerCtx,
+                );
+              }
+            : (continueIndex > 0
+                ? () {
+                    _playContinueWatchingAtIndex(continueIndex - 1, replaceContext: playerCtx);
+                  }
+                : null),
+      ),
+    );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
     }
   }
 
@@ -370,7 +504,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
       onEnter: (_) => setState(() => _isBannerInteracting = true),
       onExit: (_) => setState(() => _isBannerInteracting = false),
       child: SizedBox(
-        height: 300,
+        height: 350,
         child: Stack(
           children: [
             PageView.builder(
@@ -564,7 +698,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   Widget _buildBillboard(MatchModel match) {
     return Container(
-      height: 300,
+      height: 350,
       width: double.infinity,
       decoration: const BoxDecoration(
         color: Color(0xFF0F0F0F),
@@ -772,78 +906,85 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   }
 
   Widget _buildBillboardTeamLogos(MatchModel match) {
+    final isMobile = MediaQuery.of(context).size.width < 700;
+    final double logoSize = isMobile ? 64 : 96;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 10, bottom: 6),
+      padding: EdgeInsets.only(top: isMobile ? 8 : 12, bottom: isMobile ? 6 : 10),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _buildHeroLogoItem(match.homeLogo, match.homeTeam),
+          _buildHeroLogoItem(match.homeLogo, match.homeTeam, size: logoSize),
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            margin: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 14, vertical: isMobile ? 4 : 6),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [Color(0xFFE50914), Color(0xFF991B1B)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFE50914).withOpacity(0.4),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
+                  color: const Color(0xFFE50914).withOpacity(0.5),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: const Text(
+            child: Text(
               'VS',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 10,
+                fontSize: isMobile ? 12 : 16,
                 fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
+                letterSpacing: 1.0,
               ),
             ),
           ),
-          _buildHeroLogoItem(match.awayLogo, match.awayTeam),
+          _buildHeroLogoItem(match.awayLogo, match.awayTeam, size: logoSize),
         ],
       ),
     );
   }
 
-  Widget _buildHeroLogoItem(String logoUrl, String teamName) {
-    const double size = 36;
+  Widget _buildHeroLogoItem(String logoUrl, String teamName, {double size = 96}) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: const Color(0xFF1E293B).withOpacity(0.9),
-        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.2),
+        color: const Color(0xFF1E293B).withOpacity(0.92),
+        border: Border.all(color: Colors.white.withOpacity(0.35), width: 2.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+            color: Colors.black.withOpacity(0.65),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: const Color(0xFF38BDF8).withOpacity(0.25),
+            blurRadius: 16,
+            spreadRadius: 1,
           ),
         ],
       ),
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(6),
       child: logoUrl.isNotEmpty
           ? ClipOval(
               child: CachedNetworkImage(
                 imageUrl: logoUrl,
                 fit: BoxFit.contain,
-                memCacheWidth: 80,
-                memCacheHeight: 80,
-                errorWidget: (_, __, ___) => const Center(
-                  child: Icon(Icons.shield_rounded, size: 18, color: Colors.white54),
+                memCacheWidth: 250,
+                memCacheHeight: 250,
+                errorWidget: (_, __, ___) => Center(
+                  child: Icon(Icons.shield_rounded, size: size * 0.5, color: Colors.white54),
                 ),
               ),
             )
-          : const Center(
-              child: Icon(Icons.shield_rounded, size: 18, color: Colors.white54),
+          : Center(
+              child: Icon(Icons.shield_rounded, size: size * 0.5, color: Colors.white54),
             ),
     );
   }
@@ -910,7 +1051,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           final item = _continueWatching[idx];
           return RepaintBoundary(
             child: TvFocusableCard(
-              onTap: () => _onContinueWatchingTap(item),
+              onTap: () => _playContinueWatchingAtIndex(idx),
               borderRadius: BorderRadius.circular(6),
               scale: 1.05,
               focusBorderColor: Colors.white,
