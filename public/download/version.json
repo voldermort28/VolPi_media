@@ -1,10 +1,10 @@
 {
-  "version": "2.1.4",
-  "build": 60,
-  "tag_name": "v2.1.4",
-  "changelog": "• VolPi Media v2.1.4 - Nâng Cấp Danh Sách Luồng, Điều Khiển TV Remote & Xác Nhận Thoát:\n- Danh sách luồng phát gọn gàng: Gom toàn bộ các server vào 1 nút 'Chọn Luồng' bên dưới điều khiển; click vào mở danh sách dạng thẻ dọc không che thanh seek; tự do đổi server mà không bị tắt bảng ngay; tự tắt sau 5s hoặc khi click ra màn hình.\n- Điều hướng D-Pad TV Remote mượt mà: Bấm phím mũi tên trái/phải di chuyển linh hoạt giữa các nút điều khiển (Next, Previous, Tua 10s, Skip Intro, Chọn Luồng); bấm mũi tên Lên để focus thanh seek và tua video.\n- Bảng xác nhận khi bấm Back thoát app trên Android TV: Không thoát app đột ngột, hiển thị hộp thoại xác nhận với nút focus mặc định vào 'Ở lại' để tránh thao tác nhầm.",
+  "version": "2.1.5",
+  "build": 61,
+  "tag_name": "v2.1.5",
+  "changelog": "• VolPi Media v2.1.5 - Tối Ưu Hóa Trải Nghiệm Remote TV (D-Pad & Phím Điều Khiển):\n- Chống kẹt phím ẩn (ExcludeFocus): Loại bỏ hoàn toàn lỗi phím remote bị kẹt vào các nút điều khiển ẩn khi thanh điều khiển mờ đi.\n- Điều hướng phân tầng TV Remote mượt mà: Bấm Mũi Tên Lên từ hàng nút chuyển lên thanh Seek; từ thanh Seek bấm Lên chuyển lên nút Back; bấm Mũi Tên Xuống từ hàng nút điều khiển sẽ ẩn ngay thanh điều khiển (chuẩn Netflix/YouTube).\n- Danh sách luồng thông minh trên TV: Khi mở 'Chọn Luồng', remote TV tự động focus vào luồng đang phát; bấm Lên/Xuống cuộn chọn server; bấm Trái hoặc Back để đóng bảng và quay về nút Chọn Luồng.\n- Xử lý phím Back Remote TV: Bấm Back khi mở danh sách luồng -> chỉ đóng danh sách luồng; bấm Back khi hiện thanh điều khiển -> chỉ ẩn thanh điều khiển; bấm Back khi đang xem toàn màn hình -> quay về màn hình trước.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-21T17:25:00Z"
+  "published_at": "2026-10-21T17:45:00Z"
 }

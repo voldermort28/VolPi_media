@@ -110,6 +110,47 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _forward10FocusNode = FocusNode();
   final FocusNode _skipIntroFocusNode = FocusNode();
   final FocusNode _channelsButtonFocusNode = FocusNode();
+  final FocusNode _backButtonFocusNode = FocusNode();
+  final List<FocusNode> _channelFocusNodes = [];
+
+  void _initChannelFocusNodes() {
+    for (final node in _channelFocusNodes) {
+      node.dispose();
+    }
+    _channelFocusNodes.clear();
+    final count = widget.availableChannels?.length ?? 0;
+    for (int i = 0; i < count; i++) {
+      _channelFocusNodes.add(FocusNode());
+    }
+  }
+
+  void _focusActiveChannel() {
+    if (!mounted || !_showStreamSelector || _channelFocusNodes.isEmpty) return;
+    int activeIdx = widget.availableChannels?.indexWhere((c) => c.url == _currentStreamUrl) ?? 0;
+    if (activeIdx < 0 || activeIdx >= _channelFocusNodes.length) activeIdx = 0;
+    if (activeIdx < _channelFocusNodes.length) {
+      _channelFocusNodes[activeIdx].requestFocus();
+    }
+  }
+
+  void _handleBackAction() {
+    if (_showStreamSelector) {
+      setState(() {
+        _showStreamSelector = false;
+      });
+      _channelsButtonFocusNode.requestFocus();
+      _startHideControlsTimer();
+      return;
+    }
+    if (_showControls) {
+      setState(() {
+        _showControls = false;
+      });
+      _hideControlsTimer?.cancel();
+      return;
+    }
+    Navigator.of(context).pop();
+  }
 
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
@@ -762,6 +803,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _forward10FocusNode.dispose();
     _skipIntroFocusNode.dispose();
     _channelsButtonFocusNode.dispose();
+    _backButtonFocusNode.dispose();
+    for (final n in _channelFocusNodes) {
+      n.dispose();
+    }
+    _channelFocusNodes.clear();
     super.dispose();
   }
 
@@ -769,188 +815,213 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
 
-    return Focus(
-      autofocus: true,
-      onKeyEvent: (node, event) {
-        final key = event.logicalKey;
-        final bool isPrevTrack = key == LogicalKeyboardKey.mediaTrackPrevious ||
-            (_isMacOrDesktop && key == LogicalKeyboardKey.keyP);
-        final bool isNextTrack = key == LogicalKeyboardKey.mediaTrackNext ||
-            (_isMacOrDesktop && key == LogicalKeyboardKey.keyN);
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _handleBackAction();
+      },
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          final key = event.logicalKey;
+          final bool isPrevTrack = key == LogicalKeyboardKey.mediaTrackPrevious ||
+              (_isMacOrDesktop && key == LogicalKeyboardKey.keyP);
+          final bool isNextTrack = key == LogicalKeyboardKey.mediaTrackNext ||
+              (_isMacOrDesktop && key == LogicalKeyboardKey.keyN);
 
-        final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
-            key == LogicalKeyboardKey.mediaRewind ||
-            (isPrevTrack && widget.onPrevious == null);
-        final bool isRight = key == LogicalKeyboardKey.arrowRight ||
-            key == LogicalKeyboardKey.mediaFastForward ||
-            (isNextTrack && widget.onNext == null);
+          final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
+              key == LogicalKeyboardKey.mediaRewind ||
+              (isPrevTrack && widget.onPrevious == null);
+          final bool isRight = key == LogicalKeyboardKey.arrowRight ||
+              key == LogicalKeyboardKey.mediaFastForward ||
+              (isNextTrack && widget.onNext == null);
 
-        if (event is KeyDownEvent) {
-          if (isPrevTrack && widget.onPrevious != null) {
-            widget.onPrevious!();
-            return KeyEventResult.handled;
-          }
-          if (isNextTrack && widget.onNext != null) {
-            widget.onNext!();
-            return KeyEventResult.handled;
-          }
+          final bool isBack = key == LogicalKeyboardKey.escape ||
+              key == LogicalKeyboardKey.goBack ||
+              key == LogicalKeyboardKey.backspace;
 
-          // Hardware space or mediaPlayPause: always toggle play/pause
-          if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.mediaPlayPause) {
-            _togglePlayPause();
-            return KeyEventResult.handled;
-          }
-
-          // Select / Enter
-          if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter) {
-            if (!_showControls) {
-              _showControlsBriefly();
+          if (event is KeyDownEvent) {
+            if (isBack) {
+              _handleBackAction();
               return KeyEventResult.handled;
             }
-            // When controls are visible, let the focused TvFocusableCard button handle Enter!
-            return KeyEventResult.ignored;
-          }
 
-          // Escape / Back
-          if (key == LogicalKeyboardKey.escape) {
-            if (_showStreamSelector) {
-              setState(() {
-                _showStreamSelector = false;
-              });
+            if (isPrevTrack && widget.onPrevious != null) {
+              widget.onPrevious!();
+              return KeyEventResult.handled;
+            }
+            if (isNextTrack && widget.onNext != null) {
+              widget.onNext!();
+              return KeyEventResult.handled;
+            }
+
+            // Hardware space or mediaPlayPause: always toggle play/pause
+            if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.mediaPlayPause) {
+              _togglePlayPause();
+              return KeyEventResult.handled;
+            }
+
+            // Select / Enter
+            if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter) {
+              if (!_showControls) {
+                _showControlsBriefly();
+                return KeyEventResult.handled;
+              }
+              // When controls are visible, let the focused TvFocusableCard button handle Enter!
+              return KeyEventResult.ignored;
+            }
+
+            // Left navigation / seek
+            if (isLeft) {
+              if (!_showControls) {
+                if (_isHoldingSeek && _holdSeekDirection == -1) {
+                  _handleRemoteSeekRepeat(-1);
+                } else {
+                  _handleRemoteSeekStart(-1);
+                }
+                return KeyEventResult.handled;
+              }
+              if (_seekBarFocusNode.hasFocus) {
+                if (_isHoldingSeek && _holdSeekDirection == -1) {
+                  _handleRemoteSeekRepeat(-1);
+                } else {
+                  _handleRemoteSeekStart(-1);
+                }
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.mediaRewind) {
+                _seekRelative(-10);
+                return KeyEventResult.handled;
+              }
+              // Allow D-Pad Left to navigate between control buttons
+              _startHideControlsTimer();
+              return KeyEventResult.ignored;
+            }
+
+            // Right navigation / seek
+            if (isRight) {
+              if (!_showControls) {
+                if (_isHoldingSeek && _holdSeekDirection == 1) {
+                  _handleRemoteSeekRepeat(1);
+                } else {
+                  _handleRemoteSeekStart(1);
+                }
+                return KeyEventResult.handled;
+              }
+              if (_seekBarFocusNode.hasFocus) {
+                if (_isHoldingSeek && _holdSeekDirection == 1) {
+                  _handleRemoteSeekRepeat(1);
+                } else {
+                  _handleRemoteSeekStart(1);
+                }
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.mediaFastForward) {
+                _seekRelative(10);
+                return KeyEventResult.handled;
+              }
+              // Allow D-Pad Right to navigate between control buttons
+              _startHideControlsTimer();
+              return KeyEventResult.ignored;
+            }
+
+            // Volume Shortcuts for macOS & Desktop (Key M for mute, +/- for volume)
+            if (_isMacOrDesktop) {
+              if (key == LogicalKeyboardKey.keyM) {
+                _toggleMute();
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.equal ||
+                  key == LogicalKeyboardKey.numpadAdd) {
+                _changeVolumeBy(0.05);
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.minus ||
+                  key == LogicalKeyboardKey.numpadSubtract) {
+                _changeVolumeBy(-0.05);
+                return KeyEventResult.handled;
+              }
+            }
+
+            final bool isUp = key == LogicalKeyboardKey.arrowUp ||
+                key == LogicalKeyboardKey.channelUp ||
+                key == LogicalKeyboardKey.pageUp;
+            final bool isDown = key == LogicalKeyboardKey.arrowDown ||
+                key == LogicalKeyboardKey.channelDown ||
+                key == LogicalKeyboardKey.pageDown;
+
+            if (isUp) {
+              if (!_showControls) {
+                _showControlsBriefly();
+                return KeyEventResult.handled;
+              }
+              if (_showStreamSelector) {
+                _startHideControlsTimer();
+                return KeyEventResult.ignored;
+              }
+              if (_seekBarFocusNode.hasFocus) {
+                _backButtonFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (_backButtonFocusNode.hasFocus) {
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              _seekBarFocusNode.requestFocus();
               _startHideControlsTimer();
               return KeyEventResult.handled;
             }
-            if (_showControls) {
+            if (isDown) {
+              if (!_showControls) {
+                _showControlsBriefly();
+                return KeyEventResult.handled;
+              }
+              if (_showStreamSelector) {
+                _startHideControlsTimer();
+                return KeyEventResult.ignored;
+              }
+              if (_backButtonFocusNode.hasFocus) {
+                _seekBarFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (_seekBarFocusNode.hasFocus) {
+                _playPauseFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              // From bottom control buttons -> Down to dismiss controls!
               setState(() {
                 _showControls = false;
               });
               _hideControlsTimer?.cancel();
               return KeyEventResult.handled;
             }
-            Navigator.of(context).pop();
-            return KeyEventResult.handled;
-          }
-
-          // Left navigation / seek
-          if (isLeft) {
-            if (!_showControls) {
-              if (_isHoldingSeek && _holdSeekDirection == -1) {
-                _handleRemoteSeekRepeat(-1);
-              } else {
-                _handleRemoteSeekStart(-1);
-              }
+          } else if (event is KeyRepeatEvent) {
+            if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
+              _handleRemoteSeekRepeat(-1);
               return KeyEventResult.handled;
             }
-            if (_seekBarFocusNode.hasFocus) {
-              _seekRelative(-10);
-              _startHideControlsTimer();
+            if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
+              _handleRemoteSeekRepeat(1);
               return KeyEventResult.handled;
             }
-            if (key == LogicalKeyboardKey.mediaRewind) {
-              _seekRelative(-10);
+          } else if (event is KeyUpEvent) {
+            if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
+              _handleRemoteSeekEnd(-1);
               return KeyEventResult.handled;
             }
-            // Allow D-Pad Left to navigate between control buttons
-            _startHideControlsTimer();
-            return KeyEventResult.ignored;
-          }
-
-          // Right navigation / seek
-          if (isRight) {
-            if (!_showControls) {
-              if (_isHoldingSeek && _holdSeekDirection == 1) {
-                _handleRemoteSeekRepeat(1);
-              } else {
-                _handleRemoteSeekStart(1);
-              }
-              return KeyEventResult.handled;
-            }
-            if (_seekBarFocusNode.hasFocus) {
-              _seekRelative(10);
-              _startHideControlsTimer();
-              return KeyEventResult.handled;
-            }
-            if (key == LogicalKeyboardKey.mediaFastForward) {
-              _seekRelative(10);
-              return KeyEventResult.handled;
-            }
-            // Allow D-Pad Right to navigate between control buttons
-            _startHideControlsTimer();
-            return KeyEventResult.ignored;
-          }
-
-          // Volume Shortcuts for macOS & Desktop (Key M for mute, +/- for volume)
-          if (_isMacOrDesktop) {
-            if (key == LogicalKeyboardKey.keyM) {
-              _toggleMute();
-              return KeyEventResult.handled;
-            }
-            if (key == LogicalKeyboardKey.equal ||
-                key == LogicalKeyboardKey.numpadAdd) {
-              _changeVolumeBy(0.05);
-              return KeyEventResult.handled;
-            }
-            if (key == LogicalKeyboardKey.minus ||
-                key == LogicalKeyboardKey.numpadSubtract) {
-              _changeVolumeBy(-0.05);
+            if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
+              _handleRemoteSeekEnd(1);
               return KeyEventResult.handled;
             }
           }
-
-          final bool isUp = key == LogicalKeyboardKey.arrowUp ||
-              key == LogicalKeyboardKey.channelUp ||
-              key == LogicalKeyboardKey.pageUp;
-          final bool isDown = key == LogicalKeyboardKey.arrowDown ||
-              key == LogicalKeyboardKey.channelDown ||
-              key == LogicalKeyboardKey.pageDown;
-
-          if (isUp) {
-            if (!_showControls) {
-              _showControlsBriefly();
-              return KeyEventResult.handled;
-            }
-            if (_showControls && !_seekBarFocusNode.hasFocus && !_showStreamSelector) {
-              _seekBarFocusNode.requestFocus();
-              _startHideControlsTimer();
-              return KeyEventResult.handled;
-            }
-            _startHideControlsTimer();
-            return KeyEventResult.ignored;
-          }
-          if (isDown) {
-            if (!_showControls) {
-              _showControlsBriefly();
-              return KeyEventResult.handled;
-            }
-            if (_seekBarFocusNode.hasFocus) {
-              _playPauseFocusNode.requestFocus();
-              _startHideControlsTimer();
-              return KeyEventResult.handled;
-            }
-            _startHideControlsTimer();
-            return KeyEventResult.ignored;
-          }
-        } else if (event is KeyRepeatEvent) {
-          if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
-            _handleRemoteSeekRepeat(-1);
-            return KeyEventResult.handled;
-          }
-          if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
-            _handleRemoteSeekRepeat(1);
-            return KeyEventResult.handled;
-          }
-        } else if (event is KeyUpEvent) {
-          if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
-            _handleRemoteSeekEnd(-1);
-            return KeyEventResult.handled;
-          }
-          if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
-            _handleRemoteSeekEnd(1);
-            return KeyEventResult.handled;
-          }
-        }
-        return KeyEventResult.ignored;
-      },
+          return KeyEventResult.ignored;
+        },
       child: Scaffold(
         backgroundColor: Colors.black,
         body: MouseRegion(
@@ -1229,52 +1300,55 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
 
               // 5. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
-              AnimatedOpacity(
-                opacity: _showControls ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: IgnorePointer(
-                  ignoring: !_showControls,
-                  child: SafeArea(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Top Bar with localized gentle gradient (No full-screen darkening)
-                        MouseRegion(
-                          onEnter: (_) {
-                            _isHoveringControls = true;
-                            _hideControlsTimer?.cancel();
-                          },
-                          onExit: (_) {
-                            _isHoveringControls = false;
-                            _startHideControlsTimer();
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.black.withOpacity(0.65),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                          child: Row(
-                            children: [
-                              TvFocusableCard(
-                                onTap: () => Navigator.of(context).pop(),
-                                scale: 1.1,
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                                ),
+              ExcludeFocus(
+                excluding: !_showControls,
+                child: AnimatedOpacity(
+                  opacity: _showControls ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: IgnorePointer(
+                    ignoring: !_showControls,
+                    child: SafeArea(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Top Bar with localized gentle gradient (No full-screen darkening)
+                          MouseRegion(
+                            onEnter: (_) {
+                              _isHoveringControls = true;
+                              _hideControlsTimer?.cancel();
+                            },
+                            onExit: (_) {
+                              _isHoveringControls = false;
+                              _startHideControlsTimer();
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withOpacity(0.65),
+                                  Colors.transparent,
+                                ],
                               ),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            child: Row(
+                              children: [
+                                TvFocusableCard(
+                                  focusNode: _backButtonFocusNode,
+                                  onTap: () => Navigator.of(context).pop(),
+                                  scale: 1.1,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                                  ),
+                                ),
                               const SizedBox(width: 14),
                               Expanded(
                                 child: Column(
@@ -1358,6 +1432,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             trackHeight: 3.0,
                                           ),
                                           child: Slider(
+                                            focusNode: FocusNode(canRequestFocus: false),
                                             value: _isMuted ? 0.0 : _volume,
                                             min: 0.0,
                                             max: 1.0,
@@ -1456,6 +1531,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                                 trackHeight: 4.0,
                                               ),
                                               child: Slider(
+                                                focusNode: FocusNode(canRequestFocus: false),
                                                 value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
                                                       0.0,
                                                       _controller.value.duration.inSeconds.toDouble(),
@@ -1635,7 +1711,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         setState(() {
                                           _showStreamSelector = !_showStreamSelector;
                                         });
-                                        _startHideControlsTimer();
+                                        if (_showStreamSelector) {
+                                          _initChannelFocusNodes();
+                                          _startHideControlsTimer();
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            _focusActiveChannel();
+                                          });
+                                        } else {
+                                          _startHideControlsTimer();
+                                        }
                                       },
                                       scale: 1.08,
                                       borderRadius: BorderRadius.circular(18),
@@ -1679,6 +1763,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                 ),
+              ),
               ),
 
               // 5.5 VERTICAL STREAM SELECTOR PANEL
@@ -1738,6 +1823,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   setState(() {
                                     _showStreamSelector = false;
                                   });
+                                  _channelsButtonFocusNode.requestFocus();
                                   _startHideControlsTimer();
                                 },
                                 child: Container(
@@ -1761,15 +1847,28 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               itemBuilder: (context, index) {
                                 final ch = widget.availableChannels![index];
                                 final bool isSelected = ch.url == _currentStreamUrl;
-                                return TvFocusableCard(
-                                  autoFocus: isSelected,
-                                  onTap: () {
-                                    _switchChannel(ch);
-                                    _startHideControlsTimer(); // restart 5s idle timer
-                                    // Bảng không đóng ngay để người dùng test luồng mới
+                                final node = index < _channelFocusNodes.length ? _channelFocusNodes[index] : null;
+                                return Focus(
+                                  onKeyEvent: (focusNode, event) {
+                                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                                      setState(() {
+                                        _showStreamSelector = false;
+                                      });
+                                      _channelsButtonFocusNode.requestFocus();
+                                      _startHideControlsTimer();
+                                      return KeyEventResult.handled;
+                                    }
+                                    return KeyEventResult.ignored;
                                   },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
+                                  child: TvFocusableCard(
+                                    focusNode: node,
+                                    onTap: () {
+                                      _switchChannel(ch);
+                                      _startHideControlsTimer(); // restart 5s idle timer
+                                      // Bảng không đóng ngay để người dùng test luồng mới
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
                                     width: double.infinity,
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                                     decoration: BoxDecoration(
@@ -1805,8 +1904,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       ],
                                     ),
                                   ),
-                                );
-                              },
+                                ),
+                              );
+                            },
                             ),
                           ),
                         ],
@@ -1900,6 +2000,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         ),
       ),
     ),
-  );
+  ),
+);
   }
 }
