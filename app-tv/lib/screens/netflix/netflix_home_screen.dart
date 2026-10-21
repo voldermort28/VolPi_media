@@ -255,7 +255,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
       builder: (playerCtx) => VideoPlayerScreen(
         streamUrl: item.streamUrl,
         title: item.title,
-        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : null,
+        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : '',
         mediaId: item.mediaId.isNotEmpty ? item.mediaId : item.id,
         mediaPoster: item.poster,
         episode: item.episode,

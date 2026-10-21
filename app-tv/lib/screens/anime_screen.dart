@@ -226,7 +226,7 @@ class AnimeScreenState extends State<AnimeScreen> {
       builder: (playerCtx) => VideoPlayerScreen(
         streamUrl: item.streamUrl,
         title: item.title,
-        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : null,
+        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : '',
         availableChannels: [
           StreamChannel(
             name: 'Server 1',
@@ -313,14 +313,7 @@ class AnimeScreenState extends State<AnimeScreen> {
     }
 
     final first = streams.first;
-    final channels = streams
-        .map((s) => StreamChannel(
-              name: s.server,
-              title: s.title,
-              url: s.url,
-              headers: s.headers,
-            ))
-        .toList();
+    final channels = streams;
 
     final hasNextInList = continueIndex + 1 < list.length;
     final hasPrevInList = continueIndex > 0;
