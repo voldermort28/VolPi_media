@@ -14,6 +14,7 @@ import '../services/update_service.dart';
 import '../widgets/netflix/netflix_sidebar.dart';
 import '../widgets/passcode_dialog.dart';
 import '../widgets/update_dialog.dart';
+import '../widgets/exit_confirm_dialog.dart';
 
 class NetflixLayout extends StatefulWidget {
   final ApiService apiService;
@@ -202,8 +203,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           return;
         }
 
-        // Tab 0 & in sidebar: quit app
-        SystemNavigator.pop();
+        // Tab 0 & in sidebar: confirm before quit app
+        ExitConfirmDialog.show(context);
       },
       child: Scaffold(
         key: _scaffoldKey,

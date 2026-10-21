@@ -99,6 +99,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   // Mouse Movement & Hover Controls (macOS & Desktop)
   bool _isHoveringControls = false;
   DateTime? _lastMouseMoveTime;
+  bool _showStreamSelector = false;
+
+  // TV Remote Focus Nodes
+  final FocusNode _playPauseFocusNode = FocusNode();
+  final FocusNode _seekBarFocusNode = FocusNode();
+  final FocusNode _prevFocusNode = FocusNode();
+  final FocusNode _nextFocusNode = FocusNode();
+  final FocusNode _replay10FocusNode = FocusNode();
+  final FocusNode _forward10FocusNode = FocusNode();
+  final FocusNode _skipIntroFocusNode = FocusNode();
+  final FocusNode _channelsButtonFocusNode = FocusNode();
 
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
@@ -395,10 +406,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
-    _hideControlsTimer = Timer(const Duration(seconds: 4), () {
+    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
       if (mounted && _controller.value.isPlaying && !_isDragging && !_isHoldingSeek && !_isHoveringControls) {
         setState(() {
           _showControls = false;
+          _showStreamSelector = false;
         });
       }
     });
@@ -424,14 +436,32 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _showControls = true;
     });
     _startHideControlsTimer();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _showControls && !_playPauseFocusNode.hasFocus && !_seekBarFocusNode.hasFocus) {
+        _playPauseFocusNode.requestFocus();
+      }
+    });
   }
 
   void _toggleControls() {
+    if (_showStreamSelector) {
+      setState(() {
+        _showStreamSelector = false;
+        _showControls = false;
+      });
+      _hideControlsTimer?.cancel();
+      return;
+    }
     setState(() {
       _showControls = !_showControls;
     });
     if (_showControls) {
       _startHideControlsTimer();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _showControls && !_playPauseFocusNode.hasFocus && !_seekBarFocusNode.hasFocus) {
+          _playPauseFocusNode.requestFocus();
+        }
+      });
     } else {
       _hideControlsTimer?.cancel();
     }
@@ -449,6 +479,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _startHideControlsTimer();
       }
     });
+  }
+
+  String _getActiveChannelTitleShort() {
+    if (widget.availableChannels == null || widget.availableChannels!.isEmpty) {
+      return 'Chọn Luồng';
+    }
+    final current = widget.availableChannels!.firstWhere(
+      (c) => c.url == _currentStreamUrl,
+      orElse: () => widget.availableChannels!.first,
+    );
+    final title = current.title;
+    final match = RegExp(r'(Server\s*#?\d+|Luồng\s*#?\d+|TM\s*#?\d+|R2|CDN|Thuyết Minh|Lồng Tiếng|Phụ Đề)', caseSensitive: false).firstMatch(title);
+    if (match != null) {
+      return match.group(0)!;
+    }
+    return title.length > 12 ? '${title.substring(0, 10)}...' : title;
   }
 
   String _formatDuration(Duration d) {
@@ -708,6 +754,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _playPauseFocusNode.dispose();
+    _seekBarFocusNode.dispose();
+    _prevFocusNode.dispose();
+    _nextFocusNode.dispose();
+    _replay10FocusNode.dispose();
+    _forward10FocusNode.dispose();
+    _skipIntroFocusNode.dispose();
+    _channelsButtonFocusNode.dispose();
     super.dispose();
   }
 
@@ -740,44 +794,103 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             widget.onNext!();
             return KeyEventResult.handled;
           }
-          if (key == LogicalKeyboardKey.select ||
-              key == LogicalKeyboardKey.enter ||
-              key == LogicalKeyboardKey.space ||
-              key == LogicalKeyboardKey.mediaPlayPause) {
+
+          // Hardware space or mediaPlayPause: always toggle play/pause
+          if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.mediaPlayPause) {
             _togglePlayPause();
             return KeyEventResult.handled;
           }
-          if (isLeft) {
-            if (_isHoldingSeek && _holdSeekDirection == -1) {
-              _handleRemoteSeekRepeat(-1);
-            } else {
-              _handleRemoteSeekStart(-1);
+
+          // Select / Enter
+          if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter) {
+            if (!_showControls) {
+              _showControlsBriefly();
+              return KeyEventResult.handled;
             }
-            return KeyEventResult.handled;
+            // When controls are visible, let the focused TvFocusableCard button handle Enter!
+            return KeyEventResult.ignored;
           }
-          if (isRight) {
-            if (_isHoldingSeek && _holdSeekDirection == 1) {
-              _handleRemoteSeekRepeat(1);
-            } else {
-              _handleRemoteSeekStart(1);
+
+          // Escape / Back
+          if (key == LogicalKeyboardKey.escape) {
+            if (_showStreamSelector) {
+              setState(() {
+                _showStreamSelector = false;
+              });
+              _startHideControlsTimer();
+              return KeyEventResult.handled;
             }
+            if (_showControls) {
+              setState(() {
+                _showControls = false;
+              });
+              _hideControlsTimer?.cancel();
+              return KeyEventResult.handled;
+            }
+            Navigator.of(context).pop();
             return KeyEventResult.handled;
           }
 
-          // Volume Shortcuts for macOS & Desktop (Key M for mute, Up/Down or +/- for volume)
+          // Left navigation / seek
+          if (isLeft) {
+            if (!_showControls) {
+              if (_isHoldingSeek && _holdSeekDirection == -1) {
+                _handleRemoteSeekRepeat(-1);
+              } else {
+                _handleRemoteSeekStart(-1);
+              }
+              return KeyEventResult.handled;
+            }
+            if (_seekBarFocusNode.hasFocus) {
+              _seekRelative(-10);
+              _startHideControlsTimer();
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.mediaRewind) {
+              _seekRelative(-10);
+              return KeyEventResult.handled;
+            }
+            // Allow D-Pad Left to navigate between control buttons
+            _startHideControlsTimer();
+            return KeyEventResult.ignored;
+          }
+
+          // Right navigation / seek
+          if (isRight) {
+            if (!_showControls) {
+              if (_isHoldingSeek && _holdSeekDirection == 1) {
+                _handleRemoteSeekRepeat(1);
+              } else {
+                _handleRemoteSeekStart(1);
+              }
+              return KeyEventResult.handled;
+            }
+            if (_seekBarFocusNode.hasFocus) {
+              _seekRelative(10);
+              _startHideControlsTimer();
+              return KeyEventResult.handled;
+            }
+            if (key == LogicalKeyboardKey.mediaFastForward) {
+              _seekRelative(10);
+              return KeyEventResult.handled;
+            }
+            // Allow D-Pad Right to navigate between control buttons
+            _startHideControlsTimer();
+            return KeyEventResult.ignored;
+          }
+
+          // Volume Shortcuts for macOS & Desktop (Key M for mute, +/- for volume)
           if (_isMacOrDesktop) {
             if (key == LogicalKeyboardKey.keyM) {
               _toggleMute();
               return KeyEventResult.handled;
             }
-            if (key == LogicalKeyboardKey.arrowUp ||
-                key == LogicalKeyboardKey.equal ||
+            if (key == LogicalKeyboardKey.equal ||
                 key == LogicalKeyboardKey.numpadAdd) {
               _changeVolumeBy(0.05);
               return KeyEventResult.handled;
             }
-            if (key == LogicalKeyboardKey.arrowDown ||
-                key == LogicalKeyboardKey.minus ||
+            if (key == LogicalKeyboardKey.minus ||
                 key == LogicalKeyboardKey.numpadSubtract) {
               _changeVolumeBy(-0.05);
               return KeyEventResult.handled;
@@ -792,40 +905,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               key == LogicalKeyboardKey.pageDown;
 
           if (isUp) {
-            if (widget.isLive && widget.availableChannels != null && widget.availableChannels!.length > 1) {
-              _switchChannelDelta(-1);
-            } else {
+            if (!_showControls) {
               _showControlsBriefly();
+              return KeyEventResult.handled;
             }
-            return KeyEventResult.handled;
+            if (_showControls && !_seekBarFocusNode.hasFocus && !_showStreamSelector) {
+              _seekBarFocusNode.requestFocus();
+              _startHideControlsTimer();
+              return KeyEventResult.handled;
+            }
+            _startHideControlsTimer();
+            return KeyEventResult.ignored;
           }
           if (isDown) {
-            if (widget.isLive && widget.availableChannels != null && widget.availableChannels!.length > 1) {
-              _switchChannelDelta(1);
-            } else {
+            if (!_showControls) {
               _showControlsBriefly();
+              return KeyEventResult.handled;
             }
-            return KeyEventResult.handled;
-          }
-          if (key == LogicalKeyboardKey.escape) {
-            Navigator.of(context).pop();
-            return KeyEventResult.handled;
+            if (_seekBarFocusNode.hasFocus) {
+              _playPauseFocusNode.requestFocus();
+              _startHideControlsTimer();
+              return KeyEventResult.handled;
+            }
+            _startHideControlsTimer();
+            return KeyEventResult.ignored;
           }
         } else if (event is KeyRepeatEvent) {
-          if (isLeft) {
+          if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
             _handleRemoteSeekRepeat(-1);
             return KeyEventResult.handled;
           }
-          if (isRight) {
+          if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
             _handleRemoteSeekRepeat(1);
             return KeyEventResult.handled;
           }
         } else if (event is KeyUpEvent) {
-          if (isLeft) {
+          if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
             _handleRemoteSeekEnd(-1);
             return KeyEventResult.handled;
           }
-          if (isRight) {
+          if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
             _handleRemoteSeekEnd(1);
             return KeyEventResult.handled;
           }
@@ -1291,113 +1410,99 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              // Available Channels / Streams Switcher Row
-                              if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
-                                SizedBox(
-                                  height: 38,
-                                  child: ListView.builder(
-                                    scrollDirection: Axis.horizontal,
-                                    itemCount: widget.availableChannels!.length,
-                                    itemBuilder: (context, index) {
-                                      final ch = widget.availableChannels![index];
-                                      final bool isSelected = ch.url == _currentStreamUrl;
-                                      return Padding(
-                                        padding: const EdgeInsets.only(right: 8),
-                                        child: TvFocusableCard(
-                                          onTap: () => _switchChannel(ch),
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                            color: isSelected ? const Color(0xFF0284C7) : const Color(0xFF1E293B),
-                                            child: Text(
-                                              ch.title,
-                                              style: TextStyle(
-                                                color: isSelected ? Colors.white : Colors.white70,
-                                                fontSize: 12,
-                                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              // Progress Slider for VOD (Thanh tiến trình)
+                              if (!widget.isLive && _isInitialized) ...[
+                                Focus(
+                                  focusNode: _seekBarFocusNode,
+                                  child: AnimatedBuilder(
+                                    animation: _seekBarFocusNode,
+                                    builder: (context, child) {
+                                      final bool isFocused = _seekBarFocusNode.hasFocus;
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(10),
+                                          border: Border.all(
+                                            color: isFocused ? const Color(0xFF38BDF8) : Colors.transparent,
+                                            width: 1.5,
+                                          ),
+                                          color: isFocused ? const Color(0xFF38BDF8).withOpacity(0.08) : Colors.transparent,
+                                        ),
+                                        child: child,
+                                      );
+                                    },
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: MouseRegion(
+                                            cursor: SystemMouseCursors.click,
+                                            child: SliderTheme(
+                                              data: SliderTheme.of(context).copyWith(
+                                                activeTrackColor: const Color(0xFF38BDF8),
+                                                inactiveTrackColor: Colors.white24,
+                                                thumbColor: const Color(0xFF38BDF8),
+                                                overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                                                trackHeight: 4.0,
+                                              ),
+                                              child: Slider(
+                                                value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
+                                                      0.0,
+                                                      _controller.value.duration.inSeconds.toDouble(),
+                                                    ),
+                                                max: _controller.value.duration.inSeconds.toDouble() > 0
+                                                    ? _controller.value.duration.inSeconds.toDouble()
+                                                    : 1.0,
+                                                onChangeStart: (val) {
+                                                  _hideControlsTimer?.cancel();
+                                                  setState(() {
+                                                    _isHoldingSeek = true;
+                                                    _pendingSeekPosition = Duration(seconds: val.toInt());
+                                                  });
+                                                },
+                                                onChanged: (val) {
+                                                  setState(() {
+                                                    _pendingSeekPosition = Duration(seconds: val.toInt());
+                                                  });
+                                                },
+                                                onChangeEnd: (val) {
+                                                  final target = Duration(seconds: val.toInt());
+                                                  _controller.seekTo(target).then((_) {
+                                                    if (mounted) {
+                                                      setState(() {
+                                                        _isHoldingSeek = false;
+                                                      });
+                                                      _startHideControlsTimer();
+                                                    }
+                                                  });
+                                                },
                                               ),
                                             ),
                                           ),
                                         ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-
-                              // Progress Slider for VOD (Thanh tiến trình)
-                              if (!widget.isLive && _isInitialized) ...[
-                                Row(
-                                  children: [
-                                    Text(
-                                      _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: MouseRegion(
-                                        cursor: SystemMouseCursors.click,
-                                        child: SliderTheme(
-                                          data: SliderTheme.of(context).copyWith(
-                                            activeTrackColor: const Color(0xFF38BDF8),
-                                            inactiveTrackColor: Colors.white24,
-                                            thumbColor: const Color(0xFF38BDF8),
-                                            overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
-                                            trackHeight: 4.0,
-                                          ),
-                                          child: Slider(
-                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
-                                                  0.0,
-                                                  _controller.value.duration.inSeconds.toDouble(),
-                                                ),
-                                            max: _controller.value.duration.inSeconds.toDouble() > 0
-                                                ? _controller.value.duration.inSeconds.toDouble()
-                                                : 1.0,
-                                            onChangeStart: (val) {
-                                              _hideControlsTimer?.cancel();
-                                              setState(() {
-                                                _isHoldingSeek = true;
-                                                _pendingSeekPosition = Duration(seconds: val.toInt());
-                                              });
-                                            },
-                                            onChanged: (val) {
-                                              setState(() {
-                                                _pendingSeekPosition = Duration(seconds: val.toInt());
-                                              });
-                                            },
-                                            onChangeEnd: (val) {
-                                              final target = Duration(seconds: val.toInt());
-                                              _controller.seekTo(target).then((_) {
-                                                if (mounted) {
-                                                  setState(() {
-                                                    _isHoldingSeek = false;
-                                                  });
-                                                  _startHideControlsTimer();
-                                                }
-                                              });
-                                            },
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          _formatDuration(_controller.value.duration),
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
                                           ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      _formatDuration(_controller.value.duration),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w500,
-                                        shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                               ],
@@ -1408,6 +1513,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 children: [
                                   if (widget.onPrevious != null) ...[
                                     TvFocusableCard(
+                                      focusNode: _prevFocusNode,
                                       onTap: widget.onPrevious!,
                                       scale: 1.15,
                                       borderRadius: BorderRadius.circular(24),
@@ -1420,10 +1526,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         child: const Icon(Icons.skip_previous_rounded, color: Colors.white, size: 26),
                                       ),
                                     ),
-                                    const SizedBox(width: 18),
+                                    const SizedBox(width: 14),
                                   ],
                                   if (!widget.isLive) ...[
                                     TvFocusableCard(
+                                      focusNode: _replay10FocusNode,
                                       onTap: () => _seekRelative(-10),
                                       scale: 1.15,
                                       borderRadius: BorderRadius.circular(24),
@@ -1436,9 +1543,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         child: const Icon(Icons.replay_10_rounded, color: Colors.white, size: 26),
                                       ),
                                     ),
-                                    const SizedBox(width: 18),
+                                    const SizedBox(width: 14),
                                   ],
                                   TvFocusableCard(
+                                    focusNode: _playPauseFocusNode,
                                     onTap: _togglePlayPause,
                                     scale: 1.15,
                                     borderRadius: BorderRadius.circular(30),
@@ -1456,8 +1564,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                   ),
                                   if (!widget.isLive) ...[
-                                    const SizedBox(width: 18),
+                                    const SizedBox(width: 14),
                                     TvFocusableCard(
+                                      focusNode: _forward10FocusNode,
                                       onTap: () => _seekRelative(10),
                                       scale: 1.15,
                                       borderRadius: BorderRadius.circular(24),
@@ -1472,6 +1581,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                     const SizedBox(width: 12),
                                     TvFocusableCard(
+                                      focusNode: _skipIntroFocusNode,
                                       onTap: () => _seekDirectOffset(85, customHudText: '+85s (Bỏ qua Intro)'),
                                       scale: 1.05,
                                       borderRadius: BorderRadius.circular(16),
@@ -1501,8 +1611,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                   ],
                                   if (widget.onNext != null) ...[
-                                    const SizedBox(width: 18),
+                                    const SizedBox(width: 14),
                                     TvFocusableCard(
+                                      focusNode: _nextFocusNode,
                                       onTap: widget.onNext!,
                                       scale: 1.15,
                                       borderRadius: BorderRadius.circular(24),
@@ -1513,6 +1624,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 26),
+                                      ),
+                                    ),
+                                  ],
+                                  if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
+                                    const SizedBox(width: 14),
+                                    TvFocusableCard(
+                                      focusNode: _channelsButtonFocusNode,
+                                      onTap: () {
+                                        setState(() {
+                                          _showStreamSelector = !_showStreamSelector;
+                                        });
+                                        _startHideControlsTimer();
+                                      },
+                                      scale: 1.08,
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: _showStreamSelector
+                                              ? const Color(0xFF0284C7)
+                                              : Colors.white.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(
+                                            color: _showStreamSelector ? const Color(0xFF38BDF8) : Colors.white24,
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.dns_rounded, color: Colors.white, size: 15),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _getActiveChannelTitleShort(),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1527,6 +1680,140 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
               ),
+
+              // 5.5 VERTICAL STREAM SELECTOR PANEL
+              if (_showStreamSelector && widget.availableChannels != null && widget.availableChannels!.length > 1)
+                Positioned(
+                  bottom: 96,
+                  right: 28,
+                  child: MouseRegion(
+                    onEnter: (_) {
+                      _isHoveringControls = true;
+                      _hideControlsTimer?.cancel();
+                    },
+                    onExit: (_) {
+                      _isHoveringControls = false;
+                      _startHideControlsTimer();
+                    },
+                    child: Container(
+                      width: 380,
+                      constraints: const BoxConstraints(maxHeight: 280),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withOpacity(0.96),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.8),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(Icons.dns_rounded, color: Color(0xFF38BDF8), size: 18),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'DANH SÁCH LUỒNG PHÁT',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _showStreamSelector = false;
+                                  });
+                                  _startHideControlsTimer();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Flexible(
+                            child: ListView.separated(
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              itemCount: widget.availableChannels!.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 6),
+                              itemBuilder: (context, index) {
+                                final ch = widget.availableChannels![index];
+                                final bool isSelected = ch.url == _currentStreamUrl;
+                                return TvFocusableCard(
+                                  autoFocus: isSelected,
+                                  onTap: () {
+                                    _switchChannel(ch);
+                                    _startHideControlsTimer(); // restart 5s idle timer
+                                    // Bảng không đóng ngay để người dùng test luồng mới
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? const Color(0xFF0284C7).withOpacity(0.4)
+                                          : Colors.white.withOpacity(0.06),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFF38BDF8) : Colors.white12,
+                                        width: isSelected ? 1.5 : 0.8,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isSelected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white38,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            ch.title,
+                                            style: TextStyle(
+                                              color: isSelected ? Colors.white : Colors.white70,
+                                              fontSize: 12,
+                                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
               // 6. NEXT EPISODE COUNTDOWN OVERLAY
               if (_nextCountdownSeconds > 0)

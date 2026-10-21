@@ -1,10 +1,10 @@
 {
-  "version": "2.1.3",
-  "build": 59,
-  "tag_name": "v2.1.3",
-  "changelog": "• VolPi Media v2.1.3 - Tối Ưu Hóa Trình Phát Video Cho macOS & Desktop:\n- Quơ chuột hiện thanh điều khiển & thanh seek tua video: Chỉ cần di chuyển/rê chuột là thanh seek và các nút điều khiển xuất hiện tức thì, không cần phải click vào màn hình như trước.\n- Giữ thanh điều khiển khi rê chuột trên thanh seek/nút bấm: Tự động khóa không ẩn điều khiển khi chuột đang đặt trên thanh tiến trình hoặc các nút bấm, giúp thao tác tua video chuẩn xác.\n- Tự động ẩn con trỏ chuột và thanh điều khiển sau 4 giây không thao tác khi đang xem video.\n- Kéo thả & click thanh tua mượt mà: Cập nhật mốc thời gian thời gian thực khi rê chuột và tua chính xác khi nhả chuột.",
+  "version": "2.1.4",
+  "build": 60,
+  "tag_name": "v2.1.4",
+  "changelog": "• VolPi Media v2.1.4 - Nâng Cấp Danh Sách Luồng, Điều Khiển TV Remote & Xác Nhận Thoát:\n- Danh sách luồng phát gọn gàng: Gom toàn bộ các server vào 1 nút 'Chọn Luồng' bên dưới điều khiển; click vào mở danh sách dạng thẻ dọc không che thanh seek; tự do đổi server mà không bị tắt bảng ngay; tự tắt sau 5s hoặc khi click ra màn hình.\n- Điều hướng D-Pad TV Remote mượt mà: Bấm phím mũi tên trái/phải di chuyển linh hoạt giữa các nút điều khiển (Next, Previous, Tua 10s, Skip Intro, Chọn Luồng); bấm mũi tên Lên để focus thanh seek và tua video.\n- Bảng xác nhận khi bấm Back thoát app trên Android TV: Không thoát app đột ngột, hiển thị hộp thoại xác nhận với nút focus mặc định vào 'Ở lại' để tránh thao tác nhầm.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-21T17:15:00Z"
+  "published_at": "2026-10-21T17:25:00Z"
 }

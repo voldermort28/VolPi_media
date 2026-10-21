@@ -11,6 +11,7 @@ import '../services/update_service.dart';
 import '../widgets/profile_button.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../widgets/update_dialog.dart';
+import '../widgets/exit_confirm_dialog.dart';
 import 'netflix_layout.dart';
 
 class AdaptiveLayout extends StatefulWidget {
@@ -93,19 +94,26 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
       return NetflixLayout(apiService: widget.apiService);
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final bool isLargeScreen = constraints.maxWidth >= 900;
-        final bool isMediumScreen = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
-
-        // If iPad / Tablet in landscape: use Left Sidebar (NavigationRail)
-        if (isLargeScreen || isMediumScreen) {
-          return _buildTabletLayout();
-        }
-
-        // Else Phone / Portrait: use BottomNavigationBar + Top Header
-        return _buildPhoneLayout();
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        ExitConfirmDialog.show(context);
       },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final bool isLargeScreen = constraints.maxWidth >= 900;
+          final bool isMediumScreen = constraints.maxWidth >= 600 && constraints.maxWidth < 900;
+
+          // If iPad / Tablet in landscape: use Left Sidebar (NavigationRail)
+          if (isLargeScreen || isMediumScreen) {
+            return _buildTabletLayout();
+          }
+
+          // Else Phone / Portrait: use BottomNavigationBar + Top Header
+          return _buildPhoneLayout();
+        },
+      ),
     );
   }
 
