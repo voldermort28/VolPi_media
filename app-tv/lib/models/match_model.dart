@@ -131,17 +131,39 @@ class MatchModel {
         allText.contains('việt nam') ||
         allText.contains('viet nam') ||
         allText.contains('vietnam') ||
+        allText.contains('đt việt nam') ||
+        allText.contains('đội tuyển việt nam') ||
+        allText.contains('tuyển việt nam') ||
         allText.contains('u23 việt nam') ||
         allText.contains('u22 việt nam') ||
-        allText.contains('u19 việt nam') ||
         allText.contains('u21 việt nam') ||
-        allText.contains('đt việt nam') ||
+        allText.contains('u20 việt nam') ||
+        allText.contains('u19 việt nam') ||
+        allText.contains('u17 việt nam') ||
+        allText.contains('u16 việt nam') ||
+        allText.contains('nữ việt nam') ||
+        allText.contains('futsal việt nam') ||
         allText.contains('v-league') ||
         allText.contains('vleague') ||
         allText.contains('v.league') ||
+        allText.contains('v league') ||
         allText.contains('cúp quốc gia') ||
+        allText.contains('cúp qg việt nam') ||
+        allText.contains('siêu cúp quốc gia') ||
         allText.contains('hạng nhất quốc gia') ||
+        allText.contains('hạng nhì quốc gia') ||
+        allText.contains('aff cup') ||
+        allText.contains('aff suzuki') ||
+        allText.contains('mitsubishi electric') ||
+        allText.contains('asean cup') ||
+        allText.contains('asean championship') ||
+        allText.contains('shopee cup') ||
+        allText.contains('asean club') ||
+        (allText.contains('world cup') && allText.contains('việt nam')) ||
+        (allText.contains('asian cup') && allText.contains('việt nam')) ||
+        (allText.contains('sea games') && allText.contains('việt nam')) ||
         allText.contains('nam định') ||
+        allText.contains('thép xanh nam định') ||
         allText.contains('hà nội fc') ||
         allText.contains('clb hà nội') ||
         allText.contains('công an hà nội') ||
@@ -153,16 +175,30 @@ class MatchModel {
         allText.contains('sông lam nghệ an') ||
         allText.contains('slna') ||
         allText.contains('thanh hóa') ||
+        allText.contains('đông á thanh hóa') ||
         allText.contains('bình định') ||
+        allText.contains('quy nhơn bình định') ||
         allText.contains('hải phòng') ||
         allText.contains('bình dương') ||
         allText.contains('becamex') ||
         allText.contains('tp.hồ chí minh') ||
         allText.contains('tp hcm') ||
+        allText.contains('tphcm') ||
         allText.contains('đà nẵng') ||
+        allText.contains('shb đà nẵng') ||
         allText.contains('quảng nam') ||
         allText.contains('hà tĩnh') ||
+        allText.contains('hồng lĩnh hà tĩnh') ||
         allText.contains('khánh hòa') ||
+        allText.contains('bình phước') ||
+        allText.contains('trường tươi') ||
+        allText.contains('ninh bình') ||
+        allText.contains('phù đổng') ||
+        allText.contains('long an') ||
+        allText.contains('bà rịa vũng tàu') ||
+        allText.contains('đồng tháp') ||
+        allText.contains('hòa bình') ||
+        allText.contains('huế') ||
         allText.contains('pvf');
 
     // Separate team names from league & description to avoid league names (e.g. Hạng 2 Argentina)
@@ -307,18 +343,40 @@ class MatchModel {
       }
     }
 
-    final bool isPlOrC1 = !esportsDetected && !isLowerOrWomenLeague && (
+    final bool isOtherConfederation = leagueLower.contains('caf') ||
+        leagueLower.contains('africa') ||
+        leagueLower.contains('châu phi') ||
+        leagueLower.contains('concacaf') ||
+        leagueLower.contains('bắc mỹ') ||
+        leagueLower.contains('afc') ||
+        leagueLower.contains('châu á') ||
+        leagueLower.contains('ofc') ||
+        (leagueLower.contains('women') && !isVn) ||
+        (leagueLower.contains('nữ') && !isVn);
+
+    final bool isUefaC1 = !isOtherConfederation && (
+        leagueLower.contains('uefa champions') ||
+        leagueLower.contains('cúp c1') ||
+        leagueLower.contains('c1 châu âu') ||
+        leagueLower.contains('ucl') ||
+        (leagueLower.contains('champions league') && !isOtherConfederation) ||
+        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(leagueLower)
+    );
+
+    final bool isEnglishPl = (
         allText.contains('premier league') ||
         allText.contains('ngoại hạng anh') ||
         allText.contains('epl') ||
-        allText.contains('english premier league') ||
-        allText.contains('champions league') ||
-        allText.contains('cúp c1') ||
-        allText.contains('c1 châu âu') ||
-        allText.contains('uefa champions') ||
-        allText.contains('ucl') ||
-        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(leagueLower)
-    );
+        allText.contains('english premier league')
+    ) && ![
+      'kuwait', 'ai cập', 'egypt', 'belarus', 'nga', 'russia',
+      'scotland', 'israel', 'ukraine', 'ireland', 'wales', 'canada',
+      'úc', 'australia', 'kazakhstan', 'singapore', 'thái', 'thai',
+      'indo', 'ấn độ', 'india', 'nam phi', 'hàn quốc', 'korea', 'qatar',
+      'uae', 'saudi', 'iraq', 'armenia', 'georgia', 'azerbaijan'
+    ].any((c) => leagueLower.contains(c));
+
+    final bool isPlOrC1 = !esportsDetected && !isLowerOrWomenLeague && (isEnglishPl || isUefaC1);
 
     final bool isHotFromScraper = json['isHot'] == true ||
         (json['priority'] is Map && (json['priority']['level'] == 1 || json['priority']['level'] == 2));
@@ -448,22 +506,41 @@ class MatchModel {
 
   /// Returns true if this match belongs to Premier League (Ngoại Hạng Anh) or UEFA Champions League (Cúp C1)
   bool get isPremierLeagueOrC1 {
-    final t = '$league $title $description $homeTeam $awayTeam'.toLowerCase();
-    if (t.contains('premier league') ||
-        t.contains('ngoại hạng anh') ||
-        t.contains('epl') ||
-        t.contains('english premier league')) {
-      return true;
-    }
-    if (t.contains('champions league') ||
-        t.contains('cúp c1') ||
-        t.contains('c1 châu âu') ||
-        t.contains('uefa champions') ||
-        t.contains('ucl') ||
-        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(league.toLowerCase())) {
-      return true;
-    }
-    return false;
+    final l = league.toLowerCase();
+    final bool isOtherConfederation = l.contains('caf') ||
+        l.contains('africa') ||
+        l.contains('châu phi') ||
+        l.contains('concacaf') ||
+        l.contains('bắc mỹ') ||
+        l.contains('afc') ||
+        l.contains('châu á') ||
+        l.contains('ofc') ||
+        (l.contains('women') && !isVietnam) ||
+        (l.contains('nữ') && !isVietnam);
+
+    final bool isUefaC1 = !isOtherConfederation && (
+        l.contains('uefa champions') ||
+        l.contains('cúp c1') ||
+        l.contains('c1 châu âu') ||
+        l.contains('ucl') ||
+        (l.contains('champions league') && !isOtherConfederation) ||
+        RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(l)
+    );
+
+    final bool isEnglishPl = (
+        l.contains('premier league') ||
+        l.contains('ngoại hạng anh') ||
+        l.contains('epl') ||
+        l.contains('english premier league')
+    ) && ![
+      'kuwait', 'ai cập', 'egypt', 'belarus', 'nga', 'russia',
+      'scotland', 'israel', 'ukraine', 'ireland', 'wales', 'canada',
+      'úc', 'australia', 'kazakhstan', 'singapore', 'thái', 'thai',
+      'indo', 'ấn độ', 'india', 'nam phi', 'hàn quốc', 'korea', 'qatar',
+      'uae', 'saudi', 'iraq', 'armenia', 'georgia', 'azerbaijan'
+    ].any((c) => l.contains(c));
+
+    return isEnglishPl || isUefaC1;
   }
 }
 

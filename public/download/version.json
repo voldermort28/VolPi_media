@@ -1,10 +1,10 @@
 {
-  "version": "2.1.5",
-  "build": 61,
-  "tag_name": "v2.1.5",
-  "changelog": "• VolPi Media v2.1.5 - Tối Ưu Hóa Trải Nghiệm Remote TV (D-Pad & Phím Điều Khiển):\n- Chống kẹt phím ẩn (ExcludeFocus): Loại bỏ hoàn toàn lỗi phím remote bị kẹt vào các nút điều khiển ẩn khi thanh điều khiển mờ đi.\n- Điều hướng phân tầng TV Remote mượt mà: Bấm Mũi Tên Lên từ hàng nút chuyển lên thanh Seek; từ thanh Seek bấm Lên chuyển lên nút Back; bấm Mũi Tên Xuống từ hàng nút điều khiển sẽ ẩn ngay thanh điều khiển (chuẩn Netflix/YouTube).\n- Danh sách luồng thông minh trên TV: Khi mở 'Chọn Luồng', remote TV tự động focus vào luồng đang phát; bấm Lên/Xuống cuộn chọn server; bấm Trái hoặc Back để đóng bảng và quay về nút Chọn Luồng.\n- Xử lý phím Back Remote TV: Bấm Back khi mở danh sách luồng -> chỉ đóng danh sách luồng; bấm Back khi hiện thanh điều khiển -> chỉ ẩn thanh điều khiển; bấm Back khi đang xem toàn màn hình -> quay về màn hình trước.",
+  "version": "2.1.6",
+  "build": 62,
+  "tag_name": "v2.1.6",
+  "changelog": "• VolPi Media v2.1.6 - Chuẩn Hóa Lọc Cúp C1, Ưu Tiên Tâm Điểm Manchester United & Thêm Danh Mục Bóng Đá Việt Nam:\n- Chuẩn hóa Cúp C1 Châu Âu (UEFA Champions League): Loại bỏ triệt để các giải C1 Châu Phi (CAF) hoặc Bắc Mỹ lọt vào tab Cúp C1.\n- Thuật toán xếp hạng Tâm Điểm & Hero Banner chuẩn xác: Ưu tiên tuyệt đối ĐT Việt Nam & Manchester United lên vị trí Top 1 Tâm Điểm; không bao giờ để các đội vô danh của giải lạ chiếm sóng Hero Banner; bổ sung hiệu ứng Slide Carousel tự động xoay tua các trận tâm điểm.\n- Thêm Category 'Bóng Đá Việt Nam & V-League' ngay trên Trang Chủ: Tự động gom toàn bộ các trận V-League 1 & 2, Cúp Quốc Gia, C1/C2 Châu Á và ĐT Việt Nam (AFF Cup, Vòng loại World Cup, Asian Cup) thành một hàng riêng biệt trang trọng trên trang Home.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-21T17:45:00Z"
+  "published_at": "2026-10-21T17:55:00Z"
 }

@@ -86,13 +86,28 @@ class FootballScreenState extends State<FootballScreen> {
       return false;
     }
     if (filterId == 'c1') {
-      return (leagueLower.contains('champions league') ||
-              leagueLower.contains('cúp c1') ||
-              leagueLower.contains('uefa champions')) &&
-          !leagueLower.contains('afc') &&
-          !leagueLower.contains('châu á') &&
-          !leagueLower.contains('nữ') &&
-          !leagueLower.contains('women');
+      final bool isOtherConfederation = leagueLower.contains('caf') ||
+          leagueLower.contains('africa') ||
+          leagueLower.contains('châu phi') ||
+          leagueLower.contains('concacaf') ||
+          leagueLower.contains('bắc mỹ') ||
+          leagueLower.contains('afc') ||
+          leagueLower.contains('châu á') ||
+          leagueLower.contains('ofc') ||
+          leagueLower.contains('nữ') ||
+          leagueLower.contains('women') ||
+          leagueLower.contains('u19') ||
+          leagueLower.contains('u21') ||
+          leagueLower.contains('youth');
+
+      if (isOtherConfederation) return false;
+
+      return leagueLower.contains('uefa champions') ||
+          leagueLower.contains('cúp c1') ||
+          leagueLower.contains('c1 châu âu') ||
+          leagueLower.contains('ucl') ||
+          leagueLower.contains('champions league') ||
+          RegExp(r'(^|[\s\[(])c1([\s\])]|$)').hasMatch(leagueLower);
     }
     if (filterId == 'laliga') {
       return (leagueLower.contains('la liga') ||
