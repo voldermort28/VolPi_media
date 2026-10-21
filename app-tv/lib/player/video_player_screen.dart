@@ -113,12 +113,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _backButtonFocusNode = FocusNode();
   final List<FocusNode> _channelFocusNodes = [];
 
+  List<StreamChannel> get _effectiveChannels {
+    if (widget.availableChannels != null && widget.availableChannels!.isNotEmpty) {
+      return widget.availableChannels!;
+    }
+    return [
+      StreamChannel(
+        name: 'Server 1',
+        title: widget.subtitle?.isNotEmpty == true ? widget.subtitle! : 'Full HD (Mặc định)',
+        url: _currentStreamUrl.isNotEmpty ? _currentStreamUrl : widget.streamUrl,
+        headers: widget.headers ?? {},
+      ),
+    ];
+  }
+
   void _initChannelFocusNodes() {
     for (final node in _channelFocusNodes) {
       node.dispose();
     }
     _channelFocusNodes.clear();
-    final count = widget.availableChannels?.length ?? 0;
+    final count = _effectiveChannels.length;
     for (int i = 0; i < count; i++) {
       _channelFocusNodes.add(FocusNode());
     }
@@ -126,7 +140,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _focusActiveChannel() {
     if (!mounted || !_showStreamSelector || _channelFocusNodes.isEmpty) return;
-    int activeIdx = widget.availableChannels?.indexWhere((c) => c.url == _currentStreamUrl) ?? 0;
+    int activeIdx = _effectiveChannels.indexWhere((c) => c.url == _currentStreamUrl);
     if (activeIdx < 0 || activeIdx >= _channelFocusNodes.length) activeIdx = 0;
     if (activeIdx < _channelFocusNodes.length) {
       _channelFocusNodes[activeIdx].requestFocus();
@@ -410,8 +424,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _switchChannelDelta(int delta) {
-    final channels = widget.availableChannels;
-    if (channels == null || channels.isEmpty) return;
+    final channels = _effectiveChannels;
+    if (channels.length <= 1) return;
     int currentIndex = channels.indexWhere((c) => c.url == _currentStreamUrl);
     if (currentIndex == -1) currentIndex = 0;
 
@@ -523,12 +537,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   String _getActiveChannelTitleShort() {
-    if (widget.availableChannels == null || widget.availableChannels!.isEmpty) {
+    final channels = _effectiveChannels;
+    if (channels.isEmpty) {
       return 'Chọn Luồng';
     }
-    final current = widget.availableChannels!.firstWhere(
+    final current = channels.firstWhere(
       (c) => c.url == _currentStreamUrl,
-      orElse: () => widget.availableChannels!.first,
+      orElse: () => channels.first,
     );
     final title = current.title;
     final match = RegExp(r'(Server\s*#?\d+|Luồng\s*#?\d+|TM\s*#?\d+|R2|CDN|Thuyết Minh|Lồng Tiếng|Phụ Đề)', caseSensitive: false).firstMatch(title);
@@ -1084,7 +1099,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                           textAlign: TextAlign.center,
                         ),
-                        if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
+                        if (_effectiveChannels.length > 1) ...[
                           const SizedBox(height: 16),
                           const Text(
                             'Chọn luồng phát khác để xem:',
@@ -1095,7 +1110,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             alignment: WrapAlignment.center,
-                            children: widget.availableChannels!.map((ch) {
+                            children: _effectiveChannels.map((ch) {
                               final bool isCurrent = ch.url == _currentStreamUrl;
                               return TvFocusableCard(
                                 onTap: () => _switchChannel(ch),
@@ -1703,7 +1718,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       ),
                                     ),
                                   ],
-                                  if (widget.availableChannels != null && widget.availableChannels!.length > 1) ...[
+                                  if (_effectiveChannels.isNotEmpty) ...[
                                     const SizedBox(width: 14),
                                     TvFocusableCard(
                                       focusNode: _channelsButtonFocusNode,
@@ -1767,7 +1782,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ),
 
               // 5.5 VERTICAL STREAM SELECTOR PANEL
-              if (_showStreamSelector && widget.availableChannels != null && widget.availableChannels!.length > 1)
+              if (_showStreamSelector && _effectiveChannels.isNotEmpty)
                 Positioned(
                   bottom: 96,
                   right: 28,
@@ -1842,10 +1857,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             child: ListView.separated(
                               shrinkWrap: true,
                               padding: EdgeInsets.zero,
-                              itemCount: widget.availableChannels!.length,
+                              itemCount: _effectiveChannels.length,
                               separatorBuilder: (_, __) => const SizedBox(height: 6),
                               itemBuilder: (context, index) {
-                                final ch = widget.availableChannels![index];
+                                final ch = _effectiveChannels[index];
                                 final bool isSelected = ch.url == _currentStreamUrl;
                                 final node = index < _channelFocusNodes.length ? _channelFocusNodes[index] : null;
                                 return Focus(

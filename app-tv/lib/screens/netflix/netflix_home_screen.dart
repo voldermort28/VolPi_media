@@ -245,6 +245,13 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             mediaPoster: item.poster,
             episode: item.episode,
             season: item.season,
+            availableChannels: [
+              StreamChannel(
+                name: 'Server 1',
+                title: 'Tập ${item.episode}',
+                url: item.streamUrl,
+              ),
+            ],
             initialPosition: startPos,
             isLive: false,
           ),
@@ -263,7 +270,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             CircularProgressIndicator(color: Color(0xFFE50914)),
             SizedBox(height: 14),
             Text(
-              'Đang tải Netflix Cinema...',
+              'Loading...',
               style: TextStyle(color: Colors.white70, fontSize: 13),
             ),
           ],
@@ -377,6 +384,74 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                 return _buildBillboard(featuredMatches[idx]);
               },
             ),
+
+            // Left Arrow (Hover / Mouse navigation)
+            if (featuredMatches.length > 1)
+              Positioned(
+                left: 16,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: _isBannerInteracting ? 1.0 : 0.0,
+                    child: IgnorePointer(
+                      ignoring: !_isBannerInteracting,
+                      child: IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black.withOpacity(0.55),
+                          foregroundColor: Colors.white,
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                        onPressed: () {
+                          final prevIndex = (_currentBannerIndex - 1 + featuredMatches.length) % featuredMatches.length;
+                          _bannerPageController.animateToPage(
+                            prevIndex,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Right Arrow (Hover / Mouse navigation)
+            if (featuredMatches.length > 1)
+              Positioned(
+                right: 16,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: _isBannerInteracting ? 1.0 : 0.0,
+                    child: IgnorePointer(
+                      ignoring: !_isBannerInteracting,
+                      child: IconButton(
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black.withOpacity(0.55),
+                          foregroundColor: Colors.white,
+                          shape: const CircleBorder(),
+                          padding: const EdgeInsets.all(12),
+                        ),
+                        icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
+                        onPressed: () {
+                          final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
+                          _bannerPageController.animateToPage(
+                            nextIndex,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOutCubic,
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
 
             // Dots Indicator (Góc dưới bên phải)
             Positioned(
@@ -577,7 +652,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 8),
+                // Aesthetic Dual Team Logos + VS Badge
+                _buildBillboardTeamLogos(match),
 
                 // Match Title
                 Text(
@@ -691,6 +767,83 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBillboardTeamLogos(MatchModel match) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10, bottom: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildHeroLogoItem(match.homeLogo, match.homeTeam),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE50914), Color(0xFF991B1B)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFE50914).withOpacity(0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Text(
+              'VS',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 10,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+          _buildHeroLogoItem(match.awayLogo, match.awayTeam),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeroLogoItem(String logoUrl, String teamName) {
+    const double size = 36;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF1E293B).withOpacity(0.9),
+        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(4),
+      child: logoUrl.isNotEmpty
+          ? ClipOval(
+              child: CachedNetworkImage(
+                imageUrl: logoUrl,
+                fit: BoxFit.contain,
+                memCacheWidth: 80,
+                memCacheHeight: 80,
+                errorWidget: (_, __, ___) => const Center(
+                  child: Icon(Icons.shield_rounded, size: 18, color: Colors.white54),
+                ),
+              ),
+            )
+          : const Center(
+              child: Icon(Icons.shield_rounded, size: 18, color: Colors.white54),
+            ),
     );
   }
 

@@ -38,8 +38,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
   bool _isRefreshingHeader = false;
 
-  // TV Remote navigation FocusNodes for sidebar (5 tabs + V1 switch + Profile = 7)
-  final List<FocusNode> _sidebarFocusNodes = List.generate(7, (_) => FocusNode());
+  // TV Remote navigation FocusNodes for sidebar (5 tabs + Refresh + Update + V1 switch + Profile = 9)
+  final List<FocusNode> _sidebarFocusNodes = List.generate(9, (_) => FocusNode());
   final FocusScopeNode _contentFocusScopeNode = FocusScopeNode();
 
   @override
@@ -253,6 +253,9 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                       child: NetflixSidebar(
                         selectedIndex: _currentTabIndex,
                         focusNodes: _sidebarFocusNodes,
+                        isRefreshing: _isRefreshingHeader,
+                        onRefresh: _refreshActiveTab,
+                        onCheckUpdate: () => _checkOtaUpdate(silent: false),
                         onMoveToContent: () {
                           _contentFocusScopeNode.requestFocus();
                         },
@@ -557,7 +560,77 @@ class _NetflixLayoutState extends State<NetflixLayout> {
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
-                  // Switch to V1
+                  // 1. Làm mới dữ liệu
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _refreshActiveTab();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                      ),
+                      child: Row(
+                        children: [
+                          _isRefreshingHeader
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                                )
+                              : const Icon(Icons.refresh_rounded, size: 18, color: Color(0xFF38BDF8)),
+                          const SizedBox(width: 10),
+                          const Expanded(
+                            child: Text(
+                              'Làm mới dữ liệu',
+                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // 2. Cập nhật ứng dụng
+                  InkWell(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      _checkOtaUpdate(silent: false);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      height: 42,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.system_update_rounded, size: 18, color: Color(0xFF38BDF8)),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Cập nhật ứng dụng',
+                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  // 3. Switch to V1
                   InkWell(
                     onTap: () {
                       Navigator.of(context).pop();

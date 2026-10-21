@@ -1,10 +1,10 @@
 {
-  "version": "2.1.6",
-  "build": 62,
-  "tag_name": "v2.1.6",
-  "changelog": "• VolPi Media v2.1.6 - Chuẩn Hóa Lọc Cúp C1, Ưu Tiên Tâm Điểm Manchester United & Thêm Danh Mục Bóng Đá Việt Nam:\n- Chuẩn hóa Cúp C1 Châu Âu (UEFA Champions League): Loại bỏ triệt để các giải C1 Châu Phi (CAF) hoặc Bắc Mỹ lọt vào tab Cúp C1.\n- Thuật toán xếp hạng Tâm Điểm & Hero Banner chuẩn xác: Ưu tiên tuyệt đối ĐT Việt Nam & Manchester United lên vị trí Top 1 Tâm Điểm; không bao giờ để các đội vô danh của giải lạ chiếm sóng Hero Banner; bổ sung hiệu ứng Slide Carousel tự động xoay tua các trận tâm điểm.\n- Thêm Category 'Bóng Đá Việt Nam & V-League' ngay trên Trang Chủ: Tự động gom toàn bộ các trận V-League 1 & 2, Cúp Quốc Gia, C1/C2 Châu Á và ĐT Việt Nam (AFF Cup, Vòng loại World Cup, Asian Cup) thành một hàng riêng biệt trang trọng trên trang Home.",
+  "version": "2.1.7",
+  "build": 63,
+  "tag_name": "v2.1.7",
+  "changelog": "• VolPi Media v2.1.7 - Nâng Cấp Hero Banner, Nút Cập Nhật & Làm Mới, Tối Ưu Stream Selector & Nhớ Cửa Sổ macOS:\n- Bổ sung nút 'Cập nhật ứng dụng' và 'Làm mới dữ liệu' dễ tiếp cận trên Sidebar và Drawer của giao diện Netflix cũng như thanh điều hướng V1.\n- Chuẩn hóa chữ thông báo khởi động thành 'Loading...'.\n- Hero Banner Trang Chủ: Hiển thị logo 2 đội bóng cạnh nhau với huy hiệu 'VS' phát sáng thẩm mỹ; bổ sung nút mũi tên trái/phải điều hướng slide trận đấu tâm điểm.\n- Trình phát Video: Đảm bảo nút 'Chọn Luồng' (Stream Selector) luôn hiển thị đầy đủ cho các trận đấu từ Hero Banner, Anime và Phim riêng tư.\n- macOS: Tự động ghi nhớ kích thước và vị trí cửa sổ người dùng tùy chỉnh từ lần sử dụng trước.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-21T17:55:00Z"
+  "published_at": "2026-10-22T01:25:00Z"
 }

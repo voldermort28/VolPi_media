@@ -7,6 +7,9 @@ class NetflixSidebar extends StatefulWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback onSwitchToOldUI;
   final VoidCallback onProfilePressed;
+  final VoidCallback? onRefresh;
+  final VoidCallback? onCheckUpdate;
+  final bool isRefreshing;
   final List<FocusNode>? focusNodes;
   final VoidCallback? onMoveToContent;
 
@@ -16,6 +19,9 @@ class NetflixSidebar extends StatefulWidget {
     required this.onTabSelected,
     required this.onSwitchToOldUI,
     required this.onProfilePressed,
+    this.onRefresh,
+    this.onCheckUpdate,
+    this.isRefreshing = false,
     this.focusNodes,
     this.onMoveToContent,
   });
@@ -58,14 +64,22 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         widget.focusNodes?[index + 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 4) {
-        // Move from IPTV (index 4) directly down to V1 Switch (index 5)
+        // Move from IPTV (4) to Làm mới (5)
         widget.focusNodes?[5].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 5) {
-        // Move from V1 Switch (index 5) down to Profile (index 6)
+        // Move from Làm mới (5) to Cập nhật (6)
         widget.focusNodes?[6].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 6) {
+        // Move from Cập nhật (6) to V1 Switch (7)
+        widget.focusNodes?[7].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 7) {
+        // Move from V1 Switch (7) to Profile (8)
+        widget.focusNodes?[8].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index >= 8) {
         // Reached bottom of sidebar
         return KeyEventResult.handled;
       }
@@ -77,12 +91,20 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         // Reached top of sidebar
         return KeyEventResult.handled;
       } else if (index == 5) {
-        // Move from V1 Switch (index 5) up to IPTV (index 4)
+        // Move from Làm mới (5) up to IPTV (4)
         widget.focusNodes?[4].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 6) {
-        // Move from Profile (index 6) up to V1 Switch (index 5)
+        // Move from Cập nhật (6) up to Làm mới (5)
         widget.focusNodes?[5].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 7) {
+        // Move from V1 Switch (7) up to Cập nhật (6)
+        widget.focusNodes?[6].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 8) {
+        // Move from Profile (8) up to V1 Switch (7)
+        widget.focusNodes?[7].requestFocus();
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -268,24 +290,135 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
 
                 const Divider(color: Color(0xFF262626), height: 1, thickness: 1),
 
-                // 3. Bottom Actions: Switch back to V1 & Profile
+                // 3. Bottom Actions: Refresh, Update, Switch to V1, Profile
                 Padding(
                   padding: const EdgeInsets.all(10),
                   child: Column(
                     children: [
-                      // Switch back to V1
+                      // 1. Làm mới dữ liệu
                       Focus(
                         onKeyEvent: (node, event) => _handleSidebarItemKey(5, event),
                         child: TvFocusableCard(
                           focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 5)
                               ? widget.focusNodes![5]
                               : null,
+                          onTap: widget.onRefresh,
+                          borderRadius: BorderRadius.circular(8),
+                          focusBorderColor: const Color(0xFF38BDF8),
+                          scale: 1.02,
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFF38BDF8).withOpacity(0.35),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                widget.isRefreshing
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Color(0xFF38BDF8),
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 18,
+                                        color: Color(0xFF38BDF8),
+                                      ),
+                                if (_isExpanded) ...[
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      'Làm mới dữ liệu',
+                                      style: TextStyle(
+                                        color: Color(0xFF38BDF8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // 2. Cập nhật ứng dụng
+                      Focus(
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(6, event),
+                        child: TvFocusableCard(
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 6)
+                              ? widget.focusNodes![6]
+                              : null,
+                          onTap: widget.onCheckUpdate,
+                          borderRadius: BorderRadius.circular(8),
+                          focusBorderColor: const Color(0xFF38BDF8),
+                          scale: 1.02,
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0F172A),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFF38BDF8).withOpacity(0.35),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.system_update_rounded,
+                                  size: 18,
+                                  color: Color(0xFF38BDF8),
+                                ),
+                                if (_isExpanded) ...[
+                                  const SizedBox(width: 10),
+                                  const Expanded(
+                                    child: Text(
+                                      'Cập nhật ứng dụng',
+                                      style: TextStyle(
+                                        color: Color(0xFF38BDF8),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 6),
+
+                      // 3. Switch back to V1
+                      Focus(
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(7, event),
+                        child: TvFocusableCard(
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 7)
+                              ? widget.focusNodes![7]
+                              : null,
                           onTap: widget.onSwitchToOldUI,
                           borderRadius: BorderRadius.circular(8),
                           focusBorderColor: const Color(0xFF38BDF8),
                           scale: 1.02,
                           child: Container(
-                            height: 40,
+                            height: 38,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             decoration: BoxDecoration(
                               color: const Color(0xFF1E293B),
@@ -322,21 +455,21 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                         ),
                       ),
 
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
 
-                      // Profile / Secret
+                      // 4. Profile / Secret
                       Focus(
-                        onKeyEvent: (node, event) => _handleSidebarItemKey(6, event),
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(8, event),
                         child: TvFocusableCard(
-                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 6)
-                              ? widget.focusNodes![6]
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 8)
+                              ? widget.focusNodes![8]
                               : null,
                           onTap: widget.onProfilePressed,
                           borderRadius: BorderRadius.circular(8),
                           focusBorderColor: Colors.white,
                           scale: 1.02,
                           child: Container(
-                            height: 40,
+                            height: 38,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             decoration: BoxDecoration(
                               color: const Color(0xFF171717),

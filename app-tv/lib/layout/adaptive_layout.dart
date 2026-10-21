@@ -26,6 +26,13 @@ class AdaptiveLayout extends StatefulWidget {
 class _AdaptiveLayoutState extends State<AdaptiveLayout> {
   int _currentTabIndex = 0; // 0: Football, 1: Anime
 
+  final GlobalKey<FootballScreenState> _xoilacKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<FootballScreenState> _socoliveKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<AnimeScreenState> _animeKey = GlobalKey<AnimeScreenState>();
+  final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
+
+  bool _isRefreshing = false;
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +78,50 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
             backgroundColor: Colors.redAccent,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _refreshActiveTab() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      switch (_currentTabIndex) {
+        case 0:
+          await _xoilacKey.currentState?.reloadMatches();
+          break;
+        case 1:
+          await _socoliveKey.currentState?.reloadMatches();
+          break;
+        case 2:
+          await _animeKey.currentState?.refresh();
+          break;
+        case 3:
+          await _iptvKey.currentState?.refresh();
+          break;
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã cập nhật dữ liệu mới nhất!'),
+            backgroundColor: Color(0xFF0284C7),
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi cập nhật: $e'),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(milliseconds: 2000),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
       }
     }
   }
@@ -207,6 +258,41 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
 
                   const SizedBox(width: 12),
 
+                  // Làm Mới Button
+                  SizedBox(
+                    height: 38,
+                    child: TvFocusableCard(
+                      onTap: _refreshActiveTab,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        color: const Color(0xFF1E293B),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _isRefreshing
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Color(0xFF38BDF8),
+                                    ),
+                                  )
+                                : const Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 16),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Làm mới',
+                              style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
                   // OTA Update Check Button
                   SizedBox(
                     height: 38,
@@ -247,6 +333,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   ExcludeFocus(
                     excluding: _currentTabIndex != 0,
                     child: FootballScreen(
+                      key: _xoilacKey,
                       apiService: widget.apiService,
                       source: 'xoilac',
                       title: 'Xôi Lạc TV',
@@ -256,6 +343,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   ExcludeFocus(
                     excluding: _currentTabIndex != 1,
                     child: FootballScreen(
+                      key: _socoliveKey,
                       apiService: widget.apiService,
                       source: 'socolive',
                       title: 'Socolive TV',
@@ -264,11 +352,15 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 2,
-                    child: AnimeScreen(apiService: widget.apiService),
+                    child: AnimeScreen(
+                      key: _animeKey,
+                      apiService: widget.apiService,
+                    ),
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 3,
                     child: IptvScreen(
+                      key: _iptvKey,
                       apiService: widget.apiService,
                       isActive: _currentTabIndex == 3,
                     ),
@@ -358,6 +450,17 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
             },
           ),
           IconButton(
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+                  )
+                : const Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 20),
+            tooltip: 'Làm mới',
+            onPressed: _refreshActiveTab,
+          ),
+          IconButton(
             icon: const Icon(Icons.system_update_rounded, color: Color(0xFF38BDF8), size: 20),
             tooltip: 'Kiểm tra cập nhật',
             onPressed: () => _checkOtaUpdate(silent: false),
@@ -374,6 +477,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ExcludeFocus(
             excluding: _currentTabIndex != 0,
             child: FootballScreen(
+              key: _xoilacKey,
               apiService: widget.apiService,
               source: 'xoilac',
               title: 'Xôi Lạc TV',
@@ -383,6 +487,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ExcludeFocus(
             excluding: _currentTabIndex != 1,
             child: FootballScreen(
+              key: _socoliveKey,
               apiService: widget.apiService,
               source: 'socolive',
               title: 'Socolive TV',
@@ -391,11 +496,15 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 2,
-            child: AnimeScreen(apiService: widget.apiService),
+            child: AnimeScreen(
+              key: _animeKey,
+              apiService: widget.apiService,
+            ),
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 3,
             child: IptvScreen(
+              key: _iptvKey,
               apiService: widget.apiService,
               isActive: _currentTabIndex == 3,
             ),

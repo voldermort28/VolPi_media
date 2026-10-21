@@ -245,6 +245,13 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
           builder: (_) => VideoPlayerScreen(
             streamUrl: item.streamUrl,
             title: item.title,
+            availableChannels: [
+              StreamChannel(
+                name: 'Server 1',
+                title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+                url: item.streamUrl,
+              ),
+            ],
             isLive: false,
             initialPosition: startPos,
             mediaId: item.id,

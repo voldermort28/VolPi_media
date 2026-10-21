@@ -19,10 +19,10 @@ class AnimeScreen extends StatefulWidget {
   const AnimeScreen({super.key, required this.apiService});
 
   @override
-  State<AnimeScreen> createState() => _AnimeScreenState();
+  State<AnimeScreen> createState() => AnimeScreenState();
 }
 
-class _AnimeScreenState extends State<AnimeScreen> {
+class AnimeScreenState extends State<AnimeScreen> {
   final List<Map<String, String>> _categories = [
     {'id': 'yumei-top', 'name': '🌟 Toàn Bộ'},
     {'id': 'favorites', 'name': '❤️ Yêu Thích'},
@@ -51,6 +51,11 @@ class _AnimeScreenState extends State<AnimeScreen> {
     WatchHistoryService.instance.changeNotifier.removeListener(_onServiceUpdate);
     FavoritesService.instance.changeNotifier.removeListener(_onServiceUpdate);
     super.dispose();
+  }
+
+  Future<void> refresh() async {
+    _catalogCache.clear();
+    await _loadCategory(_selectedCategoryIndex);
   }
 
   void _onServiceUpdate() {
