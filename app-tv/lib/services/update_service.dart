@@ -12,6 +12,21 @@ class UpdateService {
   static const String _defaultApiHost = 'https://stremio.laboon.vn';
   static const String _fallbackGitHubApi = 'https://api.github.com/repos/voldermort28/VolPi_media/releases/latest';
 
+  /// Dọn dẹp file APK cài đặt còn sót lại trong cache để giải phóng bộ nhớ TV
+  static Future<void> cleanupStaleApk() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final filePath = '${tempDir.path}/VolPi-Media-Update.apk';
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint('[UpdateService] Đã tự động dọn dẹp file APK update trong cache.');
+      }
+    } catch (e) {
+      debugPrint('[UpdateService] Dọn dẹp APK error: $e');
+    }
+  }
+
   /// Check if a newer version is available.
   static Future<UpdateInfo?> checkForUpdate({String apiHost = _defaultApiHost}) async {
     try {

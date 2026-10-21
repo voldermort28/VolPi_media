@@ -5,6 +5,7 @@ import 'layout/adaptive_layout.dart';
 
 import 'services/favorites_service.dart';
 import 'services/player_settings_service.dart';
+import 'services/update_service.dart';
 import 'services/watch_history_service.dart';
 
 void main() async {
@@ -22,11 +23,12 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Khởi tạo các service lưu trữ nền song song vào RAM
+  // Khởi tạo các service lưu trữ nền song song vào RAM & tự động dọn dẹp APK thừa
   await Future.wait([
     WatchHistoryService.instance.init(),
     FavoritesService.instance.init(),
     PlayerSettingsService.instance.init(),
+    UpdateService.cleanupStaleApk(),
   ]);
 
   final apiService = ApiService();
