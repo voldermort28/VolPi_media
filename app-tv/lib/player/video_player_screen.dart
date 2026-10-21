@@ -96,6 +96,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isMuted = false;
   double _preMuteVolume = 1.0;
 
+  // Mouse Movement & Hover Controls (macOS & Desktop)
+  bool _isHoveringControls = false;
+  DateTime? _lastMouseMoveTime;
+
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
   @override
@@ -392,12 +396,27 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && _controller.value.isPlaying && !_isDragging) {
+      if (mounted && _controller.value.isPlaying && !_isDragging && !_isHoldingSeek && !_isHoveringControls) {
         setState(() {
           _showControls = false;
         });
       }
     });
+  }
+
+  void _onMouseMove() {
+    final now = DateTime.now();
+    if (_lastMouseMoveTime != null && now.difference(_lastMouseMoveTime!).inMilliseconds < 80) {
+      return;
+    }
+    _lastMouseMoveTime = now;
+
+    if (!_showControls) {
+      setState(() {
+        _showControls = true;
+      });
+    }
+    _startHideControlsTimer();
   }
 
   void _showControlsBriefly() {
@@ -413,6 +432,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
     if (_showControls) {
       _startHideControlsTimer();
+    } else {
+      _hideControlsTimer?.cancel();
     }
   }
 
@@ -813,24 +834,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: Listener(
-          onPointerSignal: (pointerSignal) {
-            if (_isMacOrDesktop && pointerSignal is PointerScrollEvent) {
-              final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
-              if (pointerSignal.scrollDelta.dy < 0) {
-                _adjustVolumeScroll(true, isFineTune: isShiftPressed);
-              } else if (pointerSignal.scrollDelta.dy > 0) {
-                _adjustVolumeScroll(false, isFineTune: isShiftPressed);
+        body: MouseRegion(
+          cursor: (_isMacOrDesktop && !_showControls) ? SystemMouseCursors.none : SystemMouseCursors.basic,
+          onHover: (_) => _onMouseMove(),
+          onEnter: (_) => _onMouseMove(),
+          child: Listener(
+            onPointerHover: (_) => _onMouseMove(),
+            onPointerMove: (_) => _onMouseMove(),
+            onPointerDown: (_) => _onMouseMove(),
+            onPointerSignal: (pointerSignal) {
+              if (_isMacOrDesktop && pointerSignal is PointerScrollEvent) {
+                final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
+                if (pointerSignal.scrollDelta.dy < 0) {
+                  _adjustVolumeScroll(true, isFineTune: isShiftPressed);
+                } else if (pointerSignal.scrollDelta.dy > 0) {
+                  _adjustVolumeScroll(false, isFineTune: isShiftPressed);
+                }
               }
-            }
-          },
-          child: GestureDetector(
-          onTap: _toggleControls,
-          onHorizontalDragStart: _onHorizontalDragStart,
-          onHorizontalDragUpdate: _onHorizontalDragUpdate,
-          onHorizontalDragEnd: _onHorizontalDragEnd,
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
+            },
+            child: GestureDetector(
+              onTap: _toggleControls,
+              onHorizontalDragStart: _onHorizontalDragStart,
+              onHorizontalDragUpdate: _onHorizontalDragUpdate,
+              onHorizontalDragEnd: _onHorizontalDragEnd,
+              behavior: HitTestBehavior.opaque,
+              child: Stack(
             alignment: Alignment.center,
             children: [
               // 1. VIDEO CANVAS
@@ -1092,8 +1120,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         // Top Bar with localized gentle gradient (No full-screen darkening)
-                        Container(
-                          decoration: BoxDecoration(
+                        MouseRegion(
+                          onEnter: (_) {
+                            _isHoveringControls = true;
+                            _hideControlsTimer?.cancel();
+                          },
+                          onExit: (_) {
+                            _isHoveringControls = false;
+                            _startHideControlsTimer();
+                          },
+                          child: Container(
+                            decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
@@ -1224,12 +1261,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ],
                           ),
                         ),
+                      ),
 
-                        // Center: Clean transparent space (No screen darkening, No blocking buttons)
-                        const Spacer(),
+                      // Center: Clean transparent space (No screen darkening, No blocking buttons)
+                      const Spacer(),
 
-                        // Bottom Bar with Timeline & Playback Controls Below Progress Bar
-                        Container(
+                      // Bottom Bar with Timeline & Playback Controls Below Progress Bar
+                      MouseRegion(
+                        onEnter: (_) {
+                          _isHoveringControls = true;
+                          _hideControlsTimer?.cancel();
+                        },
+                        onExit: (_) {
+                          _isHoveringControls = false;
+                          _startHideControlsTimer();
+                        },
+                        child: Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,
@@ -1294,27 +1341,49 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
-                                      child: SliderTheme(
-                                        data: SliderTheme.of(context).copyWith(
-                                          activeTrackColor: const Color(0xFF38BDF8),
-                                          inactiveTrackColor: Colors.white24,
-                                          thumbColor: const Color(0xFF38BDF8),
-                                          overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                          trackHeight: 3.5,
-                                        ),
-                                        child: Slider(
-                                          value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
-                                                0.0,
-                                                _controller.value.duration.inSeconds.toDouble(),
-                                              ),
-                                          max: _controller.value.duration.inSeconds.toDouble() > 0
-                                              ? _controller.value.duration.inSeconds.toDouble()
-                                              : 1.0,
-                                          onChanged: (val) {
-                                            _startHideControlsTimer();
-                                            _controller.seekTo(Duration(seconds: val.toInt()));
-                                          },
+                                      child: MouseRegion(
+                                        cursor: SystemMouseCursors.click,
+                                        child: SliderTheme(
+                                          data: SliderTheme.of(context).copyWith(
+                                            activeTrackColor: const Color(0xFF38BDF8),
+                                            inactiveTrackColor: Colors.white24,
+                                            thumbColor: const Color(0xFF38BDF8),
+                                            overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
+                                            trackHeight: 4.0,
+                                          ),
+                                          child: Slider(
+                                            value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
+                                                  0.0,
+                                                  _controller.value.duration.inSeconds.toDouble(),
+                                                ),
+                                            max: _controller.value.duration.inSeconds.toDouble() > 0
+                                                ? _controller.value.duration.inSeconds.toDouble()
+                                                : 1.0,
+                                            onChangeStart: (val) {
+                                              _hideControlsTimer?.cancel();
+                                              setState(() {
+                                                _isHoldingSeek = true;
+                                                _pendingSeekPosition = Duration(seconds: val.toInt());
+                                              });
+                                            },
+                                            onChanged: (val) {
+                                              setState(() {
+                                                _pendingSeekPosition = Duration(seconds: val.toInt());
+                                              });
+                                            },
+                                            onChangeEnd: (val) {
+                                              final target = Duration(seconds: val.toInt());
+                                              _controller.seekTo(target).then((_) {
+                                                if (mounted) {
+                                                  setState(() {
+                                                    _isHoldingSeek = false;
+                                                  });
+                                                  _startHideControlsTimer();
+                                                }
+                                              });
+                                            },
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1452,6 +1521,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ],
                           ),
                         ),
+                        ),
                       ],
                     ),
                   ),
@@ -1537,11 +1607,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                 ),
-            ],
+              ],
+            ),
           ),
         ),
-        ),
       ),
-    );
+    ),
+  );
   }
 }

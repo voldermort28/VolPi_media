@@ -1,10 +1,10 @@
 {
-  "version": "2.1.2",
-  "build": 58,
-  "tag_name": "v2.1.2",
-  "changelog": "• VolPi Media v2.1.2 - Nâng Cấp Quản Lý Nguồn IPTV & Tự Động Nhận Diện Danh Mục:\n- Web Admin: Kiểm tra trực tiếp đường link M3U khi thêm, cảnh báo ngay nếu link lỗi 404 hoặc không có kênh; hiển thị nhãn cảnh báo đỏ đối với nguồn bị hỏng.\n- App TV / Mobile / macOS: Đồng bộ danh sách nguồn đầy đủ từ server, hiển thị rõ nguồn lỗi kèm cảnh báo thay vì bị ẩn mất; tự động chuyển tab sang 'Tất cả' hoặc 'Truyền hình' khi chọn nguồn không có bóng đá, tránh tình trạng màn hình trống.",
+  "version": "2.1.3",
+  "build": 59,
+  "tag_name": "v2.1.3",
+  "changelog": "• VolPi Media v2.1.3 - Tối Ưu Hóa Trình Phát Video Cho macOS & Desktop:\n- Quơ chuột hiện thanh điều khiển & thanh seek tua video: Chỉ cần di chuyển/rê chuột là thanh seek và các nút điều khiển xuất hiện tức thì, không cần phải click vào màn hình như trước.\n- Giữ thanh điều khiển khi rê chuột trên thanh seek/nút bấm: Tự động khóa không ẩn điều khiển khi chuột đang đặt trên thanh tiến trình hoặc các nút bấm, giúp thao tác tua video chuẩn xác.\n- Tự động ẩn con trỏ chuột và thanh điều khiển sau 4 giây không thao tác khi đang xem video.\n- Kéo thả & click thanh tua mượt mà: Cập nhật mốc thời gian thời gian thực khi rê chuột và tua chính xác khi nhả chuột.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-19T18:35:00Z"
+  "published_at": "2026-10-21T17:15:00Z"
 }
