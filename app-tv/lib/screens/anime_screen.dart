@@ -67,6 +67,23 @@ class AnimeScreenState extends State<AnimeScreen> {
     }
   }
 
+  String _cleanAnimeSlug(String rawId) {
+    String id = rawId.trim();
+    id = id.replaceAll(RegExp(r'^anime:'), '');
+    id = id.replaceAll(RegExp(r':ep:\d+.*$'), '');
+    id = id.replaceAll(RegExp(r':\d+:\d+$'), '');
+    return id;
+  }
+
+  int _extractEpisodeNumber(WatchHistoryItem item) {
+    if (item.episode > 0) return item.episode;
+    final match = RegExp(r':ep:(\d+)').firstMatch(item.id) ?? RegExp(r':\d+:(\d+)$').firstMatch(item.id);
+    if (match != null) {
+      return int.tryParse(match.group(1)!) ?? 1;
+    }
+    return 1;
+  }
+
   void _loadFavoritesCategory() {
     final favs = FavoritesService.instance
         .getFavorites()
@@ -76,7 +93,7 @@ class AnimeScreenState extends State<AnimeScreen> {
     setState(() {
       _items = favs
           .map<AnimeModel>((f) => AnimeModel(
-                id: f.id.startsWith('anime:') ? f.id.substring(6) : f.id,
+                id: _cleanAnimeSlug(f.id),
                 name: f.title,
                 poster: f.poster,
                 background: f.poster,
@@ -218,19 +235,19 @@ class AnimeScreenState extends State<AnimeScreen> {
       }
     }
 
-    final hasNextItem = index + 1 < list.length;
-    final hasPrevItem = index > 0;
-    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:')) && item.episode > 0 && item.mediaId.isNotEmpty;
+    final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
+    final epNum = _extractEpisodeNumber(item);
+    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:') || item.id.startsWith('yumei:')) && cleanId.isNotEmpty;
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(
         streamUrl: item.streamUrl,
         title: item.title,
-        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : '',
+        subtitle: epNum > 0 ? 'Tập $epNum' : '',
         availableChannels: [
           StreamChannel(
             name: 'Server 1',
-            title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+            title: epNum > 0 ? 'Tập $epNum' : item.title,
             url: item.streamUrl,
             headers: const {},
           ),
@@ -240,32 +257,32 @@ class AnimeScreenState extends State<AnimeScreen> {
         mediaId: item.id,
         mediaCategory: item.category,
         mediaPoster: item.poster,
-        episode: item.episode,
+        episode: epNum,
         season: item.season,
         onNext: isAnimeSeries
             ? () => _loadAndPlayEpisode(
                   list: list,
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode + 1,
+                  episode: epNum + 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasNextItem ? () => _playContinueWatchingAtIndex(list, index + 1, replaceContext: playerCtx) : null),
-        onPrevious: isAnimeSeries && item.episode > 1
+            : null,
+        onPrevious: isAnimeSeries && epNum > 1
             ? () => _loadAndPlayEpisode(
                   list: list,
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode - 1,
+                  episode: epNum - 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasPrevItem ? () => _playContinueWatchingAtIndex(list, index - 1, replaceContext: playerCtx) : null),
+            : null,
       ),
     );
 
@@ -306,17 +323,17 @@ class AnimeScreenState extends State<AnimeScreen> {
     Navigator.of(targetContext).pop();
 
     if (streams.isEmpty) {
-      if (continueIndex + 1 < list.length) {
-        _playContinueWatchingAtIndex(list, continueIndex + 1, replaceContext: replaceContext);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không tìm thấy tập $episode hoặc đã hết các tập của $animeTitle!'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
     final first = streams.first;
     final channels = streams;
-
-    final hasNextInList = continueIndex + 1 < list.length;
-    final hasPrevInList = continueIndex > 0;
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(
@@ -352,7 +369,7 @@ class AnimeScreenState extends State<AnimeScreen> {
                   continueIndex: continueIndex,
                   replaceContext: playerCtx,
                 )
-            : (hasPrevInList ? () => _playContinueWatchingAtIndex(list, continueIndex - 1, replaceContext: playerCtx) : null),
+            : null,
       ),
     );
 

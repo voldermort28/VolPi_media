@@ -1,10 +1,10 @@
 {
-  "version": "2.1.8",
-  "build": 64,
-  "tag_name": "v2.1.8",
-  "changelog": "• VolPi Media v2.1.8 - Điều Hướng Tiếp Tục Xem & Danh Sách Yêu Thích, Phóng To Logo Hero Banner:\n- Bổ sung nút Next / Previous và tính năng tự động chuyển tập / phim tiếp theo khi xem từ mục 'Tiếp tục xem' hoặc 'Danh sách yêu thích'.\n- Hỗ trợ chuyển tập kế tiếp tự động cho Anime bộ và chuyển phim liên tục trong danh sách phát yêu thích.\n- Phóng to logo 2 đội bóng trên Hero Banner trang chủ rõ nét, nổi bật và dễ nhìn hơn rất nhiều trên màn hình TV lớn.",
+  "version": "2.1.9",
+  "build": 65,
+  "tag_name": "v2.1.9",
+  "changelog": "• VolPi Media v2.1.9 - Tối Ưu Điều Hướng D-Pad TV Remote, Hero Banner & Chuyển Tập Chuẩn:\n- Khắc phục triệt để nhảy focus trên Hero Banner trang chủ: Tự động dừng auto-slide khi con trỏ đang ở banner, loại bỏ nút 'Xem tất cả' gây trôi highlight.\n- Trình phát Bóng đá: Hỗ trợ phím mũi tên điều hướng mượt mà giữa Phát/Tạm dừng, Chọn Luồng Stream và nút Quay lại trên Remote TV.\n- Trình phát Anime: Điều hướng mũi tên Remote thông suốt qua toàn bộ các nút tua, Bỏ qua Intro, Tập tiếp theo và Chọn Luồng.\n- Sửa lỗi nút Next: Luôn phát chính xác tập phim tiếp theo (Next Episode) của phim/anime đang xem thay vì nhảy sang phim bên cạnh trong danh sách Tiếp tục xem và Yêu thích.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-22T02:08:00Z"
+  "published_at": "2026-10-22T08:15:00Z"
 }

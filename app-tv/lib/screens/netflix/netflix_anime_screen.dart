@@ -114,6 +114,23 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
     _updateHistoryAndFavorites();
   }
 
+  String _cleanAnimeSlug(String rawId) {
+    String id = rawId.trim();
+    id = id.replaceAll(RegExp(r'^anime:'), '');
+    id = id.replaceAll(RegExp(r':ep:\d+.*$'), '');
+    id = id.replaceAll(RegExp(r':\d+:\d+$'), '');
+    return id;
+  }
+
+  int _extractEpisodeNumber(WatchHistoryItem item) {
+    if (item.episode > 0) return item.episode;
+    final match = RegExp(r':ep:(\d+)').firstMatch(item.id) ?? RegExp(r':\d+:(\d+)$').firstMatch(item.id);
+    if (match != null) {
+      return int.tryParse(match.group(1)!) ?? 1;
+    }
+    return 1;
+  }
+
   void _updateHistoryAndFavorites() {
     final allHistory = WatchHistoryService.instance.getContinueWatching(excludeCategory: 'secret');
     final animeHistory = allHistory.where((item) {
@@ -124,7 +141,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
 
     final allFavs = FavoritesService.instance.getFavorites().where((f) => f.category != 'secret').toList();
     final animeFavs = allFavs.map<AnimeModel>((f) {
-      final cleanId = f.id.startsWith('anime:') ? f.id.substring(6) : f.id;
+      final cleanId = _cleanAnimeSlug(f.id);
       return AnimeModel(
         id: cleanId,
         name: f.title,
@@ -271,19 +288,19 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
       }
     }
 
-    final hasNextItem = index + 1 < _continueWatching.length;
-    final hasPrevItem = index > 0;
-    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:')) && item.episode > 0 && item.mediaId.isNotEmpty;
+    final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
+    final epNum = _extractEpisodeNumber(item);
+    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:') || item.id.startsWith('yumei:')) && cleanId.isNotEmpty;
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(
         streamUrl: item.streamUrl,
         title: item.title,
-        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : '',
+        subtitle: epNum > 0 ? 'Tập $epNum' : '',
         availableChannels: [
           StreamChannel(
             name: 'Server 1',
-            title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+            title: epNum > 0 ? 'Tập $epNum' : item.title,
             url: item.streamUrl,
             headers: const {},
           ),
@@ -293,30 +310,30 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
         mediaId: item.id,
         mediaCategory: item.category,
         mediaPoster: item.poster,
-        episode: item.episode,
+        episode: epNum,
         season: item.season,
         onNext: isAnimeSeries
             ? () => _loadAndPlayEpisode(
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode + 1,
+                  episode: epNum + 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasNextItem ? () => _playContinueWatchingAtIndex(index + 1, replaceContext: playerCtx) : null),
-        onPrevious: isAnimeSeries && item.episode > 1
+            : null,
+        onPrevious: isAnimeSeries && epNum > 1
             ? () => _loadAndPlayEpisode(
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode - 1,
+                  episode: epNum - 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasPrevItem ? () => _playContinueWatchingAtIndex(index - 1, replaceContext: playerCtx) : null),
+            : null,
       ),
     );
 
@@ -356,13 +373,12 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
     Navigator.of(targetContext).pop();
 
     if (streams.isEmpty) {
-      if (continueIndex + 1 < _continueWatching.length) {
-        _playContinueWatchingAtIndex(continueIndex + 1, replaceContext: replaceContext);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã hết các tập của $animeTitle!')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không tìm thấy tập $episode hoặc đã hết các tập của $animeTitle!'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
@@ -405,11 +421,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                   replaceContext: playerCtx,
                 );
               }
-            : (continueIndex > 0
-                ? () {
-                    _playContinueWatchingAtIndex(continueIndex - 1, replaceContext: playerCtx);
-                  }
-                : null),
+            : null,
       ),
     );
 

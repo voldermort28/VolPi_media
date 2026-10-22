@@ -120,11 +120,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return [
       StreamChannel(
         name: 'Server 1',
-        title: widget.subtitle?.isNotEmpty == true ? widget.subtitle! : 'Full HD (Mặc định)',
+        title: widget.subtitle.isNotEmpty ? widget.subtitle : 'Full HD (Mặc định)',
         url: _currentStreamUrl.isNotEmpty ? _currentStreamUrl : widget.streamUrl,
         headers: widget.headers ?? {},
       ),
     ];
+  }
+
+  List<FocusNode> _getActiveControlNodes() {
+    final list = <FocusNode>[];
+    if (widget.onPrevious != null) list.add(_prevFocusNode);
+    if (!widget.isLive) list.add(_replay10FocusNode);
+    list.add(_playPauseFocusNode);
+    if (!widget.isLive) {
+      list.add(_forward10FocusNode);
+      list.add(_skipIntroFocusNode);
+    }
+    if (widget.onNext != null) list.add(_nextFocusNode);
+    if (_effectiveChannels.isNotEmpty) list.add(_channelsButtonFocusNode);
+    return list;
   }
 
   void _initChannelFocusNodes() {
@@ -910,7 +924,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _seekRelative(-10);
                 return KeyEventResult.handled;
               }
-              // Allow D-Pad Left to navigate between control buttons
+              // Explicitly navigate between control buttons in the bottom bar
+              final controlNodes = _getActiveControlNodes();
+              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
+              if (currentIdx > 0) {
+                controlNodes[currentIdx - 1].requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
               _startHideControlsTimer();
               return KeyEventResult.ignored;
             }
@@ -938,7 +959,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _seekRelative(10);
                 return KeyEventResult.handled;
               }
-              // Allow D-Pad Right to navigate between control buttons
+              // Explicitly navigate between control buttons in the bottom bar
+              final controlNodes = _getActiveControlNodes();
+              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
+              if (currentIdx != -1 && currentIdx + 1 < controlNodes.length) {
+                controlNodes[currentIdx + 1].requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
               _startHideControlsTimer();
               return KeyEventResult.ignored;
             }
@@ -986,6 +1014,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
+              // For Live (Football), there is no seekbar -> Up goes directly to back button
+              if (widget.isLive) {
+                _backButtonFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
               _seekBarFocusNode.requestFocus();
               _startHideControlsTimer();
               return KeyEventResult.handled;
@@ -1000,7 +1034,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 return KeyEventResult.ignored;
               }
               if (_backButtonFocusNode.hasFocus) {
-                _seekBarFocusNode.requestFocus();
+                if (widget.isLive) {
+                  _playPauseFocusNode.requestFocus();
+                } else {
+                  _seekBarFocusNode.requestFocus();
+                }
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }

@@ -42,7 +42,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   }
 
   Future<void> _loadDetails() async {
-    final res = await widget.apiService.getAnimeDetails(widget.anime.id, type: widget.anime.type);
+    final cleanId = widget.anime.id.replaceAll(RegExp(r'^anime:'), '').replaceAll(RegExp(r':ep:\d+.*$'), '').replaceAll(RegExp(r':\d+:\d+$'), '');
+    final res = await widget.apiService.getAnimeDetails(cleanId, type: widget.anime.type);
     if (mounted) {
       setState(() {
         _detailedAnime = res ?? widget.anime;
@@ -134,20 +135,10 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         season: ep.season,
         onNext: index + 1 < episodes.length
             ? () => _playEpisodeAtIndex(index + 1, replaceContext: playerCtx)
-            : (widget.onNextMovie != null
-                ? () {
-                    Navigator.of(playerCtx).pop();
-                    widget.onNextMovie!();
-                  }
-                : null),
+            : null,
         onPrevious: index > 0
             ? () => _playEpisodeAtIndex(index - 1, replaceContext: playerCtx)
-            : (widget.onPreviousMovie != null
-                ? () {
-                    Navigator.of(playerCtx).pop();
-                    widget.onPreviousMovie!();
-                  }
-                : null),
+            : null,
       ),
     );
 

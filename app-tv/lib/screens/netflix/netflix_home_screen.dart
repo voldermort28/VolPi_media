@@ -42,6 +42,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   Timer? _bannerTimer;
   int _currentBannerIndex = 0;
   bool _isBannerInteracting = false;
+  bool _isBannerFocused = false;
 
   @override
   void initState() {
@@ -67,7 +68,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         : (_matches.isNotEmpty ? _matches.take(3).toList() : <MatchModel>[]);
     if (featuredMatches.length <= 1) return;
     _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
-      if (!mounted || _isBannerInteracting) return;
+      if (!mounted || _isBannerInteracting || _isBannerFocused) return;
       if (_bannerPageController.hasClients) {
         final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
         _bannerPageController.animateToPage(
@@ -232,6 +233,23 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     }
   }
 
+  String _cleanAnimeSlug(String rawId) {
+    String id = rawId.trim();
+    id = id.replaceAll(RegExp(r'^anime:'), '');
+    id = id.replaceAll(RegExp(r':ep:\d+.*$'), '');
+    id = id.replaceAll(RegExp(r':\d+:\d+$'), '');
+    return id;
+  }
+
+  int _extractEpisodeNumber(WatchHistoryItem item) {
+    if (item.episode > 0) return item.episode;
+    final match = RegExp(r':ep:(\d+)').firstMatch(item.id) ?? RegExp(r':\d+:(\d+)$').firstMatch(item.id);
+    if (match != null) {
+      return int.tryParse(match.group(1)!) ?? 1;
+    }
+    return 1;
+  }
+
   void _playContinueWatchingAtIndex(int index, {BuildContext? replaceContext}) async {
     if (index < 0 || index >= _continueWatching.length) return;
     final item = _continueWatching[index];
@@ -247,23 +265,23 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
       }
     }
 
-    final hasNextItem = index + 1 < _continueWatching.length;
-    final hasPrevItem = index > 0;
-    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:')) && item.episode > 0 && item.mediaId.isNotEmpty;
+    final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
+    final epNum = _extractEpisodeNumber(item);
+    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:') || item.id.startsWith('yumei:')) && cleanId.isNotEmpty;
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(
         streamUrl: item.streamUrl,
         title: item.title,
-        subtitle: item.episode > 0 ? 'Tập ${item.episode}' : '',
+        subtitle: epNum > 0 ? 'Tập $epNum' : '',
         mediaId: item.mediaId.isNotEmpty ? item.mediaId : item.id,
         mediaPoster: item.poster,
-        episode: item.episode,
+        episode: epNum,
         season: item.season,
         availableChannels: [
           StreamChannel(
             name: 'Server 1',
-            title: item.episode > 0 ? 'Tập ${item.episode}' : item.title,
+            title: epNum > 0 ? 'Tập $epNum' : item.title,
             url: item.streamUrl,
             headers: const {},
           ),
@@ -272,26 +290,26 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         isLive: false,
         onNext: isAnimeSeries
             ? () => _loadAndPlayEpisode(
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode + 1,
+                  episode: epNum + 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasNextItem ? () => _playContinueWatchingAtIndex(index + 1, replaceContext: playerCtx) : null),
-        onPrevious: isAnimeSeries && item.episode > 1
+            : null,
+        onPrevious: isAnimeSeries && epNum > 1
             ? () => _loadAndPlayEpisode(
-                  animeId: item.mediaId,
+                  animeId: cleanId,
                   animeTitle: item.title,
                   poster: item.poster,
                   season: item.season > 0 ? item.season : 1,
-                  episode: item.episode - 1,
+                  episode: epNum - 1,
                   continueIndex: index,
                   replaceContext: playerCtx,
                 )
-            : (hasPrevItem ? () => _playContinueWatchingAtIndex(index - 1, replaceContext: playerCtx) : null),
+            : null,
       ),
     );
 
@@ -331,13 +349,12 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     Navigator.of(targetContext).pop();
 
     if (streams.isEmpty) {
-      if (continueIndex + 1 < _continueWatching.length) {
-        _playContinueWatchingAtIndex(continueIndex + 1, replaceContext: replaceContext);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã hết các tập của $animeTitle!')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không tìm thấy tập $episode hoặc đã hết các tập của $animeTitle!'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
@@ -380,11 +397,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                   replaceContext: playerCtx,
                 );
               }
-            : (continueIndex > 0
-                ? () {
-                    _playContinueWatchingAtIndex(continueIndex - 1, replaceContext: playerCtx);
-                  }
-                : null),
+            : null,
       ),
     );
 
@@ -500,93 +513,108 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     if (featuredMatches.isEmpty) return const SizedBox.shrink();
     if (featuredMatches.length == 1) return _buildBillboard(featuredMatches.first);
 
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isBannerInteracting = true),
-      onExit: (_) => setState(() => _isBannerInteracting = false),
-      child: SizedBox(
-        height: 350,
-        child: Stack(
-          children: [
-            PageView.builder(
-              controller: _bannerPageController,
-              itemCount: featuredMatches.length,
-              onPageChanged: (idx) {
-                setState(() {
-                  _currentBannerIndex = idx;
-                });
-              },
-              itemBuilder: (context, idx) {
-                return _buildBillboard(featuredMatches[idx]);
-              },
-            ),
+    return Focus(
+      onFocusChange: (hasFocus) {
+        setState(() {
+          _isBannerFocused = hasFocus;
+          _isBannerInteracting = hasFocus;
+        });
+        if (hasFocus) {
+          _bannerTimer?.cancel();
+          _scrollToTopOnBillboardFocus();
+        } else {
+          _startBannerTimer();
+        }
+      },
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isBannerInteracting = true),
+        onExit: (_) => setState(() => _isBannerInteracting = false),
+        child: SizedBox(
+          height: 350,
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _bannerPageController,
+                itemCount: featuredMatches.length,
+                onPageChanged: (idx) {
+                  setState(() {
+                    _currentBannerIndex = idx;
+                  });
+                },
+                itemBuilder: (context, idx) {
+                  return _buildBillboard(featuredMatches[idx], isCurrent: idx == _currentBannerIndex);
+                },
+              ),
 
-            // Left Arrow (Hover / Mouse navigation)
-            if (featuredMatches.length > 1)
-              Positioned(
-                left: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _isBannerInteracting ? 1.0 : 0.0,
-                    child: IgnorePointer(
-                      ignoring: !_isBannerInteracting,
-                      child: IconButton(
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.black.withOpacity(0.55),
-                          foregroundColor: Colors.white,
-                          shape: const CircleBorder(),
-                          padding: const EdgeInsets.all(12),
+              // Left Arrow (Hover / Mouse navigation)
+              if (featuredMatches.length > 1)
+                Positioned(
+                  left: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _isBannerInteracting ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isBannerInteracting,
+                        child: IconButton(
+                          focusNode: FocusNode(canRequestFocus: false),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black.withOpacity(0.55),
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                          onPressed: () {
+                            final prevIndex = (_currentBannerIndex - 1 + featuredMatches.length) % featuredMatches.length;
+                            _bannerPageController.animateToPage(
+                              prevIndex,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
                         ),
-                        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                        onPressed: () {
-                          final prevIndex = (_currentBannerIndex - 1 + featuredMatches.length) % featuredMatches.length;
-                          _bannerPageController.animateToPage(
-                            prevIndex,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                          );
-                        },
                       ),
                     ),
                   ),
                 ),
-              ),
 
-            // Right Arrow (Hover / Mouse navigation)
-            if (featuredMatches.length > 1)
-              Positioned(
-                right: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 200),
-                    opacity: _isBannerInteracting ? 1.0 : 0.0,
-                    child: IgnorePointer(
-                      ignoring: !_isBannerInteracting,
-                      child: IconButton(
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.black.withOpacity(0.55),
-                          foregroundColor: Colors.white,
-                          shape: const CircleBorder(),
-                          padding: const EdgeInsets.all(12),
+              // Right Arrow (Hover / Mouse navigation)
+              if (featuredMatches.length > 1)
+                Positioned(
+                  right: 16,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity: _isBannerInteracting ? 1.0 : 0.0,
+                      child: IgnorePointer(
+                        ignoring: !_isBannerInteracting,
+                        child: IconButton(
+                          focusNode: FocusNode(canRequestFocus: false),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.black.withOpacity(0.55),
+                            foregroundColor: Colors.white,
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(12),
+                          ),
+                          icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
+                          onPressed: () {
+                            final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
+                            _bannerPageController.animateToPage(
+                              nextIndex,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOutCubic,
+                            );
+                          },
                         ),
-                        icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
-                        onPressed: () {
-                          final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
-                          _bannerPageController.animateToPage(
-                            nextIndex,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                          );
-                        },
                       ),
                     ),
                   ),
                 ),
-              ),
 
             // Dots Indicator (Góc dưới bên phải)
             Positioned(
@@ -611,6 +639,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }
@@ -672,22 +701,6 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          TvFocusableCard(
-            onTap: () => widget.onNavigateTab?.call(1),
-            borderRadius: BorderRadius.circular(6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDC2626),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Text(
-                'Xem tất cả',
-                style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -696,7 +709,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // BILLBOARD COMPONENT
   // =========================================================================
-  Widget _buildBillboard(MatchModel match) {
+  Widget _buildBillboard(MatchModel match, {bool isCurrent = true}) {
     return Container(
       height: 350,
       width: double.infinity,
@@ -827,7 +840,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                   child: Row(
                     children: [
                       TvFocusableCard(
-                        focusNode: _billboardPlayFocusNode,
+                        focusNode: isCurrent ? _billboardPlayFocusNode : null,
                         onFocusChange: (hasFocus) {
                           if (hasFocus) _scrollToTopOnBillboardFocus();
                         },
@@ -1015,26 +1028,6 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (onSeeAll != null) ...[
-            const SizedBox(width: 8),
-            TvFocusableCard(
-              onTap: onSeeAll,
-              borderRadius: BorderRadius.circular(4),
-              scale: 1.02,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Row(
-                  children: [
-                    Text(
-                      'Xem tất cả',
-                      style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: Color(0xFF38BDF8), size: 16),
-                  ],
-                ),
-              ),
-            ),
-          ],
         ],
       ),
     );
