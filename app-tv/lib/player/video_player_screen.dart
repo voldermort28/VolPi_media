@@ -412,6 +412,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _hudText = vol == 0.0 ? 'Tắt tiếng' : '${(vol * 100).round()}%';
       _hudSpeedBadge = 'Âm lượng';
     });
+    _showControlsBriefly();
     _hudFadeTimer = Timer(const Duration(milliseconds: 1400), () {
       if (mounted) {
         setState(() {
@@ -430,6 +431,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _hudText = text;
       _hudSpeedBadge = null;
     });
+    _showControlsBriefly();
     _hudFadeTimer = Timer(const Duration(milliseconds: 1000), () {
       if (mounted && _hudIcon == icon) {
         setState(() {
@@ -1439,89 +1441,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 4. SWIPE SEEK HUD OVERLAY (Center Indicator)
-              if (_hudIcon != null)
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF38BDF8).withOpacity(0.3),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _hudIcon == 'PLAY'
-                                  ? Icons.play_arrow_rounded
-                                  : (_hudIcon == 'PAUSE'
-                                      ? Icons.pause_rounded
-                                      : (_hudIcon == 'CHANNEL'
-                                          ? Icons.live_tv_rounded
-                                          : (_hudIcon == 'FORWARD'
-                                              ? Icons.fast_forward_rounded
-                                              : (_hudIcon == 'REWIND'
-                                                  ? Icons.fast_rewind_rounded
-                                                  : (_hudIcon == 'VOLUME_MUTE'
-                                                      ? Icons.volume_off_rounded
-                                                      : (_hudIcon == 'VOLUME_LOW'
-                                                          ? Icons.volume_down_rounded
-                                                          : Icons.volume_up_rounded)))))),
-                              color: const Color(0xFF38BDF8),
-                              size: 44,
-                            ),
-                            if (_hudSpeedBadge != null) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0284C7),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
-                                ),
-                                child: Text(
-                                  _hudSpeedBadge!,
-                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _hudText ?? '',
-                          style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (_hudIcon != 'CHANNEL' &&
-                            !_hudIcon!.startsWith('VOLUME') &&
-                            _hudIcon != 'PLAY' &&
-                            _hudIcon != 'PAUSE') ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-              // 5. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
+              // 4. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
               ExcludeFocus(
                 excluding: !_showControls,
                 child: AnimatedOpacity(
@@ -1802,8 +1722,94 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
+                                const SizedBox(height: 6),
                               ],
+
+                              // Compact HUD Indicator (Thu nhỏ & di chuyển về cụm nút điều khiển dưới seek bar)
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _hudIcon != null
+                                    ? Container(
+                                        key: ValueKey('hud_${_hudIcon}_${_hudText}'),
+                                        margin: const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xE60F172A),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF38BDF8).withOpacity(0.25),
+                                              blurRadius: 10,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _hudIcon == 'PLAY'
+                                                  ? Icons.play_arrow_rounded
+                                                  : (_hudIcon == 'PAUSE'
+                                                      ? Icons.pause_rounded
+                                                      : (_hudIcon == 'CHANNEL'
+                                                          ? Icons.live_tv_rounded
+                                                          : (_hudIcon == 'FORWARD'
+                                                              ? Icons.fast_forward_rounded
+                                                              : (_hudIcon == 'REWIND'
+                                                                  ? Icons.fast_rewind_rounded
+                                                                  : (_hudIcon == 'VOLUME_MUTE'
+                                                                      ? Icons.volume_off_rounded
+                                                                      : (_hudIcon == 'VOLUME_LOW'
+                                                                          ? Icons.volume_down_rounded
+                                                                          : Icons.volume_up_rounded)))))),
+                                              color: const Color(0xFF38BDF8),
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _hudText ?? '',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                            if (_hudSpeedBadge != null) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF0284C7),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
+                                                ),
+                                                child: Text(
+                                                  _hudSpeedBadge!,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
 
                               // Playback Controls Row (Nút điều khiển xuất hiện DƯỚI thanh tiến trình)
                               Row(

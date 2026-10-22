@@ -1,10 +1,10 @@
 {
-  "version": "2.2.0",
-  "build": 66,
-  "tag_name": "v2.2.0",
-  "changelog": "• VolPi Media v2.2.0 - Tương Thích Hoàn Toàn Các Nút Cứng Trên Remote TV (Play, Pause, Tua Tới, Tua Lui):\n- Hỗ trợ phím cứng Play (Phát) và Pause (Tạm dừng) chuyên dụng trên Remote TV: Phản hồi tức thì, hiển thị HUD thông báo trực quan.\n- Hỗ trợ phím cứng Tua tới (Fast Forward) & Tua lui (Rewind): Bấm đơn tua 10s, giữ phím tự động tăng tốc thông minh (2x, 4x, 8x, 16x) kèm HUD hiển thị thời gian chính xác.\n- Tách biệt hoàn toàn phím tua cứng khỏi phím điều hướng D-pad: Giúp chuyển nút trên thanh điều khiển không bị tua nhầm video và ngược lại.\n- Tối ưu giữ focus thanh điều khiển: Không giật hay nhảy con trỏ khi OSD hiển thị.",
+  "version": "2.2.1",
+  "build": 67,
+  "tag_name": "v2.2.1",
+  "changelog": "• VolPi Media v2.2.1 - Tinh Gọn HUD & Tối Ưu Tầm Nhìn Trình Phát:\n- Thu nhỏ biểu tượng HUD và chuyển toàn bộ thông báo trạng thái (Play, Pause, Tua tới, Tua lui, Âm lượng, Chọn luồng) về phía dưới thanh seek bar, nằm gọn gàng bên trên cụm nút điều khiển.\n- Trả lại không gian hiển thị rộng rãi, không bị che khuất tầm nhìn video ở giữa màn hình khi thao tác trên Remote TV.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-22T09:15:00Z"
+  "published_at": "2026-10-22T09:20:00Z"
 }
