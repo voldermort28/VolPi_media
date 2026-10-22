@@ -423,6 +423,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  void _showBriefPlaybackHud(String icon, String text) {
+    _hudFadeTimer?.cancel();
+    setState(() {
+      _hudIcon = icon;
+      _hudText = text;
+      _hudSpeedBadge = null;
+    });
+    _hudFadeTimer = Timer(const Duration(milliseconds: 1000), () {
+      if (mounted && _hudIcon == icon) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+          _hudSpeedBadge = null;
+        });
+      }
+    });
+  }
+
   void _switchChannel(StreamChannel channel) {
     if (_currentStreamUrl == channel.url && !_hasError) return;
     try {
@@ -506,7 +524,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
     _startHideControlsTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _showControls && !_playPauseFocusNode.hasFocus && !_seekBarFocusNode.hasFocus) {
+      final anyFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
+          _seekBarFocusNode.hasFocus ||
+          _backButtonFocusNode.hasFocus;
+      if (mounted && _showControls && !anyFocused) {
         _playPauseFocusNode.requestFocus();
       }
     });
@@ -527,7 +548,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_showControls) {
       _startHideControlsTimer();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _showControls && !_playPauseFocusNode.hasFocus && !_seekBarFocusNode.hasFocus) {
+        final anyFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
+            _seekBarFocusNode.hasFocus ||
+            _backButtonFocusNode.hasFocus;
+        if (mounted && _showControls && !anyFocused) {
           _playPauseFocusNode.requestFocus();
         }
       });
@@ -536,18 +560,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _playVideo() {
+    if (!_isInitialized) return;
+    if (!_controller.value.isPlaying) {
+      _controller.play();
+    }
+    _showBriefPlaybackHud('PLAY', 'Đang phát');
+    setState(() {
+      _showControls = true;
+    });
+    _startHideControlsTimer();
+  }
+
+  void _pauseVideo() {
+    if (!_isInitialized) return;
+    if (_controller.value.isPlaying) {
+      _controller.pause();
+    }
+    _showBriefPlaybackHud('PAUSE', 'Tạm dừng');
+    setState(() {
+      _showControls = true;
+    });
+    _hideControlsTimer?.cancel();
+  }
+
   void _togglePlayPause() {
     if (!_isInitialized) return;
-    setState(() {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
-        _showControls = true;
-        _hideControlsTimer?.cancel();
-      } else {
-        _controller.play();
-        _startHideControlsTimer();
-      }
-    });
+    if (_controller.value.isPlaying) {
+      _pauseVideo();
+    } else {
+      _playVideo();
+    }
   }
 
   String _getActiveChannelTitleShort() {
@@ -701,7 +744,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     _hudFadeTimer?.cancel();
     _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
-      if (mounted && !_isHoldingSeek) {
+      if (mounted && !_isHoldingSeek && (_hudIcon == 'FORWARD' || _hudIcon == 'REWIND')) {
         setState(() {
           _hudIcon = null;
           _hudText = null;
@@ -854,17 +897,72 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         autofocus: true,
         onKeyEvent: (node, event) {
           final key = event.logicalKey;
+          final int code = key.keyId & 0xFFFF;
+          final String debugName = key.debugName?.toLowerCase() ?? '';
+
+          // 1. Physical Play key on remote
+          final bool isPlayKey = key == LogicalKeyboardKey.mediaPlay ||
+              code == 126 ||
+              (debugName.contains('mediaplay') && !debugName.contains('pause'));
+
+          // 2. Physical Pause / Stop key on remote
+          final bool isPauseKey = key == LogicalKeyboardKey.mediaPause ||
+              key == LogicalKeyboardKey.mediaStop ||
+              code == 127 ||
+              code == 86 ||
+              ((debugName.contains('mediapause') || debugName.contains('mediastop')) && !debugName.contains('play'));
+
+          // 3. Play / Pause toggle key (Space, mediaPlayPause, or desktop Key K)
+          final bool isPlayPauseToggle = key == LogicalKeyboardKey.mediaPlayPause ||
+              key == LogicalKeyboardKey.space ||
+              code == 85 ||
+              debugName.contains('playpause') ||
+              debugName.contains('play_pause') ||
+              (_isMacOrDesktop && key == LogicalKeyboardKey.keyK);
+
+          // 4. Physical Fast Forward (Tua tới) key on remote
+          final bool isFwdKey = key == LogicalKeyboardKey.mediaFastForward ||
+              key == LogicalKeyboardKey.mediaSkipForward ||
+              key == LogicalKeyboardKey.mediaStepForward ||
+              code == 90 ||
+              code == 272 ||
+              code == 274 ||
+              debugName.contains('fastforward') ||
+              debugName.contains('fast_forward') ||
+              debugName.contains('skipforward') ||
+              debugName.contains('skip_forward') ||
+              debugName.contains('stepforward') ||
+              (_isMacOrDesktop && key == LogicalKeyboardKey.keyL);
+
+          // 5. Physical Rewind (Tua lui) key on remote
+          final bool isRwdKey = key == LogicalKeyboardKey.mediaRewind ||
+              key == LogicalKeyboardKey.mediaSkipBackward ||
+              key == LogicalKeyboardKey.mediaStepBackward ||
+              code == 89 ||
+              code == 273 ||
+              code == 275 ||
+              debugName.contains('rewind') ||
+              debugName.contains('skipbackward') ||
+              debugName.contains('skip_backward') ||
+              debugName.contains('stepbackward') ||
+              debugName.contains('step_backward') ||
+              (_isMacOrDesktop && key == LogicalKeyboardKey.keyJ);
+
+          // 6. Track navigation (Previous / Next Track)
           final bool isPrevTrack = key == LogicalKeyboardKey.mediaTrackPrevious ||
+              code == 88 ||
+              debugName.contains('trackprevious') ||
+              debugName.contains('track_previous') ||
               (_isMacOrDesktop && key == LogicalKeyboardKey.keyP);
           final bool isNextTrack = key == LogicalKeyboardKey.mediaTrackNext ||
+              code == 87 ||
+              debugName.contains('tracknext') ||
+              debugName.contains('track_next') ||
               (_isMacOrDesktop && key == LogicalKeyboardKey.keyN);
 
-          final bool isLeft = key == LogicalKeyboardKey.arrowLeft ||
-              key == LogicalKeyboardKey.mediaRewind ||
-              (isPrevTrack && widget.onPrevious == null);
-          final bool isRight = key == LogicalKeyboardKey.arrowRight ||
-              key == LogicalKeyboardKey.mediaFastForward ||
-              (isNextTrack && widget.onNext == null);
+          // 7. D-pad Navigation Left / Right
+          final bool isLeft = key == LogicalKeyboardKey.arrowLeft;
+          final bool isRight = key == LogicalKeyboardKey.arrowRight;
 
           final bool isBack = key == LogicalKeyboardKey.escape ||
               key == LogicalKeyboardKey.goBack ||
@@ -876,18 +974,68 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
 
+            // Dedicated Remote Play Key
+            if (isPlayKey) {
+              _playVideo();
+              return KeyEventResult.handled;
+            }
+
+            // Dedicated Remote Pause Key
+            if (isPauseKey) {
+              _pauseVideo();
+              return KeyEventResult.handled;
+            }
+
+            // Dedicated Remote Play/Pause Toggle Key
+            if (isPlayPauseToggle) {
+              _togglePlayPause();
+              return KeyEventResult.handled;
+            }
+
+            // Dedicated Remote Fast Forward (Tua tới) Key
+            if (isFwdKey) {
+              if (widget.isLive) {
+                _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
+                return KeyEventResult.handled;
+              }
+              if (_showStreamSelector) {
+                setState(() {
+                  _showStreamSelector = false;
+                });
+              }
+              if (_isHoldingSeek && _holdSeekDirection == 1) {
+                _handleRemoteSeekRepeat(1);
+              } else {
+                _handleRemoteSeekStart(1);
+              }
+              return KeyEventResult.handled;
+            }
+
+            // Dedicated Remote Rewind (Tua lui) Key
+            if (isRwdKey) {
+              if (widget.isLive) {
+                _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
+                return KeyEventResult.handled;
+              }
+              if (_showStreamSelector) {
+                setState(() {
+                  _showStreamSelector = false;
+                });
+              }
+              if (_isHoldingSeek && _holdSeekDirection == -1) {
+                _handleRemoteSeekRepeat(-1);
+              } else {
+                _handleRemoteSeekStart(-1);
+              }
+              return KeyEventResult.handled;
+            }
+
             if (isPrevTrack && widget.onPrevious != null) {
               widget.onPrevious!();
               return KeyEventResult.handled;
             }
             if (isNextTrack && widget.onNext != null) {
               widget.onNext!();
-              return KeyEventResult.handled;
-            }
-
-            // Hardware space or mediaPlayPause: always toggle play/pause
-            if (key == LogicalKeyboardKey.space || key == LogicalKeyboardKey.mediaPlayPause) {
-              _togglePlayPause();
               return KeyEventResult.handled;
             }
 
@@ -920,10 +1068,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
-              if (key == LogicalKeyboardKey.mediaRewind) {
-                _seekRelative(-10);
-                return KeyEventResult.handled;
-              }
               // Explicitly navigate between control buttons in the bottom bar
               final controlNodes = _getActiveControlNodes();
               final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
@@ -953,10 +1097,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   _handleRemoteSeekStart(1);
                 }
                 _startHideControlsTimer();
-                return KeyEventResult.handled;
-              }
-              if (key == LogicalKeyboardKey.mediaFastForward) {
-                _seekRelative(10);
                 return KeyEventResult.handled;
               }
               // Explicitly navigate between control buttons in the bottom bar
@@ -1055,6 +1195,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
           } else if (event is KeyRepeatEvent) {
+            if (isPlayKey || isPauseKey || isPlayPauseToggle) {
+              return KeyEventResult.handled;
+            }
+            if (isFwdKey) {
+              if (!widget.isLive) _handleRemoteSeekRepeat(1);
+              return KeyEventResult.handled;
+            }
+            if (isRwdKey) {
+              if (!widget.isLive) _handleRemoteSeekRepeat(-1);
+              return KeyEventResult.handled;
+            }
             if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekRepeat(-1);
               return KeyEventResult.handled;
@@ -1064,6 +1215,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
           } else if (event is KeyUpEvent) {
+            if (isPlayKey || isPauseKey || isPlayPauseToggle) {
+              return KeyEventResult.handled;
+            }
+            if (isFwdKey) {
+              if (!widget.isLive) _handleRemoteSeekEnd(1);
+              return KeyEventResult.handled;
+            }
+            if (isRwdKey) {
+              if (!widget.isLive) _handleRemoteSeekEnd(-1);
+              return KeyEventResult.handled;
+            }
             if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekEnd(-1);
               return KeyEventResult.handled;
@@ -1301,17 +1463,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              _hudIcon == 'CHANNEL'
-                                  ? Icons.live_tv_rounded
-                                  : (_hudIcon == 'FORWARD'
-                                      ? Icons.fast_forward_rounded
-                                      : (_hudIcon == 'REWIND'
-                                          ? Icons.fast_rewind_rounded
-                                          : (_hudIcon == 'VOLUME_MUTE'
-                                              ? Icons.volume_off_rounded
-                                              : (_hudIcon == 'VOLUME_LOW'
-                                                  ? Icons.volume_down_rounded
-                                                  : Icons.volume_up_rounded)))),
+                              _hudIcon == 'PLAY'
+                                  ? Icons.play_arrow_rounded
+                                  : (_hudIcon == 'PAUSE'
+                                      ? Icons.pause_rounded
+                                      : (_hudIcon == 'CHANNEL'
+                                          ? Icons.live_tv_rounded
+                                          : (_hudIcon == 'FORWARD'
+                                              ? Icons.fast_forward_rounded
+                                              : (_hudIcon == 'REWIND'
+                                                  ? Icons.fast_rewind_rounded
+                                                  : (_hudIcon == 'VOLUME_MUTE'
+                                                      ? Icons.volume_off_rounded
+                                                      : (_hudIcon == 'VOLUME_LOW'
+                                                          ? Icons.volume_down_rounded
+                                                          : Icons.volume_up_rounded)))))),
                               color: const Color(0xFF38BDF8),
                               size: 44,
                             ),
@@ -1340,7 +1506,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (_hudIcon != 'CHANNEL' && !_hudIcon!.startsWith('VOLUME')) ...[
+                        if (_hudIcon != 'CHANNEL' &&
+                            !_hudIcon!.startsWith('VOLUME') &&
+                            _hudIcon != 'PLAY' &&
+                            _hudIcon != 'PAUSE') ...[
                           const SizedBox(height: 4),
                           Text(
                             '${_formatDuration(_dragTargetPosition)} / ${_formatDuration(_controller.value.duration)}',
