@@ -1536,6 +1536,91 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ],
                                   ),
                                 ),
+                              // HUD Status Pill (Bên trên video, cạnh phần volume, không đụng tiêu đề phim)
+                              AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                transitionBuilder: (child, animation) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: ScaleTransition(
+                                      scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: _hudIcon != null
+                                    ? Container(
+                                        key: ValueKey('hud_${_hudIcon}_${_hudText}'),
+                                        margin: const EdgeInsets.only(left: 10),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xE60F172A),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFF38BDF8).withOpacity(0.25),
+                                              blurRadius: 10,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              _hudIcon == 'PLAY'
+                                                  ? Icons.play_arrow_rounded
+                                                  : (_hudIcon == 'PAUSE'
+                                                      ? Icons.pause_rounded
+                                                      : (_hudIcon == 'CHANNEL'
+                                                          ? Icons.live_tv_rounded
+                                                          : (_hudIcon == 'FORWARD'
+                                                              ? Icons.fast_forward_rounded
+                                                              : (_hudIcon == 'REWIND'
+                                                                  ? Icons.fast_rewind_rounded
+                                                                  : (_hudIcon == 'VOLUME_MUTE'
+                                                                      ? Icons.volume_off_rounded
+                                                                      : (_hudIcon == 'VOLUME_LOW'
+                                                                          ? Icons.volume_down_rounded
+                                                                          : Icons.volume_up_rounded)))))),
+                                              color: const Color(0xFF38BDF8),
+                                              size: 16,
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              _hudText ?? '',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 0.3,
+                                              ),
+                                            ),
+                                            if (_hudSpeedBadge != null) ...[
+                                              const SizedBox(width: 6),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF0284C7),
+                                                  borderRadius: BorderRadius.circular(5),
+                                                  border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
+                                                ),
+                                                child: Text(
+                                                  _hudSpeedBadge!,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                               if (_isMacOrDesktop) ...[
                                 const SizedBox(width: 12),
                                 Container(
@@ -1722,94 +1807,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 8),
                               ],
-
-                              // Compact HUD Indicator (Thu nhỏ & di chuyển về cụm nút điều khiển dưới seek bar)
-                              AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                transitionBuilder: (child, animation) {
-                                  return FadeTransition(
-                                    opacity: animation,
-                                    child: ScaleTransition(
-                                      scale: Tween<double>(begin: 0.85, end: 1.0).animate(animation),
-                                      child: child,
-                                    ),
-                                  );
-                                },
-                                child: _hudIcon != null
-                                    ? Container(
-                                        key: ValueKey('hud_${_hudIcon}_${_hudText}'),
-                                        margin: const EdgeInsets.only(bottom: 8),
-                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xE60F172A),
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: const Color(0xFF38BDF8).withOpacity(0.25),
-                                              blurRadius: 10,
-                                              spreadRadius: 1,
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              _hudIcon == 'PLAY'
-                                                  ? Icons.play_arrow_rounded
-                                                  : (_hudIcon == 'PAUSE'
-                                                      ? Icons.pause_rounded
-                                                      : (_hudIcon == 'CHANNEL'
-                                                          ? Icons.live_tv_rounded
-                                                          : (_hudIcon == 'FORWARD'
-                                                              ? Icons.fast_forward_rounded
-                                                              : (_hudIcon == 'REWIND'
-                                                                  ? Icons.fast_rewind_rounded
-                                                                  : (_hudIcon == 'VOLUME_MUTE'
-                                                                      ? Icons.volume_off_rounded
-                                                                      : (_hudIcon == 'VOLUME_LOW'
-                                                                          ? Icons.volume_down_rounded
-                                                                          : Icons.volume_up_rounded)))))),
-                                              color: const Color(0xFF38BDF8),
-                                              size: 18,
-                                            ),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              _hudText ?? '',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 13,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 0.3,
-                                              ),
-                                            ),
-                                            if (_hudSpeedBadge != null) ...[
-                                              const SizedBox(width: 6),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFF0284C7),
-                                                  borderRadius: BorderRadius.circular(6),
-                                                  border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
-                                                ),
-                                                child: Text(
-                                                  _hudSpeedBadge!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 11,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ],
-                                        ),
-                                      )
-                                    : const SizedBox.shrink(),
-                              ),
 
                               // Playback Controls Row (Nút điều khiển xuất hiện DƯỚI thanh tiến trình)
                               Row(

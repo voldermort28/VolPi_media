@@ -1,10 +1,10 @@
 {
-  "version": "2.2.1",
-  "build": 67,
-  "tag_name": "v2.2.1",
-  "changelog": "• VolPi Media v2.2.1 - Tinh Gọn HUD & Tối Ưu Tầm Nhìn Trình Phát:\n- Thu nhỏ biểu tượng HUD và chuyển toàn bộ thông báo trạng thái (Play, Pause, Tua tới, Tua lui, Âm lượng, Chọn luồng) về phía dưới thanh seek bar, nằm gọn gàng bên trên cụm nút điều khiển.\n- Trả lại không gian hiển thị rộng rãi, không bị che khuất tầm nhìn video ở giữa màn hình khi thao tác trên Remote TV.",
+  "version": "2.2.2",
+  "build": 68,
+  "tag_name": "v2.2.2",
+  "changelog": "• VolPi Media v2.2.2 - Di Chuyển HUD Lên Thanh Header Top Bar (Cạnh Nút Âm Lượng):\n- Chuyển toàn bộ biểu tượng HUD thông báo trạng thái (Play, Pause, Tua tới, Tua lui, Âm lượng, Chọn luồng) lên thanh Header phía trên video, đặt cạnh thanh điều chỉnh âm lượng.\n- Không làm đẩy thanh seek bar lên cao ở thanh dưới, giữ nguyên bố cục seek bar chuẩn xác.\n- Nằm gọn gàng bên phải tiêu đề phim, tự động căn chỉnh không bao giờ đè lên tên phim.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-22T09:20:00Z"
+  "published_at": "2026-10-22T09:30:00Z"
 }
