@@ -111,7 +111,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _skipIntroFocusNode = FocusNode();
   final FocusNode _channelsButtonFocusNode = FocusNode();
   final FocusNode _backButtonFocusNode = FocusNode();
+  final FocusNode _rotateFocusNode = FocusNode();
+  final FocusNode _lockFocusNode = FocusNode();
   final List<FocusNode> _channelFocusNodes = [];
+
+  // Screen Orientation & Touch Lock (Mobile / iOS / Tablet)
+  bool _isScreenLocked = false;
+  bool _showLockOverlay = false;
+  Timer? _lockOverlayTimer;
 
   List<StreamChannel> get _effectiveChannels {
     if (widget.availableChannels != null && widget.availableChannels!.isNotEmpty) {
@@ -162,6 +169,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _handleBackAction() {
+    if (_isScreenLocked) {
+      setState(() {
+        _showLockOverlay = true;
+      });
+      _startLockOverlayTimer();
+      _showBriefPlaybackHud('LOCK', 'Màn hình đang khóa');
+      return;
+    }
     if (_showStreamSelector) {
       setState(() {
         _showStreamSelector = false;
@@ -505,7 +520,54 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  void _toggleScreenOrientation() {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+      _showBriefPlaybackHud('ROTATE', 'Màn hình dọc');
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      _showBriefPlaybackHud('ROTATE', 'Màn hình ngang');
+    }
+  }
+
+  void _toggleLockScreen() {
+    setState(() {
+      _isScreenLocked = !_isScreenLocked;
+      if (_isScreenLocked) {
+        _showControls = false;
+        _showLockOverlay = true;
+      } else {
+        _showControls = true;
+      }
+    });
+    if (_isScreenLocked) {
+      _showBriefPlaybackHud('LOCK', 'Đã khóa màn hình cảm ứng');
+      _startLockOverlayTimer();
+    } else {
+      _showBriefPlaybackHud('UNLOCK', 'Đã mở khóa màn hình');
+      _startHideControlsTimer();
+    }
+  }
+
+  void _startLockOverlayTimer() {
+    _lockOverlayTimer?.cancel();
+    _lockOverlayTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _isScreenLocked) {
+        setState(() {
+          _showLockOverlay = false;
+        });
+      }
+    });
+  }
+
   void _onMouseMove() {
+    if (!_isMacOrDesktop || _isScreenLocked) return;
     final now = DateTime.now();
     if (_lastMouseMoveTime != null && now.difference(_lastMouseMoveTime!).inMilliseconds < 80) {
       return;
@@ -521,6 +583,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _showControlsBriefly() {
+    if (_isScreenLocked) return;
     setState(() {
       _showControls = true;
     });
@@ -536,6 +599,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _toggleControls() {
+    if (_isScreenLocked) return;
     if (_showStreamSelector) {
       setState(() {
         _showStreamSelector = false;
@@ -862,6 +926,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     WatchHistoryService.instance.flush();
     SyncService.pushToServer(null);
     _hideControlsTimer?.cancel();
+    _lockOverlayTimer?.cancel();
     _nextCountdownTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
@@ -869,6 +934,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _playPauseFocusNode.dispose();
     _seekBarFocusNode.dispose();
     _prevFocusNode.dispose();
@@ -878,6 +949,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _skipIntroFocusNode.dispose();
     _channelsButtonFocusNode.dispose();
     _backButtonFocusNode.dispose();
+    _rotateFocusNode.dispose();
+    _lockFocusNode.dispose();
     for (final n in _channelFocusNodes) {
       n.dispose();
     }
@@ -976,6 +1049,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
 
+            if (_isScreenLocked) {
+              return KeyEventResult.ignored;
+            }
+
             // Dedicated Remote Play Key
             if (isPlayKey) {
               _playVideo();
@@ -1053,6 +1130,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
             // Left navigation / seek
             if (isLeft) {
+              if (_lockFocusNode.hasFocus) {
+                _rotateFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (_rotateFocusNode.hasFocus) {
+                _backButtonFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
               if (!_showControls) {
                 if (_isHoldingSeek && _holdSeekDirection == -1) {
                   _handleRemoteSeekRepeat(-1);
@@ -1084,6 +1171,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
             // Right navigation / seek
             if (isRight) {
+              if (_backButtonFocusNode.hasFocus) {
+                _rotateFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              if (_rotateFocusNode.hasFocus) {
+                _lockFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
               if (!_showControls) {
                 if (_isHoldingSeek && _holdSeekDirection == 1) {
                   _handleRemoteSeekRepeat(1);
@@ -1152,7 +1249,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
-              if (_backButtonFocusNode.hasFocus) {
+              if (_backButtonFocusNode.hasFocus || _rotateFocusNode.hasFocus || _lockFocusNode.hasFocus) {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
@@ -1175,7 +1272,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
-              if (_backButtonFocusNode.hasFocus) {
+              if (_backButtonFocusNode.hasFocus || _rotateFocusNode.hasFocus || _lockFocusNode.hasFocus) {
                 if (widget.isLive) {
                   _playPauseFocusNode.requestFocus();
                 } else {
@@ -1197,6 +1294,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
           } else if (event is KeyRepeatEvent) {
+            if (_isScreenLocked) return KeyEventResult.ignored;
             if (isPlayKey || isPauseKey || isPlayPauseToggle) {
               return KeyEventResult.handled;
             }
@@ -1217,6 +1315,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
           } else if (event is KeyUpEvent) {
+            if (_isScreenLocked) return KeyEventResult.ignored;
             if (isPlayKey || isPauseKey || isPlayPauseToggle) {
               return KeyEventResult.handled;
             }
@@ -1246,9 +1345,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           onHover: (_) => _onMouseMove(),
           onEnter: (_) => _onMouseMove(),
           child: Listener(
-            onPointerHover: (_) => _onMouseMove(),
-            onPointerMove: (_) => _onMouseMove(),
-            onPointerDown: (_) => _onMouseMove(),
+            onPointerHover: (_) {
+              if (_isMacOrDesktop) _onMouseMove();
+            },
+            onPointerMove: (_) {
+              if (_isMacOrDesktop) _onMouseMove();
+            },
             onPointerSignal: (pointerSignal) {
               if (_isMacOrDesktop && pointerSignal is PointerScrollEvent) {
                 final bool isShiftPressed = HardwareKeyboard.instance.isShiftPressed;
@@ -1260,10 +1362,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               }
             },
             child: GestureDetector(
-              onTap: _toggleControls,
-              onHorizontalDragStart: _onHorizontalDragStart,
-              onHorizontalDragUpdate: _onHorizontalDragUpdate,
-              onHorizontalDragEnd: _onHorizontalDragEnd,
+              onTap: () {
+                if (_isScreenLocked) {
+                  setState(() {
+                    _showLockOverlay = true;
+                  });
+                  _startLockOverlayTimer();
+                  return;
+                }
+                _toggleControls();
+              },
+              onHorizontalDragStart: _isScreenLocked ? null : _onHorizontalDragStart,
+              onHorizontalDragUpdate: _isScreenLocked ? null : _onHorizontalDragUpdate,
+              onHorizontalDragEnd: _isScreenLocked ? null : _onHorizontalDragEnd,
               behavior: HitTestBehavior.opaque,
               child: Stack(
             alignment: Alignment.center,
@@ -1382,7 +1493,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 bottom: 0,
                 width: screenSize.width * 0.35,
                 child: GestureDetector(
-                  onDoubleTap: () => _onDoubleTapSide(false),
+                  onDoubleTap: () {
+                    if (_isScreenLocked) return;
+                    _onDoubleTapSide(false);
+                  },
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1393,7 +1507,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 bottom: 0,
                 width: screenSize.width * 0.35,
                 child: GestureDetector(
-                  onDoubleTap: () => _onDoubleTapSide(true),
+                  onDoubleTap: () {
+                    if (_isScreenLocked) return;
+                    _onDoubleTapSide(true);
+                  },
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1443,12 +1560,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
               // 4. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
               ExcludeFocus(
-                excluding: !_showControls,
+                excluding: !_showControls || _isScreenLocked,
                 child: AnimatedOpacity(
-                  opacity: _showControls ? 1.0 : 0.0,
+                  opacity: (_showControls && !_isScreenLocked) ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 200),
                   child: IgnorePointer(
-                    ignoring: !_showControls,
+                    ignoring: !_showControls || _isScreenLocked,
                     child: SafeArea(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1479,7 +1596,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               children: [
                                 TvFocusableCard(
                                   focusNode: _backButtonFocusNode,
-                                  onTap: () => Navigator.of(context).pop(),
+                                  onTap: _handleBackAction,
                                   scale: 1.1,
                                   borderRadius: BorderRadius.circular(20),
                                   child: Container(
@@ -1583,7 +1700,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                                                       ? Icons.volume_off_rounded
                                                                       : (_hudIcon == 'VOLUME_LOW'
                                                                           ? Icons.volume_down_rounded
-                                                                          : Icons.volume_up_rounded)))))),
+                                                                          : (_hudIcon == 'LOCK'
+                                                                              ? Icons.lock_rounded
+                                                                              : (_hudIcon == 'UNLOCK'
+                                                                                  ? Icons.lock_open_rounded
+                                                                                  : (_hudIcon == 'ROTATE'
+                                                                                      ? Icons.screen_rotation_rounded
+                                                                                      : Icons.volume_up_rounded))))))))),
                                               color: const Color(0xFF38BDF8),
                                               size: 16,
                                             ),
@@ -1620,6 +1743,46 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         ),
                                       )
                                     : const SizedBox.shrink(),
+                              ),
+                              // Rotate Screen Button
+                              const SizedBox(width: 8),
+                              TvFocusableCard(
+                                focusNode: _rotateFocusNode,
+                                onTap: _toggleScreenOrientation,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24, width: 0.8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.screen_rotation_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                              // Lock Touch Screen Button
+                              const SizedBox(width: 8),
+                              TvFocusableCard(
+                                focusNode: _lockFocusNode,
+                                onTap: _toggleLockScreen,
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  padding: const EdgeInsets.all(7),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black45,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white24, width: 0.8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.lock_outline_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
                               ),
                               if (_isMacOrDesktop) ...[
                                 const SizedBox(width: 12),
@@ -2218,6 +2381,55 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ),
+
+              // 5. FLOATING UNLOCK BUTTON (Hiển thị khi khóa màn hình cảm ứng)
+              if (_isScreenLocked)
+                Positioned(
+                  top: 24,
+                  left: 24,
+                  child: SafeArea(
+                    child: AnimatedOpacity(
+                      opacity: _showLockOverlay ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: IgnorePointer(
+                        ignoring: !_showLockOverlay,
+                        child: GestureDetector(
+                          onTap: _toggleLockScreen,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xE60F172A),
+                              borderRadius: BorderRadius.circular(30),
+                              border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF38BDF8).withOpacity(0.35),
+                                  blurRadius: 14,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.lock_rounded, color: Color(0xFF38BDF8), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Chạm để mở khóa',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),

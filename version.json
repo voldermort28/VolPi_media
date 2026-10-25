@@ -1,10 +1,10 @@
 {
-  "version": "2.2.2",
-  "build": 68,
-  "tag_name": "v2.2.2",
-  "changelog": "• VolPi Media v2.2.2 - Di Chuyển HUD Lên Thanh Header Top Bar (Cạnh Nút Âm Lượng):\n- Chuyển toàn bộ biểu tượng HUD thông báo trạng thái (Play, Pause, Tua tới, Tua lui, Âm lượng, Chọn luồng) lên thanh Header phía trên video, đặt cạnh thanh điều chỉnh âm lượng.\n- Không làm đẩy thanh seek bar lên cao ở thanh dưới, giữ nguyên bố cục seek bar chuẩn xác.\n- Nằm gọn gàng bên phải tiêu đề phim, tự động căn chỉnh không bao giờ đè lên tên phim.",
+  "version": "2.2.3",
+  "build": 69,
+  "tag_name": "v2.2.3",
+  "changelog": "• VolPi Media v2.2.3 - Sửa Lỗi Tắt Nhanh Thanh Điều Khiển Trên iOS & Bổ Sung Nút Xoay Màn Hình, Khóa Màn Hình Cảm Ứng:\n- Sửa triệt để lỗi trên iOS/thiết bị cảm ứng khi chạm vào màn hình các nút điều khiển và seek bar bị tắt ngay lập tức, đảm bảo hiển thị ổn định để thao tác.\n- Bổ sung nút Xoay màn hình (ngang / dọc) trên thanh điều khiển của Player kèm thông báo HUD.\n- Bổ sung nút Khóa màn hình cảm ứng để tránh chạm nhầm khi đang xem video, đi kèm nút Chạm để mở khóa nổi tiện lợi.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-22T09:30:00Z"
+  "published_at": "2026-10-26T01:30:00Z"
 }
