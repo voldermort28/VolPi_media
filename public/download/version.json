@@ -1,10 +1,10 @@
 {
-  "version": "2.2.4",
-  "build": 70,
-  "tag_name": "v2.2.4",
-  "changelog": "• VolPi Media v2.2.4 - Chạm Ẩn Thanh Điều Khiển & Giữ Vuốt Tăng Tốc 2X -> 3X (Kiểu Telegram):\n- Khi đang hiện các nút điều khiển, chạm vào khoảng trống trên màn hình video sẽ lập tức ẩn thanh điều khiển ngay.\n- Bổ sung cử chỉ Chạm Giữ & Vuốt Sang Phải kiểu Telegram: Khi chạm giữ màn hình video sẽ tăng tốc 2X, vuốt ngón tay sang phải sẽ tăng tốc lên 3X cực nhanh với thanh thông báo nổi sống động.\n- Thả tay ra thì tốc độ phát sẽ tự động mượt mà trở lại bình thường (1.0X).",
+  "version": "2.2.5",
+  "build": 71,
+  "tag_name": "v2.2.5",
+  "changelog": "• VolPi Media v2.2.5 - Tối Ưu Hóa Riêng Biệt Cho Từng Nền Tảng (macOS, Android TV & iOS):\n- Tách biệt hoàn toàn tính năng cảm ứng: Nút Xoay màn hình, Khóa màn hình cảm ứng, và Cử chỉ giữ vuốt 2X -> 3X chỉ hiển thị và hoạt động trên thiết bị di động iOS (iPhone / iPad).\n- Trên macOS (Desktop): Loại bỏ nút Xoay và Khóa cảm ứng, giữ thanh điều khiển sạch đẹp với thanh Âm lượng chuẩn desktop.\n- Trên Android TV: Loại bỏ nút Xoay và Khóa cảm ứng, phục hồi điều hướng phím D-pad trên remote cực kỳ mượt mà và chuẩn xác, không bị kẹt nút hay nhảy sai.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-26T01:35:00Z"
+  "published_at": "2026-10-26T03:50:00Z"
 }

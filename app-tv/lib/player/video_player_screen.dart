@@ -202,6 +202,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isIOS => !kIsWeb && Platform.isIOS;
 
   @override
   void initState() {
@@ -527,6 +528,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _toggleScreenOrientation() {
+    if (!_isIOS) return;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     if (isLandscape) {
       SystemChrome.setPreferredOrientations([
@@ -543,6 +545,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _toggleLockScreen() {
+    if (!_isIOS) return;
     setState(() {
       _isScreenLocked = !_isScreenLocked;
       if (_isScreenLocked) {
@@ -874,7 +877,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   // --- Telegram-Style Hold & Swipe Fast Forward (2x -> 3x) ---
   void _onLongPressStart(LongPressStartDetails details) {
-    if (!_isInitialized || widget.isLive || _isScreenLocked) return;
+    if (!_isIOS || !_isInitialized || widget.isLive || _isScreenLocked) return;
     _holdStartOffset = details.localPosition;
     _isHoldSpeeding = true;
     _wasPlayingBeforeHold = _controller.value.isPlaying;
@@ -998,12 +1001,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    if (_isIOS) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+    }
     _playPauseFocusNode.dispose();
     _seekBarFocusNode.dispose();
     _prevFocusNode.dispose();
@@ -1194,15 +1199,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
             // Left navigation / seek
             if (isLeft) {
-              if (_lockFocusNode.hasFocus) {
-                _rotateFocusNode.requestFocus();
-                _startHideControlsTimer();
-                return KeyEventResult.handled;
-              }
-              if (_rotateFocusNode.hasFocus) {
-                _backButtonFocusNode.requestFocus();
-                _startHideControlsTimer();
-                return KeyEventResult.handled;
+              if (_isIOS) {
+                if (_lockFocusNode.hasFocus) {
+                  _rotateFocusNode.requestFocus();
+                  _startHideControlsTimer();
+                  return KeyEventResult.handled;
+                }
+                if (_rotateFocusNode.hasFocus) {
+                  _backButtonFocusNode.requestFocus();
+                  _startHideControlsTimer();
+                  return KeyEventResult.handled;
+                }
               }
               if (!_showControls) {
                 if (_isHoldingSeek && _holdSeekDirection == -1) {
@@ -1235,15 +1242,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
             // Right navigation / seek
             if (isRight) {
-              if (_backButtonFocusNode.hasFocus) {
-                _rotateFocusNode.requestFocus();
-                _startHideControlsTimer();
-                return KeyEventResult.handled;
-              }
-              if (_rotateFocusNode.hasFocus) {
-                _lockFocusNode.requestFocus();
-                _startHideControlsTimer();
-                return KeyEventResult.handled;
+              if (_isIOS) {
+                if (_backButtonFocusNode.hasFocus) {
+                  _rotateFocusNode.requestFocus();
+                  _startHideControlsTimer();
+                  return KeyEventResult.handled;
+                }
+                if (_rotateFocusNode.hasFocus) {
+                  _lockFocusNode.requestFocus();
+                  _startHideControlsTimer();
+                  return KeyEventResult.handled;
+                }
               }
               if (!_showControls) {
                 if (_isHoldingSeek && _holdSeekDirection == 1) {
@@ -1313,7 +1322,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
-              if (_backButtonFocusNode.hasFocus || _rotateFocusNode.hasFocus || _lockFocusNode.hasFocus) {
+              if (_backButtonFocusNode.hasFocus || (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
@@ -1336,7 +1345,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
-              if (_backButtonFocusNode.hasFocus || _rotateFocusNode.hasFocus || _lockFocusNode.hasFocus) {
+              if (_backButtonFocusNode.hasFocus || (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
                 if (widget.isLive) {
                   _playPauseFocusNode.requestFocus();
                 } else {
@@ -1439,10 +1448,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               onHorizontalDragStart: _isScreenLocked ? null : _onHorizontalDragStart,
               onHorizontalDragUpdate: _isScreenLocked ? null : _onHorizontalDragUpdate,
               onHorizontalDragEnd: _isScreenLocked ? null : _onHorizontalDragEnd,
-              onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
-              onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
-              onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
-              onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
+              onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
+              onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
+              onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
+              onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
               behavior: HitTestBehavior.opaque,
               child: Stack(
             alignment: Alignment.center,
@@ -1565,10 +1574,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     if (_isScreenLocked) return;
                     _onDoubleTapSide(false);
                   },
-                  onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
-                  onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
-                  onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
-                  onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
+                  onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
+                  onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
+                  onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
+                  onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1583,10 +1592,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     if (_isScreenLocked) return;
                     _onDoubleTapSide(true);
                   },
-                  onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
-                  onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
-                  onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
-                  onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
+                  onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
+                  onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
+                  onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
+                  onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1820,46 +1829,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       )
                                     : const SizedBox.shrink(),
                               ),
-                              // Rotate Screen Button
-                              const SizedBox(width: 8),
-                              TvFocusableCard(
-                                focusNode: _rotateFocusNode,
-                                onTap: _toggleScreenOrientation,
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white24, width: 0.8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.screen_rotation_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                              ),
-                              // Lock Touch Screen Button
-                              const SizedBox(width: 8),
-                              TvFocusableCard(
-                                focusNode: _lockFocusNode,
-                                onTap: _toggleLockScreen,
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  padding: const EdgeInsets.all(7),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black45,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white24, width: 0.8),
-                                  ),
-                                  child: const Icon(
-                                    Icons.lock_outline_rounded,
-                                    color: Colors.white,
-                                    size: 18,
+                              // Rotate Screen & Lock Touch Screen Buttons (Chỉ hiển thị trên iOS)
+                              if (_isIOS) ...[
+                                const SizedBox(width: 8),
+                                TvFocusableCard(
+                                  focusNode: _rotateFocusNode,
+                                  onTap: _toggleScreenOrientation,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white24, width: 0.8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.screen_rotation_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
                                   ),
                                 ),
-                              ),
+                                // Lock Touch Screen Button
+                                const SizedBox(width: 8),
+                                TvFocusableCard(
+                                  focusNode: _lockFocusNode,
+                                  onTap: _toggleLockScreen,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black45,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white24, width: 0.8),
+                                    ),
+                                    child: const Icon(
+                                      Icons.lock_outline_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
                               if (_isMacOrDesktop) ...[
                                 const SizedBox(width: 12),
                                 Container(
@@ -2470,8 +2481,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 5. FLOATING UNLOCK BUTTON (Hiển thị khi khóa màn hình cảm ứng)
-              if (_isScreenLocked)
+              // 5. FLOATING UNLOCK BUTTON (Hiển thị khi khóa màn hình cảm ứng - Chỉ trên iOS)
+              if (_isIOS && _isScreenLocked)
                 Positioned(
                   top: 24,
                   left: 24,
@@ -2519,8 +2530,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 6. TELEGRAM-STYLE FAST FORWARD HUD (2x -> 3x)
-              if (_isHoldSpeeding)
+              // 6. TELEGRAM-STYLE FAST FORWARD HUD (2x -> 3x - Chỉ trên iOS)
+              if (_isIOS && _isHoldSpeeding)
                 Positioned(
                   top: 24,
                   child: SafeArea(
