@@ -120,6 +120,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _showLockOverlay = false;
   Timer? _lockOverlayTimer;
 
+  // Touch Hold Fast Forward (2x -> 3x Telegram Style)
+  bool _isHoldSpeeding = false;
+  double _currentHoldSpeed = 1.0;
+  bool _wasPlayingBeforeHold = true;
+  Offset? _holdStartOffset;
+
   List<StreamChannel> get _effectiveChannels {
     if (widget.availableChannels != null && widget.availableChannels!.isNotEmpty) {
       return widget.availableChannels!;
@@ -866,6 +872,61 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _showControlsBriefly();
   }
 
+  // --- Telegram-Style Hold & Swipe Fast Forward (2x -> 3x) ---
+  void _onLongPressStart(LongPressStartDetails details) {
+    if (!_isInitialized || widget.isLive || _isScreenLocked) return;
+    _holdStartOffset = details.localPosition;
+    _isHoldSpeeding = true;
+    _wasPlayingBeforeHold = _controller.value.isPlaying;
+    _currentHoldSpeed = 2.0;
+
+    if (!_controller.value.isPlaying) {
+      _controller.play();
+    }
+    _controller.setPlaybackSpeed(2.0);
+
+    _hideControlsTimer?.cancel();
+    setState(() {
+      _showControls = false;
+    });
+  }
+
+  void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    if (!_isHoldSpeeding || !_isInitialized || widget.isLive || _isScreenLocked) return;
+    if (_holdStartOffset == null) return;
+
+    // Calculate horizontal distance from initial press position
+    final deltaX = details.localPosition.dx - _holdStartOffset!.dx;
+
+    // Swiping right by > 40px bumps speed to 3x, otherwise remains at 2x
+    final double targetSpeed = deltaX > 40 ? 3.0 : 2.0;
+
+    if (targetSpeed != _currentHoldSpeed) {
+      _currentHoldSpeed = targetSpeed;
+      _controller.setPlaybackSpeed(_currentHoldSpeed);
+      setState(() {});
+    }
+  }
+
+  void _onLongPressEnd(LongPressEndDetails? details) {
+    if (!_isHoldSpeeding) return;
+    _isHoldSpeeding = false;
+    _holdStartOffset = null;
+    _currentHoldSpeed = 1.0;
+
+    if (_isInitialized) {
+      _controller.setPlaybackSpeed(1.0);
+      if (!_wasPlayingBeforeHold) {
+        _controller.pause();
+      }
+    }
+    setState(() {});
+  }
+
+  void _onLongPressCancel() {
+    _onLongPressEnd(null);
+  }
+
   void _onDoubleTapSide(bool isRight) {
     if (!_isInitialized || widget.isLive) return;
     if (isRight) {
@@ -931,6 +992,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
     _commitSeekTimer?.cancel();
+    if (_isHoldSpeeding) {
+      _controller.setPlaybackSpeed(1.0);
+    }
     _controller.removeListener(_videoListener);
     _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -1375,6 +1439,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               onHorizontalDragStart: _isScreenLocked ? null : _onHorizontalDragStart,
               onHorizontalDragUpdate: _isScreenLocked ? null : _onHorizontalDragUpdate,
               onHorizontalDragEnd: _isScreenLocked ? null : _onHorizontalDragEnd,
+              onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
+              onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
+              onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
+              onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
               behavior: HitTestBehavior.opaque,
               child: Stack(
             alignment: Alignment.center,
@@ -1497,6 +1565,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     if (_isScreenLocked) return;
                     _onDoubleTapSide(false);
                   },
+                  onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
+                  onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
+                  onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
+                  onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1511,6 +1583,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     if (_isScreenLocked) return;
                     _onDoubleTapSide(true);
                   },
+                  onLongPressStart: _isScreenLocked ? null : _onLongPressStart,
+                  onLongPressMoveUpdate: _isScreenLocked ? null : _onLongPressMoveUpdate,
+                  onLongPressEnd: _isScreenLocked ? null : _onLongPressEnd,
+                  onLongPressCancel: _isScreenLocked ? null : _onLongPressCancel,
                   behavior: HitTestBehavior.translucent,
                   child: Container(),
                 ),
@@ -1847,8 +1923,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                       ),
 
-                      // Center: Clean transparent space (No screen darkening, No blocking buttons)
-                      const Spacer(),
+                      // Center: Tap empty area to dismiss controls immediately
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: () {
+                            if (_isScreenLocked) return;
+                            _toggleControls();
+                          },
+                          child: const SizedBox.expand(),
+                        ),
+                      ),
 
                       // Bottom Bar with Timeline & Playback Controls Below Progress Bar
                       MouseRegion(
@@ -2429,6 +2514,68 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 6. TELEGRAM-STYLE FAST FORWARD HUD (2x -> 3x)
+              if (_isHoldSpeeding)
+                Positioned(
+                  top: 24,
+                  child: SafeArea(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xE60F172A),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: _currentHoldSpeed == 3.0 ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (_currentHoldSpeed == 3.0 ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8)).withOpacity(0.4),
+                            blurRadius: 18,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _currentHoldSpeed == 3.0 ? Icons.bolt_rounded : Icons.fast_forward_rounded,
+                            color: _currentHoldSpeed == 3.0 ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            _currentHoldSpeed == 3.0 ? 'Tốc độ 3X' : 'Tốc độ 2X',
+                            style: TextStyle(
+                              color: _currentHoldSpeed == 3.0 ? const Color(0xFFFBBF24) : Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: _currentHoldSpeed == 3.0 ? const Color(0x33F59E0B) : const Color(0x3338BDF8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _currentHoldSpeed == 3.0 ? '⚡ Cực nhanh' : '👉 Vuốt sang phải để lên 3X',
+                              style: TextStyle(
+                                color: _currentHoldSpeed == 3.0 ? const Color(0xFFFDE68A) : const Color(0xFFBAE6FD),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
