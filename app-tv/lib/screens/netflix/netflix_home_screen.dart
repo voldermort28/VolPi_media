@@ -1262,7 +1262,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   }
 
   void _onFavoriteItemTap(FavoriteItem item) {
-    final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
+    final cleanId = _cleanAnimeSlug(item.id);
     final anime = AnimeModel(
       id: cleanId,
       name: item.title,

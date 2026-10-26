@@ -5,6 +5,8 @@ class FavoriteItem {
   final String category; // 'anime' | 'secret'
   final String createdAt; // Thời điểm thêm vào yêu thích (ISO 8601)
 
+  String get mediaId => id;
+
   const FavoriteItem({
     required this.id,
     required this.title,
