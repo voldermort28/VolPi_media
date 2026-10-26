@@ -8,6 +8,7 @@ import 'favorites_service.dart';
 class SyncService {
   static const String _syncKey = '3105'; // Mã đồng bộ mặc định (PIN chung)
   static Timer? _pushDebounce;
+  static Timer? _periodicPullTimer;
   static bool _isSyncing = false;
   static String? _configuredBaseUrl;
   static bool _listenersAttached = false;
@@ -22,6 +23,12 @@ class SyncService {
     }
     // Thực hiện đồng bộ 2 chiều ngay khi khởi động
     syncFull(baseUrl);
+
+    // Tự động kéo dữ liệu đồng bộ từ server mỗi 15 giây để cập nhật tức thì giữa các thiết bị
+    _periodicPullTimer?.cancel();
+    _periodicPullTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      pullFromServer(null);
+    });
   }
 
   static void _onDataChanged() {
@@ -50,6 +57,16 @@ class SyncService {
         final body = jsonDecode(utf8.decode(res.bodyBytes));
         if (body is Map && body['success'] == true && body['data'] is Map) {
           final data = body['data'];
+          if (data['deletedFavoriteIds'] is List) {
+            for (final id in data['deletedFavoriteIds']) {
+              FavoritesService.instance.removeLocalOnly(id.toString());
+            }
+          }
+          if (data['deletedHistoryIds'] is List) {
+            for (final id in data['deletedHistoryIds']) {
+              WatchHistoryService.instance.removeLocalOnly(id.toString());
+            }
+          }
           if (data['history'] is List) {
             WatchHistoryService.instance.importFromSync(
               List<Map<String, dynamic>>.from(data['history']),
@@ -112,6 +129,16 @@ class SyncService {
         final resBody = jsonDecode(utf8.decode(res.bodyBytes));
         if (resBody is Map && resBody['success'] == true && resBody['data'] is Map) {
           final merged = resBody['data'];
+          if (merged['deletedFavoriteIds'] is List) {
+            for (final id in merged['deletedFavoriteIds']) {
+              FavoritesService.instance.removeLocalOnly(id.toString());
+            }
+          }
+          if (merged['deletedHistoryIds'] is List) {
+            for (final id in merged['deletedHistoryIds']) {
+              WatchHistoryService.instance.removeLocalOnly(id.toString());
+            }
+          }
           if (merged['history'] is List) {
             WatchHistoryService.instance.importFromSync(
               List<Map<String, dynamic>>.from(merged['history']),

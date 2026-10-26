@@ -101,6 +101,15 @@ class WatchHistoryService {
     }
   }
 
+  /// Xóa mục cục bộ khi đồng bộ nhận được lệnh xóa từ thiết bị khác (không ghi nhận vào pendingDeletions)
+  void removeLocalOnly(String id) {
+    if (_cache.containsKey(id)) {
+      _cache.remove(id);
+      _notify();
+      _scheduleDiskWrite();
+    }
+  }
+
   /// Kiểm tra xem có mục lịch sử nào bắt đầu bằng tiền tố id không
   bool hasProgressForPrefix(String prefix) {
     return _cache.keys.any((k) => k == prefix || k.startsWith('$prefix:'));

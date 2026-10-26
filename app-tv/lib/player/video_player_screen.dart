@@ -114,6 +114,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _rotateFocusNode = FocusNode();
   final FocusNode _lockFocusNode = FocusNode();
   final List<FocusNode> _channelFocusNodes = [];
+  bool _lastFocusedOnSeekBar = true;
 
   // Screen Orientation & Touch Lock (Mobile / iOS / Tablet)
   bool _isScreenLocked = false;
@@ -225,6 +226,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _volume = PlayerSettingsService.instance.volume;
     _isMuted = PlayerSettingsService.instance.isMuted;
     _preMuteVolume = PlayerSettingsService.instance.preMuteVolume;
+
+    _seekBarFocusNode.addListener(() {
+      if (_seekBarFocusNode.hasFocus) {
+        _lastFocusedOnSeekBar = true;
+      }
+    });
+    _playPauseFocusNode.addListener(() {
+      if (_playPauseFocusNode.hasFocus) {
+        _lastFocusedOnSeekBar = false;
+      }
+    });
+    _backButtonFocusNode.addListener(() {
+      if (_backButtonFocusNode.hasFocus) {
+        _lastFocusedOnSeekBar = false;
+      }
+    });
+    for (final node in [
+      _prevFocusNode,
+      _nextFocusNode,
+      _replay10FocusNode,
+      _forward10FocusNode,
+      _skipIntroFocusNode,
+      _channelsButtonFocusNode,
+    ]) {
+      node.addListener(() {
+        if (node.hasFocus) {
+          _lastFocusedOnSeekBar = false;
+        }
+      });
+    }
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _initPlayer();
@@ -611,17 +642,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _startHideControlsTimer();
   }
 
-  void _showControlsBriefly() {
+  void _showControlsBriefly({bool focusSeekBar = false}) {
     if (_isScreenLocked) return;
     setState(() {
       _showControls = true;
     });
     _startHideControlsTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_showControls) return;
+      if (!widget.isLive && (focusSeekBar || _lastFocusedOnSeekBar)) {
+        _seekBarFocusNode.requestFocus();
+        return;
+      }
       final anyFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
           _seekBarFocusNode.hasFocus ||
           _backButtonFocusNode.hasFocus;
-      if (mounted && _showControls && !anyFocused) {
+      if (!anyFocused) {
         _playPauseFocusNode.requestFocus();
       }
     });
@@ -643,11 +679,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (_showControls) {
       _startHideControlsTimer();
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_showControls) return;
         final anyFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
             _seekBarFocusNode.hasFocus ||
             _backButtonFocusNode.hasFocus;
-        if (mounted && _showControls && !anyFocused) {
-          _playPauseFocusNode.requestFocus();
+        if (!anyFocused) {
+          if (!widget.isLive && _lastFocusedOnSeekBar) {
+            _seekBarFocusNode.requestFocus();
+          } else {
+            _playPauseFocusNode.requestFocus();
+          }
         }
       });
     } else {
@@ -739,6 +780,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _handleRemoteSeekStart(int direction) {
     if (!_isInitialized || widget.isLive) return;
+    _lastFocusedOnSeekBar = true;
 
     final now = DateTime.now();
 
@@ -808,7 +850,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _dragTargetPosition = _pendingSeekPosition;
     });
 
-    _showControlsBriefly();
+    _showControlsBriefly(focusSeekBar: true);
 
     // Auto-commit if no key events arrive within 400ms
     _commitSeekTimer?.cancel();
@@ -1260,6 +1302,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 }
               }
               if (!_showControls) {
+                _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == -1) {
                   _handleRemoteSeekRepeat(-1);
                 } else {
@@ -1268,6 +1311,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 return KeyEventResult.handled;
               }
               if (_seekBarFocusNode.hasFocus) {
+                _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == -1) {
                   _handleRemoteSeekRepeat(-1);
                 } else {
@@ -1303,6 +1347,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 }
               }
               if (!_showControls) {
+                _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == 1) {
                   _handleRemoteSeekRepeat(1);
                 } else {
@@ -1311,6 +1356,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 return KeyEventResult.handled;
               }
               if (_seekBarFocusNode.hasFocus) {
+                _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == 1) {
                   _handleRemoteSeekRepeat(1);
                 } else {
@@ -1380,6 +1426,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
+              _lastFocusedOnSeekBar = true;
               _seekBarFocusNode.requestFocus();
               _startHideControlsTimer();
               return KeyEventResult.handled;
@@ -1397,12 +1444,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 if (widget.isLive) {
                   _playPauseFocusNode.requestFocus();
                 } else {
+                  _lastFocusedOnSeekBar = true;
                   _seekBarFocusNode.requestFocus();
                 }
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
               if (_seekBarFocusNode.hasFocus) {
+                _lastFocusedOnSeekBar = false;
                 _playPauseFocusNode.requestFocus();
                 _startHideControlsTimer();
                 return KeyEventResult.handled;

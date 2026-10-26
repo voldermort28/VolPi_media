@@ -124,6 +124,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     });
 
     try {
+      SyncService.syncFull(widget.apiService.baseUrl);
       switch (_currentTabIndex) {
         case 0:
           await _homeKey.currentState?.refresh();

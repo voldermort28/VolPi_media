@@ -96,6 +96,15 @@ class FavoritesService {
     }
   }
 
+  /// Xóa mục yêu thích cục bộ khi thiết bị khác đã gỡ bỏ (không thêm vào pendingDeletions)
+  void removeLocalOnly(String id) {
+    if (_cache.containsKey(id)) {
+      _cache.remove(id);
+      _notify();
+      _scheduleDiskWrite();
+    }
+  }
+
   void _notify() {
     changeNotifier.value++;
   }

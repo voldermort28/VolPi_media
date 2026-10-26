@@ -86,6 +86,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
     try {
+      SyncService.syncFull(widget.apiService.baseUrl);
       switch (_currentTabIndex) {
         case 0:
           await _xoilacKey.currentState?.reloadMatches();

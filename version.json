@@ -1,10 +1,10 @@
 {
-  "version": "2.2.6",
-  "build": 72,
-  "tag_name": "v2.2.6",
-  "changelog": "• VolPi Media v2.2.6 - Sửa Lỗi Thao Tác Toàn Diện Đa Nền Tảng (Android TV, macOS, iOS):\n- Sửa lỗi nút Trở về (Back) trên màn hình: Trước đây khi đang hiện thanh điều khiển, nhấn nút Back chỉ ẩn điều khiển mà không thoát player; nay đã sửa để thoát về trang trước ngay lập tức.\n- Chuẩn hóa bàn phím macOS: Phím Mũi tên Trái/Phải tua lùi/tua tới 10s, Mũi tên Lên/Xuống tăng/giảm âm lượng (không bị nhảy focus các nút trên thanh công cụ).\n- Loại bỏ cử chỉ cảm ứng ngoài ý muốn trên macOS: Chuột nhấp đúp hoặc kéo rê không còn vô tình kích hoạt tua video hoặc hiện biểu tượng vòng tròn tua cảm ứng.\n- Khắc phục bảng chọn Luồng phát (Stream Selector) trên Android TV: Kéo dài thời gian tự ẩn từ 5s lên 15s để người dùng remote có đủ thời gian đọc và chọn luồng không bị ngắt quãng.\n- Giữ nguyên vị trí phát khi đổi Server/Luồng: Xem Anime hoặc Phim lẻ khi đổi server/luồng phát khác sẽ tiếp tục phát tại đúng giây đang xem thay vì bị tua về 0:00.\n- Tinh chỉnh thanh kéo tiến trình (Seek bar) trên iOS: Tăng kích thước nút kéo thumb để ngón tay dễ chạm và kéo mượt mà hơn.",
+  "version": "2.2.7",
+  "build": 73,
+  "tag_name": "v2.2.7",
+  "changelog": "• VolPi Media v2.2.7 - Sửa Lỗi Focus Thanh Tiến Trình (Seek Bar) & Kích Hoạt Đồng Bộ Đa Thiết Bị:\n- Khắc phục lỗi tua trên Android TV: Khi đang tua trên seek bar, sau 5s thanh điều khiển tự ẩn, bấm tiếp nút mũi tên sẽ tiếp tục tua trên seek bar mượt mà thay vì bị nhảy con trỏ xuống hàng nút điều khiển bên dưới.\n- Kích hoạt đồng bộ Đa Thiết Bị (Cross-Device Sync): Triển khai API đồng bộ 2 chiều lên máy chủ VPS. Yêu thích (Favorites) và Tiếp tục xem (Continue Watching) tự động đồng bộ tức thì giữa Android TV, iPhone, iPad và macOS.\n- Bổ sung hàng 'Danh Sách Yêu Thích' trên Trang Chủ Netflix (Home): Giúp bạn truy cập nhanh các bộ phim và anime đã thả tim ngay tại màn hình chính.\n- Tự động đồng bộ nền mỗi 15 giây và mỗi khi nhấn nút Làm mới dữ liệu (Refresh).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-26T16:15:00Z"
+  "published_at": "2026-10-26T17:05:00Z"
 }

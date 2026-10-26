@@ -9,6 +9,7 @@ import '../../models/favorite_item_model.dart';
 import '../../models/watch_history_model.dart';
 import '../../player/video_player_screen.dart';
 import '../../services/favorites_service.dart';
+import '../../services/sync_service.dart';
 import '../../services/watch_history_service.dart';
 import '../../widgets/movie_action_dialog.dart';
 import '../../widgets/netflix/netflix_scrollable_row.dart';
@@ -31,7 +32,10 @@ class NetflixAnimeScreen extends StatefulWidget {
 }
 
 class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
-  Future<void> refresh() => _loadAllData();
+  Future<void> refresh() {
+    SyncService.syncFull(widget.apiService.baseUrl);
+    return _loadAllData();
+  }
 
   final List<Map<String, String>> _categories = const [
     {

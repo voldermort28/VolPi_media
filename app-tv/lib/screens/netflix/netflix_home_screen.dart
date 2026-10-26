@@ -3,13 +3,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../api/api_service.dart';
+import '../../models/anime_model.dart';
+import '../../models/favorite_item_model.dart';
 import '../../models/match_model.dart';
 import '../../models/watch_history_model.dart';
 import '../../player/video_player_screen.dart';
+import '../../services/favorites_service.dart';
+import '../../services/sync_service.dart';
 import '../../services/watch_history_service.dart';
 import '../../widgets/resume_playback_dialog.dart';
 import '../../widgets/tv_focusable_card.dart';
 import '../../widgets/netflix/netflix_scrollable_row.dart';
+import '../anime_detail_screen.dart';
 
 class NetflixHomeScreen extends StatefulWidget {
   final ApiService apiService;
@@ -33,6 +38,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   List<MatchModel> _liveMatches = [];
   List<MatchModel> _vietnamMatches = [];
   List<WatchHistoryItem> _continueWatching = [];
+  List<FavoriteItem> _favorites = [];
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -48,12 +54,14 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   void initState() {
     super.initState();
     WatchHistoryService.instance.changeNotifier.addListener(_onHistoryChanged);
+    FavoritesService.instance.changeNotifier.addListener(_onFavoritesChanged);
     _loadData();
   }
 
   @override
   void dispose() {
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryChanged);
+    FavoritesService.instance.changeNotifier.removeListener(_onFavoritesChanged);
     _bannerTimer?.cancel();
     _bannerPageController.dispose();
     _scrollController.dispose();
@@ -98,11 +106,23 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     }
   }
 
+  void _onFavoritesChanged() {
+    if (mounted) {
+      setState(() {
+        _favorites = FavoritesService.instance.getFavorites().where((f) => f.category != 'secret').toList();
+      });
+    }
+  }
+
   Future<void> _loadData({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+
+    if (forceRefresh) {
+      SyncService.syncFull(widget.apiService.baseUrl);
+    }
 
     try {
       final results = await widget.apiService.getLiveMatches(forceRefresh: forceRefresh, source: 'xoilac');
@@ -167,6 +187,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         _majorMatches = major;
         _liveMatches = live;
         _continueWatching = WatchHistoryService.instance.getContinueWatching(excludeCategory: 'secret');
+        _favorites = FavoritesService.instance.getFavorites().where((f) => f.category != 'secret').toList();
         _isLoading = false;
       });
 
@@ -467,6 +488,13 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           if (_continueWatching.isNotEmpty) ...[
             _buildSectionTitle('🍿 TIẾP TỤC XEM CHO BẠN'),
             _buildContinueWatchingRow(),
+            const SizedBox(height: 20),
+          ],
+
+          // 2.5 FAVORITES (❤️ DANH SÁCH YÊU THÍCH)
+          if (_favorites.isNotEmpty) ...[
+            _buildSectionTitle('❤️ DANH SÁCH YÊU THÍCH', onSeeAll: () => widget.onNavigateTab?.call(3)),
+            _buildFavoritesRow(),
             const SizedBox(height: 20),
           ],
 
@@ -1151,6 +1179,104 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             ),
           );
         },
+    );
+  }
+
+  // =========================================================================
+  // FAVORITES HORIZONTAL ROW (Poster Ratio)
+  // =========================================================================
+  Widget _buildFavoritesRow() {
+    return NetflixScrollableRow(
+      height: 180,
+      itemCount: _favorites.length,
+      itemBuilder: (context, idx) {
+        final item = _favorites[idx];
+        return RepaintBoundary(
+          child: TvFocusableCard(
+            onTap: () => _onFavoriteItemTap(item),
+            borderRadius: BorderRadius.circular(6),
+            scale: 1.05,
+            focusBorderColor: Colors.white,
+            child: Container(
+              width: 120,
+              decoration: BoxDecoration(
+                color: const Color(0xFF181818),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        if (item.poster.isNotEmpty)
+                          CachedNetworkImage(
+                            imageUrl: item.poster,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 150,
+                            memCacheHeight: 220,
+                            errorWidget: (_, __, ___) => Container(
+                              color: const Color(0xFF262626),
+                              child: const Icon(Icons.favorite_rounded, color: Colors.white30),
+                            ),
+                          )
+                        else
+                          Container(color: const Color(0xFF262626)),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.favorite, color: Colors.redAccent, size: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+                    child: Text(
+                      item.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _onFavoriteItemTap(FavoriteItem item) {
+    final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
+    final anime = AnimeModel(
+      id: cleanId,
+      name: item.title,
+      poster: item.poster,
+      background: item.poster,
+      description: '',
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AnimeDetailScreen(
+          anime: anime,
+          apiService: widget.apiService,
+        ),
+      ),
     );
   }
 

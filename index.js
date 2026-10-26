@@ -599,7 +599,7 @@ function readSyncData(syncKey) {
   } catch (e) {
     console.error("Error reading sync data:", e.message);
   }
-  return { history: [], favorites: [], lastSyncAt: null };
+  return { history: [], favorites: [], deletedHistoryIds: [], deletedFavoriteIds: [], lastSyncAt: null };
 }
 
 function writeSyncData(syncKey, data) {
@@ -626,42 +626,65 @@ app.post("/api/user/sync", (req, res) => {
   const incoming = req.body || {};
   const existing = readSyncData(syncKey);
 
-  // Merge history: keep item with latest updatedAt
+  const deletedHistorySet = new Set(existing.deletedHistoryIds || []);
+  const deletedFavSet = new Set(existing.deletedFavoriteIds || []);
+
+  for (const delId of (incoming.deletedHistoryIds || [])) {
+    if (delId) {
+      deletedHistorySet.add(delId);
+    }
+  }
+  for (const delId of (incoming.deletedFavoriteIds || [])) {
+    if (delId) {
+      deletedFavSet.add(delId);
+    }
+  }
+
+  // Merge history: keep item with latest updatedAt unless marked deleted
   const historyMap = new Map();
   for (const item of (existing.history || [])) {
-    if (item && item.id) historyMap.set(item.id, item);
+    if (item && item.id && !deletedHistorySet.has(item.id)) {
+      historyMap.set(item.id, item);
+    }
   }
   for (const item of (incoming.history || [])) {
     if (item && item.id) {
+      // Re-added or newly watched item clears deletion tombstone
+      deletedHistorySet.delete(item.id);
       const prev = historyMap.get(item.id);
       if (!prev || (item.updatedAt || "") >= (prev.updatedAt || "")) {
         historyMap.set(item.id, item);
       }
     }
   }
-  for (const delId of (incoming.deletedHistoryIds || [])) {
+  for (const delId of deletedHistorySet) {
     historyMap.delete(delId);
   }
 
-  // Merge favorites: union by id, keep existing or incoming
+  // Merge favorites: union by id, keep existing or incoming unless marked deleted
   const favMap = new Map();
   for (const item of (existing.favorites || [])) {
-    if (item && item.id) favMap.set(item.id, item);
+    if (item && item.id && !deletedFavSet.has(item.id)) {
+      favMap.set(item.id, item);
+    }
   }
   for (const item of (incoming.favorites || [])) {
     if (item && item.id) {
+      deletedFavSet.delete(item.id);
       if (!favMap.has(item.id)) {
         favMap.set(item.id, item);
       }
     }
   }
-  for (const delId of (incoming.deletedFavoriteIds || [])) {
+  for (const delId of deletedFavSet) {
     favMap.delete(delId);
   }
 
   const merged = {
     history: Array.from(historyMap.values()),
     favorites: Array.from(favMap.values()),
+    deletedHistoryIds: Array.from(deletedHistorySet).slice(-500),
+    deletedFavoriteIds: Array.from(deletedFavSet).slice(-500),
   };
 
   writeSyncData(syncKey, merged);
