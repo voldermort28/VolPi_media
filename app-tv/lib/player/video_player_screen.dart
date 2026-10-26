@@ -174,6 +174,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _exitPlayer() {
+    if (_isScreenLocked) {
+      setState(() {
+        _showLockOverlay = true;
+      });
+      _startLockOverlayTimer();
+      _showBriefPlaybackHud('LOCK', 'Màn hình đang khóa');
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   void _handleBackAction() {
     if (_isScreenLocked) {
       setState(() {
@@ -198,7 +210,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _hideControlsTimer?.cancel();
       return;
     }
-    Navigator.of(context).pop();
+    _exitPlayer();
   }
 
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
@@ -218,7 +230,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _initPlayer();
   }
 
-  Future<void> _initPlayer() async {
+  Future<void> _initPlayer({Duration? resumePosition}) async {
     setState(() {
       _isInitialized = false;
       _hasError = false;
@@ -233,8 +245,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       await _controller.initialize();
       final double targetVol = _isMuted ? 0.0 : _volume;
       await _controller.setVolume(targetVol);
-      if (widget.initialPosition != null && widget.initialPosition! > Duration.zero) {
-        await _controller.seekTo(widget.initialPosition!);
+      final Duration? targetPos = resumePosition ?? widget.initialPosition;
+      if (targetPos != null && targetPos > Duration.zero) {
+        await _controller.seekTo(targetPos);
       }
       await _controller.play();
 
@@ -467,6 +480,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _switchChannel(StreamChannel channel) {
     if (_currentStreamUrl == channel.url && !_hasError) return;
+    Duration? lastPos;
+    if (_isInitialized && !widget.isLive) {
+      try {
+        lastPos = _controller.value.position;
+      } catch (_) {}
+    }
     try {
       _controller.removeListener(_videoListener);
       _controller.dispose();
@@ -476,7 +495,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _currentTitle = channel.title;
       _currentHeaders = channel.headers;
     });
-    _initPlayer();
+    _initPlayer(resumePosition: lastPos);
   }
 
   void _switchChannelDelta(int delta) {
@@ -517,7 +536,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
-    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+    final duration = _showStreamSelector ? const Duration(seconds: 15) : const Duration(seconds: 5);
+    _hideControlsTimer = Timer(duration, () {
       if (mounted && _controller.value.isPlaying && !_isDragging && !_isHoldingSeek && !_isHoveringControls) {
         setState(() {
           _showControls = false;
@@ -1122,6 +1142,34 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.ignored;
             }
 
+            // Keyboard Shortcuts for macOS & Desktop (Arrow Left/Right to Seek, Arrow Up/Down for Volume)
+            if (_isMacOrDesktop && !_showStreamSelector) {
+              if (isLeft) {
+                if (widget.isLive) {
+                  _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
+                } else {
+                  _seekDirectOffset(-10);
+                }
+                return KeyEventResult.handled;
+              }
+              if (isRight) {
+                if (widget.isLive) {
+                  _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
+                } else {
+                  _seekDirectOffset(10);
+                }
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.arrowUp) {
+                _changeVolumeBy(0.05);
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.arrowDown) {
+                _changeVolumeBy(-0.05);
+                return KeyEventResult.handled;
+              }
+            }
+
             // Dedicated Remote Play Key
             if (isPlayKey) {
               _playVideo();
@@ -1368,6 +1416,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
           } else if (event is KeyRepeatEvent) {
             if (_isScreenLocked) return KeyEventResult.ignored;
+            if (_isMacOrDesktop && !_showStreamSelector) {
+              if (isLeft) {
+                if (!widget.isLive) _seekDirectOffset(-10);
+                return KeyEventResult.handled;
+              }
+              if (isRight) {
+                if (!widget.isLive) _seekDirectOffset(10);
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.arrowUp) {
+                _changeVolumeBy(0.05);
+                return KeyEventResult.handled;
+              }
+              if (key == LogicalKeyboardKey.arrowDown) {
+                _changeVolumeBy(-0.05);
+                return KeyEventResult.handled;
+              }
+            }
             if (isPlayKey || isPauseKey || isPlayPauseToggle) {
               return KeyEventResult.handled;
             }
@@ -1389,6 +1455,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
           } else if (event is KeyUpEvent) {
             if (_isScreenLocked) return KeyEventResult.ignored;
+            if (_isMacOrDesktop && !_showStreamSelector) {
+              if (isLeft || isRight || key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
+                return KeyEventResult.handled;
+              }
+            }
             if (isPlayKey || isPauseKey || isPlayPauseToggle) {
               return KeyEventResult.handled;
             }
@@ -1445,9 +1516,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 }
                 _toggleControls();
               },
-              onHorizontalDragStart: _isScreenLocked ? null : _onHorizontalDragStart,
-              onHorizontalDragUpdate: _isScreenLocked ? null : _onHorizontalDragUpdate,
-              onHorizontalDragEnd: _isScreenLocked ? null : _onHorizontalDragEnd,
+              onHorizontalDragStart: (_isIOS && !_isScreenLocked) ? _onHorizontalDragStart : null,
+              onHorizontalDragUpdate: (_isIOS && !_isScreenLocked) ? _onHorizontalDragUpdate : null,
+              onHorizontalDragEnd: (_isIOS && !_isScreenLocked) ? _onHorizontalDragEnd : null,
               onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
               onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
               onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
@@ -1563,46 +1634,48 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 2. DOUBLE-TAP SEEK ZONES (Left 35% & Right 35%)
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: screenSize.width * 0.35,
-                child: GestureDetector(
-                  onDoubleTap: () {
-                    if (_isScreenLocked) return;
-                    _onDoubleTapSide(false);
-                  },
-                  onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
-                  onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
-                  onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
-                  onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
-                  behavior: HitTestBehavior.translucent,
-                  child: Container(),
+              // 2. DOUBLE-TAP SEEK ZONES (iOS only - Left 35% & Right 35%)
+              if (_isIOS) ...[
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.35,
+                  child: GestureDetector(
+                    onDoubleTap: () {
+                      if (_isScreenLocked) return;
+                      _onDoubleTapSide(false);
+                    },
+                    onLongPressStart: !_isScreenLocked ? _onLongPressStart : null,
+                    onLongPressMoveUpdate: !_isScreenLocked ? _onLongPressMoveUpdate : null,
+                    onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
+                    onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
+                    behavior: HitTestBehavior.translucent,
+                    child: Container(),
+                  ),
                 ),
-              ),
-              Positioned(
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: screenSize.width * 0.35,
-                child: GestureDetector(
-                  onDoubleTap: () {
-                    if (_isScreenLocked) return;
-                    _onDoubleTapSide(true);
-                  },
-                  onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
-                  onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
-                  onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
-                  onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
-                  behavior: HitTestBehavior.translucent,
-                  child: Container(),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.35,
+                  child: GestureDetector(
+                    onDoubleTap: () {
+                      if (_isScreenLocked) return;
+                      _onDoubleTapSide(true);
+                    },
+                    onLongPressStart: !_isScreenLocked ? _onLongPressStart : null,
+                    onLongPressMoveUpdate: !_isScreenLocked ? _onLongPressMoveUpdate : null,
+                    onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
+                    onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
+                    behavior: HitTestBehavior.translucent,
+                    child: Container(),
+                  ),
                 ),
-              ),
+              ],
 
-              // 3. DOUBLE-TAP RIPPLE INDICATORS
-              if (_showDoubleTapLeft)
+              // 3. DOUBLE-TAP RIPPLE INDICATORS (iOS only)
+              if (_isIOS && _showDoubleTapLeft)
                 Positioned(
                   left: screenSize.width * 0.15,
                   child: Container(
@@ -1622,7 +1695,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                 ),
-              if (_showDoubleTapRight)
+              if (_isIOS && _showDoubleTapRight)
                 Positioned(
                   right: screenSize.width * 0.15,
                   child: Container(
@@ -1681,7 +1754,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                               children: [
                                 TvFocusableCard(
                                   focusNode: _backButtonFocusNode,
-                                  onTap: _handleBackAction,
+                                  onTap: _exitPlayer,
                                   scale: 1.1,
                                   borderRadius: BorderRadius.circular(20),
                                   child: Container(
@@ -2013,8 +2086,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                                 inactiveTrackColor: Colors.white24,
                                                 thumbColor: const Color(0xFF38BDF8),
                                                 overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.5),
-                                                trackHeight: 4.0,
+                                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isIOS ? 8.5 : 6.5),
+                                                trackHeight: _isIOS ? 5.0 : 4.0,
                                               ),
                                               child: Slider(
                                                 focusNode: FocusNode(canRequestFocus: false),

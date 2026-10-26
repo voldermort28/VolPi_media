@@ -1,10 +1,10 @@
 {
-  "version": "2.2.5",
-  "build": 71,
-  "tag_name": "v2.2.5",
-  "changelog": "• VolPi Media v2.2.5 - Tối Ưu Hóa Riêng Biệt Cho Từng Nền Tảng (macOS, Android TV & iOS):\n- Tách biệt hoàn toàn tính năng cảm ứng: Nút Xoay màn hình, Khóa màn hình cảm ứng, và Cử chỉ giữ vuốt 2X -> 3X chỉ hiển thị và hoạt động trên thiết bị di động iOS (iPhone / iPad).\n- Trên macOS (Desktop): Loại bỏ nút Xoay và Khóa cảm ứng, giữ thanh điều khiển sạch đẹp với thanh Âm lượng chuẩn desktop.\n- Trên Android TV: Loại bỏ nút Xoay và Khóa cảm ứng, phục hồi điều hướng phím D-pad trên remote cực kỳ mượt mà và chuẩn xác, không bị kẹt nút hay nhảy sai.",
+  "version": "2.2.6",
+  "build": 72,
+  "tag_name": "v2.2.6",
+  "changelog": "• VolPi Media v2.2.6 - Sửa Lỗi Thao Tác Toàn Diện Đa Nền Tảng (Android TV, macOS, iOS):\n- Sửa lỗi nút Trở về (Back) trên màn hình: Trước đây khi đang hiện thanh điều khiển, nhấn nút Back chỉ ẩn điều khiển mà không thoát player; nay đã sửa để thoát về trang trước ngay lập tức.\n- Chuẩn hóa bàn phím macOS: Phím Mũi tên Trái/Phải tua lùi/tua tới 10s, Mũi tên Lên/Xuống tăng/giảm âm lượng (không bị nhảy focus các nút trên thanh công cụ).\n- Loại bỏ cử chỉ cảm ứng ngoài ý muốn trên macOS: Chuột nhấp đúp hoặc kéo rê không còn vô tình kích hoạt tua video hoặc hiện biểu tượng vòng tròn tua cảm ứng.\n- Khắc phục bảng chọn Luồng phát (Stream Selector) trên Android TV: Kéo dài thời gian tự ẩn từ 5s lên 15s để người dùng remote có đủ thời gian đọc và chọn luồng không bị ngắt quãng.\n- Giữ nguyên vị trí phát khi đổi Server/Luồng: Xem Anime hoặc Phim lẻ khi đổi server/luồng phát khác sẽ tiếp tục phát tại đúng giây đang xem thay vì bị tua về 0:00.\n- Tinh chỉnh thanh kéo tiến trình (Seek bar) trên iOS: Tăng kích thước nút kéo thumb để ngón tay dễ chạm và kéo mượt mà hơn.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-26T03:50:00Z"
+  "published_at": "2026-10-26T16:15:00Z"
 }
