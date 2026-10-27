@@ -896,6 +896,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                       // Button 1: Xem Ngay
                       TvFocusableCard(
                         focusNode: isCurrent ? _billboardPlayFocusNode : null,
+                        verticalScrollAlignment: 0.0,
                         onFocusChange: (hasFocus) {
                           if (hasFocus) _scrollToTopOnBillboardFocus();
                         },
@@ -936,6 +937,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
 
                       // Button 2: Thông tin chi tiết
                       TvFocusableCard(
+                        verticalScrollAlignment: 0.0,
                         onFocusChange: (hasFocus) {
                           if (hasFocus) _scrollToTopOnBillboardFocus();
                         },
@@ -1024,7 +1026,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
   // =========================================================================
   Widget _buildSectionHeader(String title, {String? badge}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 6, 28, 10),
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
       child: Row(
         children: [
           Text(

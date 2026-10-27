@@ -17,6 +17,7 @@ class TvFocusableCard extends StatefulWidget {
   final FocusNode? focusNode;
   final bool autoFocus;
   final ValueChanged<bool>? onFocusChange;
+  final double? verticalScrollAlignment;
 
   const TvFocusableCard({
     super.key,
@@ -30,6 +31,7 @@ class TvFocusableCard extends StatefulWidget {
     this.focusNode,
     this.autoFocus = false,
     this.onFocusChange,
+    this.verticalScrollAlignment,
   });
 
   @override
@@ -75,14 +77,24 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
       widget.onFocusChange?.call(hasFocus);
 
       if (hasFocus) {
-        // Auto scroll viewport so the focused item is fully visible on TV screen
+        // Auto scroll viewport so the focused item is fully visible on TV screen with context margin
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _focusNode.hasFocus) {
-            Scrollable.ensureVisible(
-              context,
-              duration: const Duration(milliseconds: 120),
+          if (!mounted || !_focusNode.hasFocus) return;
+          final renderObj = context.findRenderObject();
+          if (renderObj == null) return;
+
+          ScrollableState? scrollable = Scrollable.maybeOf(context);
+          while (scrollable != null) {
+            final isVertical = scrollable.axisDirection == AxisDirection.down ||
+                scrollable.axisDirection == AxisDirection.up;
+
+            scrollable.position.ensureVisible(
+              renderObj,
+              alignment: isVertical ? (widget.verticalScrollAlignment ?? 0.12) : 0.0,
+              duration: const Duration(milliseconds: 140),
               curve: Curves.easeOutQuad,
             );
+            scrollable = Scrollable.maybeOf(scrollable.context);
           }
         });
       }

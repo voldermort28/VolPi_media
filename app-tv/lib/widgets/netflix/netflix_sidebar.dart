@@ -118,6 +118,29 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
     return KeyEventResult.ignored;
   }
 
+  Widget _buildExpandingLabel({
+    required Widget child,
+    double width = 146,
+    double leftPadding = 12,
+  }) {
+    return ClipRect(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        width: _isExpanded ? width : 0,
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          opacity: _isExpanded ? 1.0 : 0.0,
+          child: Padding(
+            padding: EdgeInsets.only(left: leftPadding),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FocusScope(
@@ -142,7 +165,7 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
           onEnter: (_) => setState(() => _isExpanded = true),
           onExit: (_) => setState(() => _isExpanded = false),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: const Duration(milliseconds: 240),
             curve: Curves.easeOutCubic,
             width: _isExpanded ? 220 : 68,
             decoration: BoxDecoration(
@@ -176,36 +199,36 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                           fit: BoxFit.contain,
                         ),
                       ),
-                      if (_isExpanded) ...[
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'VOLPI MEDIA',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.8,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                      _buildExpandingLabel(
+                        width: 142,
+                        leftPadding: 12,
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'VOLPI MEDIA',
+                              softWrap: false,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.8,
                               ),
-                              Text(
-                                'NETFLIX CINEMA',
-                                style: TextStyle(
-                                  color: Color(0xFFE50914),
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.5,
-                                ),
+                            ),
+                            Text(
+                              'NETFLIX CINEMA',
+                              softWrap: false,
+                              style: TextStyle(
+                                color: Color(0xFFE50914),
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
@@ -257,25 +280,23 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                         ? const Color(0xFFE50914)
                                         : Colors.white70,
                                   ),
-                                  if (_isExpanded) ...[
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Text(
-                                        _menuItems[idx]['label'] as String,
-                                        style: TextStyle(
-                                          color: widget.selectedIndex == idx
-                                              ? Colors.white
-                                              : Colors.white70,
-                                          fontSize: 13,
-                                          fontWeight: widget.selectedIndex == idx
-                                              ? FontWeight.bold
-                                              : FontWeight.w500,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
+                                  _buildExpandingLabel(
+                                    width: 146,
+                                    leftPadding: 14,
+                                    child: Text(
+                                      _menuItems[idx]['label'] as String,
+                                      softWrap: false,
+                                      style: TextStyle(
+                                        color: widget.selectedIndex == idx
+                                            ? Colors.white
+                                            : Colors.white70,
+                                        fontSize: 13,
+                                        fontWeight: widget.selectedIndex == idx
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -332,21 +353,19 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                         size: 18,
                                         color: Color(0xFF38BDF8),
                                       ),
-                                if (_isExpanded) ...[
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Làm mới dữ liệu',
-                                      style: TextStyle(
-                                        color: Color(0xFF38BDF8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                _buildExpandingLabel(
+                                  width: 140,
+                                  leftPadding: 10,
+                                  child: const Text(
+                                    'Làm mới dữ liệu',
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      color: Color(0xFF38BDF8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
@@ -383,21 +402,19 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                   size: 18,
                                   color: Color(0xFF38BDF8),
                                 ),
-                                if (_isExpanded) ...[
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Cập nhật ứng dụng',
-                                      style: TextStyle(
-                                        color: Color(0xFF38BDF8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                _buildExpandingLabel(
+                                  width: 140,
+                                  leftPadding: 10,
+                                  child: const Text(
+                                    'Cập nhật ứng dụng',
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      color: Color(0xFF38BDF8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
@@ -434,21 +451,19 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                   size: 18,
                                   color: Color(0xFF38BDF8),
                                 ),
-                                if (_isExpanded) ...[
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Giao diện Cũ (V1)',
-                                      style: TextStyle(
-                                        color: Color(0xFF38BDF8),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                _buildExpandingLabel(
+                                  width: 140,
+                                  leftPadding: 10,
+                                  child: const Text(
+                                    'Giao diện Cũ (V1)',
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      color: Color(0xFF38BDF8),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),
@@ -495,21 +510,19 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                     ),
                                   ),
                                 ),
-                                if (_isExpanded) ...[
-                                  const SizedBox(width: 10),
-                                  const Expanded(
-                                    child: Text(
-                                      'Tài khoản & Phim',
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                _buildExpandingLabel(
+                                  width: 140,
+                                  leftPadding: 10,
+                                  child: const Text(
+                                    'Tài khoản & Phim',
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                ],
+                                ),
                               ],
                             ),
                           ),

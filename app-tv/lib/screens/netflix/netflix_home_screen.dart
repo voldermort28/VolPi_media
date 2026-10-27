@@ -869,6 +869,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                     children: [
                       TvFocusableCard(
                         focusNode: isCurrent ? _billboardPlayFocusNode : null,
+                        verticalScrollAlignment: 0.0,
                         onFocusChange: (hasFocus) {
                           if (hasFocus) _scrollToTopOnBillboardFocus();
                         },
@@ -904,6 +905,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                       const SizedBox(width: 12),
 
                       TvFocusableCard(
+                        verticalScrollAlignment: 0.0,
                         onFocusChange: (hasFocus) {
                           if (hasFocus) _scrollToTopOnBillboardFocus();
                         },
@@ -1036,9 +1038,11 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   Widget _buildSectionTitle(String title, {VoidCallback? onSeeAll}) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: isMobile ? 14 : 24,
-        vertical: isMobile ? 4 : 6,
+      padding: EdgeInsets.fromLTRB(
+        isMobile ? 14 : 24,
+        12,
+        isMobile ? 14 : 24,
+        8,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -82,6 +82,18 @@ class WatchHistoryService {
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
+  /// Lấy toàn bộ lịch sử xem theo category (không giới hạn isInProgress), sắp xếp mới xem nhất lên đầu
+  List<WatchHistoryItem> getHistory({String? category, String? excludeCategory}) {
+    return _cache.values
+        .where((item) {
+          if (category != null && item.category != category) return false;
+          if (excludeCategory != null && item.category == excludeCategory) return false;
+          return true;
+        })
+        .toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
   /// Lưu tiến trình xem — cập nhật RAM tức thì, gom ghi đĩa mỗi 4 giây
   void saveProgress(WatchHistoryItem item) {
     _cache[item.id] = item;
