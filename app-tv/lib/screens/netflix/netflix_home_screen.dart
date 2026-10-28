@@ -499,6 +499,68 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   }
 
   // =========================================================================
+  // VIETNAM EMPTY STATE BANNER (When no VN matches scheduled)
+  // =========================================================================
+  Widget _buildVietnamEmptyBanner() {
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 0),
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 20, vertical: isMobile ? 12 : 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141414),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.3), width: 1.0),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF991B1B).withOpacity(0.18),
+            const Color(0xFF141414),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDC2626).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Text('🇻🇳', style: TextStyle(fontSize: 22)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Lịch Thi Đấu Bóng Đá Việt Nam',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Hôm nay chưa có trận diễn ra. Các trận đấu V.League 1 & 2, Cúp Quốc Gia, C1/C2 Châu Á (Nam Định, CAHN...) và ĐT Việt Nam (AFF Cup, Vòng loại World Cup) sẽ tự động cập nhật khi có lịch phát sóng.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.65),
+                    fontSize: isMobile ? 10.5 : 11.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // =========================================================================
   // SECTION TITLE
   // =========================================================================
   Widget _buildSectionTitle(String title, {VoidCallback? onSeeAll}) {
