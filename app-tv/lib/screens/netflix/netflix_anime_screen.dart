@@ -597,6 +597,8 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
     if (_featuredList.isEmpty) return const SizedBox.shrink();
 
     return Focus(
+      canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
+      skipTraversal: true,
       onFocusChange: (hasFocus) {
         setState(() {
           _isBannerInteracting = hasFocus;
@@ -884,6 +886,8 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
 
                 // Action Buttons
                 Focus(
+                  canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
+                  skipTraversal: true,
                   onKeyEvent: (node, event) {
                     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
                       _scrollToTopOnBillboardFocus();

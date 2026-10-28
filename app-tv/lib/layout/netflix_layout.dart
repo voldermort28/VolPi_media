@@ -106,6 +106,74 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     );
   }
 
+  /// Chuyển focus từ sidebar sang vùng nội dung một cách ổn định:
+  /// 1. Ưu tiên quay lại thẻ đã focus trước đó nếu nó vẫn còn hợp lệ và đang hiển thị trên màn hình.
+  /// 2. Nếu không, chọn thẻ đang hiển thị gần nhất với vị trí mục sidebar (ngang hàng, sát mép trái).
+  /// Tránh trường hợp focus nhảy tới thẻ đã cuộn khuất / thuộc tab cũ khiến trang cuộn lung tung.
+  void _moveFocusToContent() {
+    final Size screen = MediaQuery.of(context).size;
+    const double contentLeft = 68;
+
+    bool isUsable(FocusNode node) {
+      if (!node.canRequestFocus || node.skipTraversal || node is FocusScopeNode) return false;
+      final ctx = node.context;
+      if (ctx == null || !ctx.mounted) return false;
+      final ro = ctx.findRenderObject();
+      if (ro is! RenderBox || !ro.attached || !ro.hasSize) return false;
+      return true;
+    }
+
+    bool isOnScreen(Rect r) {
+      if (r.width <= 0 || r.height <= 0) return false;
+      // Phải nằm phần lớn trong vùng nội dung nhìn thấy
+      final visible = r.intersect(Rect.fromLTWH(contentLeft, 0, screen.width - contentLeft, screen.height));
+      if (visible.width <= 0 || visible.height <= 0) return false;
+      return visible.width >= r.width * 0.6 && visible.height >= r.height * 0.6;
+    }
+
+    // 1. Thẻ đã focus trước đó trong vùng nội dung
+    FocusNode? previous = _contentFocusScopeNode.focusedChild;
+    while (previous is FocusScopeNode && previous.focusedChild != null) {
+      previous = previous.focusedChild;
+    }
+    if (previous != null && isUsable(previous) && isOnScreen(previous.rect)) {
+      previous.requestFocus();
+      return;
+    }
+
+    // 2. Tìm thẻ hiển thị gần nhất với mục sidebar hiện tại
+    final FocusNode? sidebarNode = _sidebarFocusNodes.firstWhere(
+      (n) => n.hasFocus,
+      orElse: () => _sidebarFocusNodes[_currentTabIndex],
+    );
+    final double anchorY = (sidebarNode != null && sidebarNode.context != null)
+        ? sidebarNode.rect.center.dy
+        : screen.height * 0.3;
+
+    FocusNode? best;
+    double bestScore = double.infinity;
+    for (final node in _contentFocusScopeNode.traversalDescendants) {
+      if (!isUsable(node)) continue;
+      // Bỏ qua các Focus "bọc ngoài" (wrapper) chỉ dùng để bắt phím, chỉ chọn thẻ thật (leaf)
+      if (node.descendants.any((d) => d.canRequestFocus && !d.skipTraversal)) continue;
+      final r = node.rect;
+      if (!isOnScreen(r)) continue;
+      final double dy = (r.center.dy - anchorY).abs();
+      final double dx = (r.left - contentLeft).clamp(0.0, double.infinity);
+      final double score = dy + dx * 0.6;
+      if (score < bestScore) {
+        bestScore = score;
+        best = node;
+      }
+    }
+
+    if (best != null) {
+      best.requestFocus();
+    } else {
+      _contentFocusScopeNode.requestFocus();
+    }
+  }
+
   void _switchToOldUI() {
     PlayerSettingsService.instance.setUseNetflixUI(false);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -229,13 +297,20 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                       child: Focus(
                         onKeyEvent: (node, event) {
                           if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                            final primary = FocusManager.instance.primaryFocus;
+                            // Để TextField (ô tìm kiếm) tự xử lý di chuyển con trỏ chữ
+                            if (primary?.context?.findAncestorWidgetOfExactType<EditableText>() != null) {
+                              return KeyEventResult.ignored;
+                            }
                             // Check if primary focus has nowhere left to go inside content
-                            final moved = FocusManager.instance.primaryFocus?.focusInDirection(TraversalDirection.left) ?? false;
+                            final moved = primary?.focusInDirection(TraversalDirection.left) ?? false;
                             if (!moved) {
                               // Reached left edge of content: jump directly to active sidebar item!
                               _sidebarFocusNodes[_currentTabIndex].requestFocus();
-                              return KeyEventResult.handled;
                             }
+                            // Luôn chặn sự kiện tại đây: nếu trả về ignored sau khi đã di chuyển,
+                            // Shortcuts mặc định sẽ di chuyển thêm 1 lần nữa -> con trỏ nhảy 2 ô.
+                            return KeyEventResult.handled;
                           }
                           return KeyEventResult.ignored;
                         },
@@ -257,9 +332,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                         isRefreshing: _isRefreshingHeader,
                         onRefresh: _refreshActiveTab,
                         onCheckUpdate: () => _checkOtaUpdate(silent: false),
-                        onMoveToContent: () {
-                          _contentFocusScopeNode.requestFocus();
-                        },
+                        onMoveToContent: _moveFocusToContent,
                         onTabSelected: (idx) {
                           setState(() {
                             _currentTabIndex = idx;

@@ -542,6 +542,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     if (featuredMatches.length == 1) return _buildBillboard(featuredMatches.first);
 
     return Focus(
+      canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
+      skipTraversal: true,
       onFocusChange: (hasFocus) {
         setState(() {
           _isBannerFocused = hasFocus;
@@ -858,6 +860,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
 
                 // Actions: Netflix White "PHÁT NGAY" button + Info
                 Focus(
+                  canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
+                  skipTraversal: true,
                   onKeyEvent: (node, event) {
                     if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
                       _scrollToTopOnBillboardFocus();

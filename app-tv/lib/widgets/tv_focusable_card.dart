@@ -80,24 +80,75 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
         // Auto scroll viewport so the focused item is fully visible on TV screen with context margin
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_focusNode.hasFocus) return;
-          final renderObj = context.findRenderObject();
-          if (renderObj == null) return;
+          _revealInScrollables();
+        });
+      }
+    }
+  }
 
-          ScrollableState? scrollable = Scrollable.maybeOf(context);
-          while (scrollable != null) {
-            final isVertical = scrollable.axisDirection == AxisDirection.down ||
-                scrollable.axisDirection == AxisDirection.up;
+  /// Cuộn tối thiểu để thẻ đang focus hiển thị đầy đủ.
+  /// - Mỗi cấp Scrollable (hàng ngang lồng trong trang dọc) dùng đúng viewport của chính nó
+  ///   (trước đây dùng nhầm viewport của hàng ngang để tính cuộn dọc -> trang nhảy sai vị trí).
+  /// - Chỉ cuộn khi thẻ bị khuất; nếu đã nằm trọn trong vùng nhìn thì giữ nguyên để
+  ///   bố cục ổn định, giúp điều hướng D-pad không bị nhảy.
+  void _revealInScrollables() {
+    final RenderObject? target = context.findRenderObject();
+    if (target == null || !target.attached) return;
 
-            scrollable.position.ensureVisible(
-              renderObj,
-              alignment: isVertical ? (widget.verticalScrollAlignment ?? 0.12) : 0.0,
+    BuildContext levelContext = context;
+    ScrollableState? scrollable = Scrollable.maybeOf(levelContext);
+    while (scrollable != null) {
+      final RenderObject? levelObject = levelContext.findRenderObject();
+      if (levelObject == null || !levelObject.attached) break;
+      final RenderAbstractViewport? viewport = RenderAbstractViewport.maybeOf(levelObject);
+      if (viewport == null) break;
+
+      final ScrollPosition position = scrollable.position;
+      // Bỏ qua PageView (billboard carousel) để không làm lệch trang
+      if (position is! PageMetrics && position.hasContentDimensions && position.hasPixels) {
+        Rect targetRect = target.paintBounds;
+        if (!identical(levelObject, target)) {
+          targetRect = MatrixUtils.transformRect(target.getTransformTo(levelObject), target.paintBounds);
+        }
+
+        final bool isVertical = scrollable.axisDirection == AxisDirection.down ||
+            scrollable.axisDirection == AxisDirection.up;
+        // Offset khi thẻ nằm sát mép đầu / mép cuối viewport
+        final double atStart = viewport.getOffsetToReveal(levelObject, 0.0, rect: targetRect).offset;
+        final double atEnd = viewport.getOffsetToReveal(levelObject, 1.0, rect: targetRect).offset;
+        final double current = position.pixels;
+        double? destination;
+
+        if (isVertical) {
+          final double topMargin = widget.verticalScrollAlignment ?? 0.12;
+          final double withMargin =
+              viewport.getOffsetToReveal(levelObject, topMargin, rect: targetRect).offset;
+          // Thẻ bị che phía trên (hoặc quá sát mép trên che mất tiêu đề danh mục) / bị khuất phía dưới
+          if (current > withMargin || current < atEnd) {
+            destination = withMargin;
+          }
+        } else {
+          if (current > atStart) {
+            destination = atStart; // khuất bên trái
+          } else if (current < atEnd) {
+            destination = atEnd; // khuất bên phải
+          }
+        }
+
+        if (destination != null) {
+          final double clamped = destination.clamp(position.minScrollExtent, position.maxScrollExtent);
+          if ((clamped - current).abs() > 1.0) {
+            position.animateTo(
+              clamped,
               duration: const Duration(milliseconds: 140),
               curve: Curves.easeOutQuad,
             );
-            scrollable = Scrollable.maybeOf(scrollable.context);
           }
-        });
+        }
       }
+
+      levelContext = scrollable.context;
+      scrollable = Scrollable.maybeOf(levelContext);
     }
   }
 
