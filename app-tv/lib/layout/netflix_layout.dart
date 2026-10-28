@@ -41,6 +41,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   // TV Remote navigation FocusNodes for sidebar (5 tabs + Refresh + Update + V1 switch + Profile = 9)
   final List<FocusNode> _sidebarFocusNodes = List.generate(9, (_) => FocusNode());
   final FocusScopeNode _contentFocusScopeNode = FocusScopeNode();
+  final Map<int, FocusNode> _lastContentFocusPerTab = {};
 
   @override
   void initState() {
@@ -110,6 +111,10 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   /// 1. Ưu tiên quay lại thẻ đã focus trước đó nếu nó vẫn còn hợp lệ và đang hiển thị trên màn hình.
   /// 2. Nếu không, chọn thẻ đang hiển thị gần nhất với vị trí mục sidebar (ngang hàng, sát mép trái).
   /// Tránh trường hợp focus nhảy tới thẻ đã cuộn khuất / thuộc tab cũ khiến trang cuộn lung tung.
+  /// Chuyển focus từ sidebar sang vùng nội dung một cách xác định và mượt mà:
+  /// 1. Nếu cùng tab và thẻ đã focus trước đó vẫn đang hiển thị: quay lại đúng thẻ đó.
+  /// 2. Nếu chuyển tab hoặc thẻ cũ không còn hiển thị: focus trực tiếp vào điểm đón chính (primary node) của tab.
+  /// 3. Fallback: Chọn thẻ trên cùng - bên trái nhất đang hiển thị trong viewport.
   void _moveFocusToContent() {
     final Size screen = MediaQuery.of(context).size;
     const double contentLeft = 68.0;
@@ -130,50 +135,88 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
     bool isOnScreen(Rect r) {
       if (r.width <= 0 || r.height <= 0) return false;
-      // Phải nằm phần lớn trong vùng nội dung nhìn thấy
       final visible = r.intersect(Rect.fromLTWH(contentLeft, 0, screen.width - contentLeft, screen.height));
       if (visible.width <= 0 || visible.height <= 0) return false;
       return visible.width >= r.width * 0.5 && visible.height >= r.height * 0.5;
     }
 
-    // 1. Thẻ đã focus trước đó trong vùng nội dung
-    FocusNode? previous = _contentFocusScopeNode.focusedChild;
-    while (previous is FocusScopeNode && previous.focusedChild != null) {
-      previous = previous.focusedChild;
-    }
-    if (previous != null && isUsable(previous)) {
-      final r = getNodeRect(previous);
+    // 1. Thẻ đã focus trước đó trên cùng tab (nếu còn hiển thị trên màn hình)
+    final FocusNode? lastFocused = _lastContentFocusPerTab[_currentTabIndex];
+    if (lastFocused != null && isUsable(lastFocused)) {
+      final r = getNodeRect(lastFocused);
       if (r != null && isOnScreen(r)) {
-        previous.requestFocus();
+        lastFocused.requestFocus();
         return;
       }
     }
 
-    // 2. Tìm thẻ hiển thị gần nhất với mục sidebar hiện tại
-    FocusNode? sidebarNode;
-    for (final node in _sidebarFocusNodes) {
-      if (node.hasFocus) {
-        sidebarNode = node;
+    // 2. Chuyển trực tiếp vào điểm đón chuẩn của Tab hiện tại
+    switch (_currentTabIndex) {
+      case 0: // Trang chủ: Thẻ "PHÁT NGAY" trên Billboard
+        final homeState = _homeKey.currentState;
+        if (homeState != null && homeState.mounted) {
+          final playNode = homeState.billboardPlayFocusNode;
+          if (playNode.canRequestFocus && isUsable(playNode)) {
+            playNode.requestFocus();
+            return;
+          }
+        }
         break;
-      }
-    }
-    if (sidebarNode == null && _currentTabIndex >= 0 && _currentTabIndex < _sidebarFocusNodes.length) {
-      sidebarNode = _sidebarFocusNodes[_currentTabIndex];
-    }
-    final sidebarRect = (sidebarNode != null) ? getNodeRect(sidebarNode) : null;
-    final double anchorY = sidebarRect != null ? sidebarRect.center.dy : screen.height * 0.3;
 
+      case 1: // Xôi Lạc TV: Trận bóng đầu tiên
+        final xoilacState = _xoilacKey.currentState;
+        if (xoilacState != null && xoilacState.mounted) {
+          final firstNode = xoilacState.firstMatchFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
+
+      case 2: // Socolive TV: Trận bóng đầu tiên
+        final socoliveState = _socoliveKey.currentState;
+        if (socoliveState != null && socoliveState.mounted) {
+          final firstNode = socoliveState.firstMatchFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
+
+      case 3: // Anime & Phim: Thẻ "PHÁT NGAY" trên Billboard
+        final animeState = _animeKey.currentState;
+        if (animeState != null && animeState.mounted) {
+          final playNode = animeState.billboardPlayFocusNode;
+          if (playNode.canRequestFocus && isUsable(playNode)) {
+            playNode.requestFocus();
+            return;
+          }
+        }
+        break;
+
+      case 4: // Truyền hình IPTV: Kênh truyền hình đầu tiên
+        final iptvState = _iptvKey.currentState;
+        if (iptvState != null && iptvState.mounted) {
+          final firstNode = iptvState.firstChannelCardFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
+    }
+
+    // 3. Fallback: Thẻ hiển thị trên cùng - bên trái nhất của vùng nội dung nhìn thấy
     FocusNode? best;
     double bestScore = double.infinity;
     for (final node in _contentFocusScopeNode.traversalDescendants) {
       if (!isUsable(node)) continue;
-      // Bỏ qua các Focus "bọc ngoài" (wrapper) chỉ dùng để bắt phím, chỉ chọn thẻ thật (leaf)
       if (node.descendants.any((d) => d.canRequestFocus && !d.skipTraversal)) continue;
       final r = getNodeRect(node);
       if (r == null || !isOnScreen(r)) continue;
-      final double dy = (r.center.dy - anchorY).abs();
-      final double dx = (r.left - contentLeft).clamp(0.0, double.infinity);
-      final double score = dy + dx * 0.6;
+      final double score = r.top * 2.0 + (r.left - contentLeft).clamp(0.0, double.infinity);
       if (score < bestScore) {
         bestScore = score;
         best = node;
@@ -319,6 +362,9 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                             final moved = primary?.focusInDirection(TraversalDirection.left) ?? false;
                             if (!moved) {
                               // Reached left edge of content: jump directly to active sidebar item!
+                              if (primary != null) {
+                                _lastContentFocusPerTab[_currentTabIndex] = primary;
+                              }
                               _sidebarFocusNodes[_currentTabIndex].requestFocus();
                             }
                             // Luôn chặn sự kiện tại đây: nếu trả về ignored sau khi đã di chuyển,

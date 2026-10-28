@@ -108,6 +108,9 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      if (index < _menuItems.length && index != widget.selectedIndex) {
+        widget.onTabSelected(index);
+      }
       widget.onMoveToContent?.call();
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
@@ -250,7 +253,10 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                             focusNode: (widget.focusNodes != null && idx < widget.focusNodes!.length)
                                 ? widget.focusNodes![idx]
                                 : null,
-                            onTap: () => widget.onTabSelected(idx),
+                            onTap: () {
+                              widget.onTabSelected(idx);
+                              widget.onMoveToContent?.call();
+                            },
                             borderRadius: BorderRadius.circular(8),
                             focusBorderColor: Colors.white,
                             scale: 1.02,

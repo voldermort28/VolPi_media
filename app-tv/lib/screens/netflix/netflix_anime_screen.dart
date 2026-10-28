@@ -83,6 +83,7 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
 
   final ScrollController _scrollController = ScrollController();
   final FocusNode _billboardPlayFocusNode = FocusNode();
+  FocusNode get billboardPlayFocusNode => _billboardPlayFocusNode;
 
   @override
   void initState() {
@@ -630,7 +631,10 @@ class NetflixAnimeScreenState extends State<NetflixAnimeScreen> {
                 },
                 itemBuilder: (context, index) {
                   final anime = _featuredList[index];
-                  return _buildBillboardItem(anime, isCurrent: index == _currentBannerIndex);
+                  return ExcludeFocus(
+                    excluding: index != _currentBannerIndex,
+                    child: _buildBillboardItem(anime, isCurrent: index == _currentBannerIndex),
+                  );
                 },
               ),
 

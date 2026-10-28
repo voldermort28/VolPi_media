@@ -44,6 +44,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
 
   final ScrollController _scrollController = ScrollController();
   final FocusNode _billboardPlayFocusNode = FocusNode();
+  FocusNode get billboardPlayFocusNode => _billboardPlayFocusNode;
   final PageController _bannerPageController = PageController();
   Timer? _bannerTimer;
   int _currentBannerIndex = 0;
@@ -572,7 +573,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                   });
                 },
                 itemBuilder: (context, idx) {
-                  return _buildBillboard(featuredMatches[idx], isCurrent: idx == _currentBannerIndex);
+                  return ExcludeFocus(
+                    excluding: idx != _currentBannerIndex,
+                    child: _buildBillboard(featuredMatches[idx], isCurrent: idx == _currentBannerIndex),
+                  );
                 },
               ),
 

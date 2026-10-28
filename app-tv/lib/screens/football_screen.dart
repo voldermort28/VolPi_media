@@ -35,6 +35,7 @@ class FootballScreenState extends State<FootballScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   final FocusNode _firstMatchFocusNode = FocusNode();
+  FocusNode get firstMatchFocusNode => _firstMatchFocusNode;
 
   String _selectedFilterId = 'all';
 

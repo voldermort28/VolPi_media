@@ -81,19 +81,47 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || !_focusNode.hasFocus) return;
           final renderObj = context.findRenderObject();
-          if (renderObj == null) return;
+          if (renderObj == null || renderObj is! RenderBox || !renderObj.attached || !renderObj.hasSize) return;
 
           ScrollableState? scrollable = Scrollable.maybeOf(context);
           while (scrollable != null) {
+            // Không bao giờ cuộn PageView (billboard carousel) vì sẽ làm lệch toàn bộ banner trang
+            if (scrollable.widget is PageView || scrollable.position.runtimeType.toString().contains('Page')) {
+              scrollable = Scrollable.maybeOf(scrollable.context);
+              continue;
+            }
+
             final isVertical = scrollable.axisDirection == AxisDirection.down ||
                 scrollable.axisDirection == AxisDirection.up;
 
-            scrollable.position.ensureVisible(
-              renderObj,
-              alignment: isVertical ? (widget.verticalScrollAlignment ?? 0.12) : 0.0,
-              duration: const Duration(milliseconds: 140),
-              curve: Curves.easeOutQuad,
-            );
+            if (isVertical) {
+              scrollable.position.ensureVisible(
+                renderObj,
+                alignment: widget.verticalScrollAlignment ?? 0.12,
+                duration: const Duration(milliseconds: 140),
+                curve: Curves.easeOutQuad,
+              );
+            } else {
+              // Hàng ngang: Chỉ cuộn khi thẻ bị che hoặc vượt ra ngoài màn hình.
+              // Nếu thẻ đã hiển thị đầy đủ trong viewport thì giữ nguyên 100%, không bị giật sang mép trái.
+              final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
+              if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
+                final double cardLeft = renderObj.localToGlobal(Offset.zero).dx;
+                final double cardRight = cardLeft + renderObj.size.width;
+                final double vpLeft = scrollableBox.localToGlobal(Offset.zero).dx;
+                final double vpRight = vpLeft + scrollableBox.size.width;
+
+                if (cardLeft < vpLeft || cardRight > vpRight) {
+                  final double alignment = (cardLeft < vpLeft) ? 0.0 : 1.0;
+                  scrollable.position.ensureVisible(
+                    renderObj,
+                    alignment: alignment,
+                    duration: const Duration(milliseconds: 140),
+                    curve: Curves.easeOutQuad,
+                  );
+                }
+              }
+            }
             scrollable = Scrollable.maybeOf(scrollable.context);
           }
         });

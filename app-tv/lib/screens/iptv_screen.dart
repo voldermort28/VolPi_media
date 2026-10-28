@@ -56,6 +56,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   final FocusNode _searchCardFocusNode = FocusNode(debugLabel: 'IptvSearchCard');
   final FocusNode _searchTextFieldFocusNode = FocusNode(debugLabel: 'IptvSearchTextField');
   final FocusNode _firstChannelCardFocusNode = FocusNode(debugLabel: 'IptvFirstChannel');
+  FocusNode get firstChannelCardFocusNode => _firstChannelCardFocusNode;
   final FocusNode _refreshButtonFocusNode = FocusNode(debugLabel: 'IptvRefreshButton');
   bool _isSearchCardFocused = false;
   bool _isSearchActive = false;

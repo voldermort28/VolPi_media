@@ -1,10 +1,10 @@
 {
-  "version": "2.2.10",
-  "build": 76,
-  "tag_name": "v2.2.10",
-  "changelog": "• VolPi Media v2.2.10 - Ổn Định Focus & Điều Hướng D-Pad Remote Android TV:\n- Khắc phục triệt để lỗi con trỏ nhảy lung tung khi bấm mũi tên Phải từ thanh Sidebar vào vùng nội dung: Tự động ghi nhớ và ưu tiên quay lại thẻ nội dung đang xem trước đó nếu còn hiển thị trên màn hình, hoặc chọn thẻ nội dung hiển thị gần nhất ngang hàng với mục sidebar.\n- Loại bỏ các bẫy focus (intermediate wrappers) trên banner Billboard và hàng nút điều khiển, đảm bảo con trỏ tiếp đất chính xác vào các thẻ xem phim / thông tin.\n- Tối ưu cơ chế cuộn thông minh (smart viewport reveal): Chỉ kích hoạt cuộn khi thẻ thực sự nằm ngoài hoặc bị khuất mép màn hình, giữ nguyên vị trí ổn định khi thẻ đã nằm trọn trong tầm nhìn giúp điều hướng D-pad mượt mà, không giật trang.",
+  "version": "2.2.11",
+  "build": 77,
+  "tag_name": "v2.2.11",
+  "changelog": "• VolPi Media v2.2.11 - Cải Tiến Toàn Diện Điều Hướng & Focus TV Remote:\n- Khắc phục triệt để lỗi con trỏ nhảy lung tung khi từ sidebar vào nội dung: Mỗi tab (Trang chủ, Xôi Lạc, Socolive, Anime, IPTV) sở hữu điểm đón focus chính xác (primary entry point) như nút 'PHÁT NGAY' trên banner hoặc thẻ trận đấu/kênh đầu tiên, loại bỏ hoàn toàn hiện tượng tính toán tọa độ ngẫu nhiên.\n- Chuyển tab thông minh từ sidebar: Khi di chuyển xuống một mục trên sidebar và bấm mũi tên Phải (hoặc bấm OK), hệ thống tự động kích hoạt tab đó và đưa con trỏ vào ngay nội dung tương ứng.\n- Chống giật hàng ngang: Thẻ trong các danh sách ngang chỉ cuộn khi bị che khuất ngoài khung hình; nếu thẻ đã hiển thị trọn vẹn thì giữ nguyên vị trí, không còn bị giật sang mép trái mỗi khi nhận focus.\n- Tách biệt focus PageView: Loại trừ các trang banner ẩn khỏi cây focus, đảm bảo banner không bị lệch hay nhảy trang khi duyệt điều khiển.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-28T16:05:00Z"
+  "published_at": "2026-10-28T17:45:00Z"
 }
