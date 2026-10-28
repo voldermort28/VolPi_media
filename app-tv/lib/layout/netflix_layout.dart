@@ -112,15 +112,20 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   /// Tránh trường hợp focus nhảy tới thẻ đã cuộn khuất / thuộc tab cũ khiến trang cuộn lung tung.
   void _moveFocusToContent() {
     final Size screen = MediaQuery.of(context).size;
-    const double contentLeft = 68;
+    const double contentLeft = 68.0;
+
+    Rect? getNodeRect(FocusNode node) {
+      final ctx = node.context;
+      if (ctx == null || !ctx.mounted) return null;
+      final ro = ctx.findRenderObject();
+      if (ro is! RenderBox || !ro.attached || !ro.hasSize) return null;
+      final offset = ro.localToGlobal(Offset.zero);
+      return offset & ro.size;
+    }
 
     bool isUsable(FocusNode node) {
       if (!node.canRequestFocus || node.skipTraversal || node is FocusScopeNode) return false;
-      final ctx = node.context;
-      if (ctx == null || !ctx.mounted) return false;
-      final ro = ctx.findRenderObject();
-      if (ro is! RenderBox || !ro.attached || !ro.hasSize) return false;
-      return true;
+      return getNodeRect(node) != null;
     }
 
     bool isOnScreen(Rect r) {
@@ -128,7 +133,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       // Phải nằm phần lớn trong vùng nội dung nhìn thấy
       final visible = r.intersect(Rect.fromLTWH(contentLeft, 0, screen.width - contentLeft, screen.height));
       if (visible.width <= 0 || visible.height <= 0) return false;
-      return visible.width >= r.width * 0.6 && visible.height >= r.height * 0.6;
+      return visible.width >= r.width * 0.5 && visible.height >= r.height * 0.5;
     }
 
     // 1. Thẻ đã focus trước đó trong vùng nội dung
@@ -136,19 +141,27 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     while (previous is FocusScopeNode && previous.focusedChild != null) {
       previous = previous.focusedChild;
     }
-    if (previous != null && isUsable(previous) && isOnScreen(previous.rect)) {
-      previous.requestFocus();
-      return;
+    if (previous != null && isUsable(previous)) {
+      final r = getNodeRect(previous);
+      if (r != null && isOnScreen(r)) {
+        previous.requestFocus();
+        return;
+      }
     }
 
     // 2. Tìm thẻ hiển thị gần nhất với mục sidebar hiện tại
-    final FocusNode? sidebarNode = _sidebarFocusNodes.firstWhere(
-      (n) => n.hasFocus,
-      orElse: () => _sidebarFocusNodes[_currentTabIndex],
-    );
-    final double anchorY = (sidebarNode != null && sidebarNode.context != null)
-        ? sidebarNode.rect.center.dy
-        : screen.height * 0.3;
+    FocusNode? sidebarNode;
+    for (final node in _sidebarFocusNodes) {
+      if (node.hasFocus) {
+        sidebarNode = node;
+        break;
+      }
+    }
+    if (sidebarNode == null && _currentTabIndex >= 0 && _currentTabIndex < _sidebarFocusNodes.length) {
+      sidebarNode = _sidebarFocusNodes[_currentTabIndex];
+    }
+    final sidebarRect = (sidebarNode != null) ? getNodeRect(sidebarNode) : null;
+    final double anchorY = sidebarRect != null ? sidebarRect.center.dy : screen.height * 0.3;
 
     FocusNode? best;
     double bestScore = double.infinity;
@@ -156,8 +169,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       if (!isUsable(node)) continue;
       // Bỏ qua các Focus "bọc ngoài" (wrapper) chỉ dùng để bắt phím, chỉ chọn thẻ thật (leaf)
       if (node.descendants.any((d) => d.canRequestFocus && !d.skipTraversal)) continue;
-      final r = node.rect;
-      if (!isOnScreen(r)) continue;
+      final r = getNodeRect(node);
+      if (r == null || !isOnScreen(r)) continue;
       final double dy = (r.center.dy - anchorY).abs();
       final double dx = (r.left - contentLeft).clamp(0.0, double.infinity);
       final double score = dy + dx * 0.6;
