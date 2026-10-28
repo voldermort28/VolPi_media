@@ -43,13 +43,9 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   String? _errorMessage;
 
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _billboardPlayFocusNode = FocusNode();
-  FocusNode get billboardPlayFocusNode => _billboardPlayFocusNode;
-  final PageController _bannerPageController = PageController();
-  Timer? _bannerTimer;
-  int _currentBannerIndex = 0;
-  bool _isBannerInteracting = false;
-  bool _isBannerFocused = false;
+  final FocusNode _firstHomeCardFocusNode = FocusNode();
+  FocusNode get firstCardFocusNode => _firstHomeCardFocusNode;
+  FocusNode get billboardPlayFocusNode => _firstHomeCardFocusNode;
 
   @override
   void initState() {
@@ -63,40 +59,9 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   void dispose() {
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryChanged);
     FavoritesService.instance.changeNotifier.removeListener(_onFavoritesChanged);
-    _bannerTimer?.cancel();
-    _bannerPageController.dispose();
     _scrollController.dispose();
-    _billboardPlayFocusNode.dispose();
+    _firstHomeCardFocusNode.dispose();
     super.dispose();
-  }
-
-  void _startBannerTimer() {
-    _bannerTimer?.cancel();
-    final featuredMatches = _majorMatches.isNotEmpty
-        ? _majorMatches.take(5).toList()
-        : (_matches.isNotEmpty ? _matches.take(3).toList() : <MatchModel>[]);
-    if (featuredMatches.length <= 1) return;
-    _bannerTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
-      if (!mounted || _isBannerInteracting || _isBannerFocused) return;
-      if (_bannerPageController.hasClients) {
-        final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
-        _bannerPageController.animateToPage(
-          nextIndex,
-          duration: const Duration(milliseconds: 700),
-          curve: Curves.easeInOutCubic,
-        );
-      }
-    });
-  }
-
-  void _scrollToTopOnBillboardFocus() {
-    if (_scrollController.hasClients && _scrollController.offset > 0) {
-      _scrollController.animateTo(
-        0.0,
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-      );
-    }
   }
 
   void _onHistoryChanged() {
@@ -192,12 +157,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         _isLoading = false;
       });
 
-      _startBannerTimer();
-
-      // Auto-focus billboard play button
+      // Tự động focus thẻ nội dung đầu tiên trên Android TV khi tải xong dữ liệu
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _majorMatches.isNotEmpty) {
-          _billboardPlayFocusNode.requestFocus();
+        if (mounted && _firstHomeCardFocusNode.canRequestFocus) {
+          _firstHomeCardFocusNode.requestFocus();
         }
       });
     } catch (e) {
@@ -470,9 +433,12 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
       );
     }
 
-    final featuredMatches = _majorMatches.isNotEmpty
-        ? _majorMatches.take(5).toList()
-        : (_matches.isNotEmpty ? _matches.take(3).toList() : <MatchModel>[]);
+    // Xác định mục đầu tiên để gán focus node chính (primary entry node cho Android TV)
+    final bool hasContinue = _continueWatching.isNotEmpty;
+    final bool hasFavorites = _favorites.isNotEmpty;
+    final bool hasLive = _liveMatches.isNotEmpty;
+    final bool hasVietnam = _vietnamMatches.isNotEmpty;
+    final bool hasMajor = _majorMatches.isNotEmpty;
 
     return SingleChildScrollView(
       controller: _scrollController,
@@ -480,36 +446,33 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 1. BILLBOARD HERO BANNER (Top Matches Carousel)
-          if (featuredMatches.isNotEmpty) _buildBillboardCarousel(featuredMatches),
+          const SizedBox(height: 18),
 
-          const SizedBox(height: 16),
-
-          // 2. CONTINUE WATCHING (🍿 TIẾP TỤC XEM)
-          if (_continueWatching.isNotEmpty) ...[
+          // 1. CONTINUE WATCHING (🍿 TIẾP TỤC XEM)
+          if (hasContinue) ...[
             _buildSectionTitle('🍿 TIẾP TỤC XEM CHO BẠN'),
-            _buildContinueWatchingRow(),
+            _buildContinueWatchingRow(isFirstSection: true),
             const SizedBox(height: 20),
           ],
 
-          // 2.5 FAVORITES (❤️ DANH SÁCH YÊU THÍCH)
-          if (_favorites.isNotEmpty) ...[
+          // 2. FAVORITES (❤️ DANH SÁCH YÊU THÍCH)
+          if (hasFavorites) ...[
             _buildSectionTitle('❤️ DANH SÁCH YÊU THÍCH', onSeeAll: () => widget.onNavigateTab?.call(3)),
-            _buildFavoritesRow(),
+            _buildFavoritesRow(isFirstSection: !hasContinue),
             const SizedBox(height: 20),
           ],
 
           // 3. LIVE NOW MATCHES (🔴 ĐANG THI ĐẤU TRỰC TIẾP)
-          if (_liveMatches.isNotEmpty) ...[
+          if (hasLive) ...[
             _buildSectionTitle('🔴 ĐANG THI ĐẤU TRỰC TIẾP', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_liveMatches),
+            _buildMatchesRow(_liveMatches, isFirstSection: !hasContinue && !hasFavorites),
             const SizedBox(height: 20),
           ],
 
-          // 3.5. VIETNAM FOOTBALL (🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE)
-          if (_vietnamMatches.isNotEmpty) ...[
+          // 4. VIETNAM FOOTBALL (🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE)
+          if (hasVietnam) ...[
             _buildSectionTitle('🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_vietnamMatches),
+            _buildMatchesRow(_vietnamMatches, isFirstSection: !hasContinue && !hasFavorites && !hasLive),
             const SizedBox(height: 20),
           ] else ...[
             _buildSectionTitle('🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE', onSeeAll: () => widget.onNavigateTab?.call(1)),
@@ -517,526 +480,21 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             const SizedBox(height: 20),
           ],
 
-          // 4. SPOTLIGHT MATCHES (⭐ TRẬN CẦU TÂM ĐIỂM & GIẢI ĐẤU HÀNG ĐẦU)
-          if (_majorMatches.isNotEmpty) ...[
+          // 5. SPOTLIGHT MATCHES (⭐ TRẬN CẦU TÂM ĐIỂM & GIẢI ĐẤU HÀNG ĐẦU)
+          if (hasMajor) ...[
             _buildSectionTitle('⭐ TRẬN CẦU TÂM ĐIỂM & GIẢI HÀNG ĐẦU', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_majorMatches),
+            _buildMatchesRow(_majorMatches, isFirstSection: !hasContinue && !hasFavorites && !hasLive && !hasVietnam),
             const SizedBox(height: 20),
           ],
 
-          // 5. ALL MATCHES (⚽ CÁC TRẬN ĐẤU KHÁC)
+          // 6. ALL MATCHES (⚽ CÁC TRẬN ĐẤU KHÁC)
           if (_matches.isNotEmpty) ...[
             _buildSectionTitle('⚽ CÁC TRẬN ĐẤU KHÁC HÔM NAY', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_matches.skip(3).take(10).toList()),
+            _buildMatchesRow(_matches.skip(3).take(10).toList(), isFirstSection: !hasContinue && !hasFavorites && !hasLive && !hasVietnam && !hasMajor),
             const SizedBox(height: 32),
           ],
         ],
       ),
-    );
-  }
-
-  // =========================================================================
-  // BILLBOARD CAROUSEL (Top Matches Auto-Slide)
-  // =========================================================================
-  Widget _buildBillboardCarousel(List<MatchModel> featuredMatches) {
-    if (featuredMatches.isEmpty) return const SizedBox.shrink();
-    if (featuredMatches.length == 1) return _buildBillboard(featuredMatches.first);
-
-    return Focus(
-      canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
-      skipTraversal: true,
-      onFocusChange: (hasFocus) {
-        setState(() {
-          _isBannerFocused = hasFocus;
-          _isBannerInteracting = hasFocus;
-        });
-        if (hasFocus) {
-          _bannerTimer?.cancel();
-          _scrollToTopOnBillboardFocus();
-        } else {
-          _startBannerTimer();
-        }
-      },
-      child: MouseRegion(
-        onEnter: (_) => setState(() => _isBannerInteracting = true),
-        onExit: (_) => setState(() => _isBannerInteracting = false),
-        child: SizedBox(
-          height: 350,
-          child: Stack(
-            children: [
-              PageView.builder(
-                controller: _bannerPageController,
-                itemCount: featuredMatches.length,
-                onPageChanged: (idx) {
-                  setState(() {
-                    _currentBannerIndex = idx;
-                  });
-                },
-                itemBuilder: (context, idx) {
-                  return ExcludeFocus(
-                    excluding: idx != _currentBannerIndex,
-                    child: _buildBillboard(featuredMatches[idx], isCurrent: idx == _currentBannerIndex),
-                  );
-                },
-              ),
-
-              // Left Arrow (Hover / Mouse navigation)
-              if (featuredMatches.length > 1)
-                Positioned(
-                  left: 16,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _isBannerInteracting ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !_isBannerInteracting,
-                        child: IconButton(
-                          focusNode: FocusNode(canRequestFocus: false),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.black.withOpacity(0.55),
-                            foregroundColor: Colors.white,
-                            shape: const CircleBorder(),
-                            padding: const EdgeInsets.all(12),
-                          ),
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
-                          onPressed: () {
-                            final prevIndex = (_currentBannerIndex - 1 + featuredMatches.length) % featuredMatches.length;
-                            _bannerPageController.animateToPage(
-                              prevIndex,
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeOutCubic,
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // Right Arrow (Hover / Mouse navigation)
-              if (featuredMatches.length > 1)
-                Positioned(
-                  right: 16,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: AnimatedOpacity(
-                      duration: const Duration(milliseconds: 200),
-                      opacity: _isBannerInteracting ? 1.0 : 0.0,
-                      child: IgnorePointer(
-                        ignoring: !_isBannerInteracting,
-                        child: IconButton(
-                          focusNode: FocusNode(canRequestFocus: false),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.black.withOpacity(0.55),
-                            foregroundColor: Colors.white,
-                            shape: const CircleBorder(),
-                            padding: const EdgeInsets.all(12),
-                          ),
-                          icon: const Icon(Icons.arrow_forward_ios_rounded, size: 20),
-                          onPressed: () {
-                            final nextIndex = (_currentBannerIndex + 1) % featuredMatches.length;
-                            _bannerPageController.animateToPage(
-                              nextIndex,
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeOutCubic,
-                            );
-                          },
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-            // Dots Indicator (Góc dưới bên phải)
-            Positioned(
-              bottom: 24,
-              right: 32,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(featuredMatches.length, (idx) {
-                  final bool isSelected = idx == _currentBannerIndex;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: isSelected ? 18 : 6,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFFE50914) : Colors.white24,
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-      ),
-    );
-  }
-
-  // =========================================================================
-  // VIETNAM EMPTY STATE BANNER (When no VN matches scheduled)
-  // =========================================================================
-  Widget _buildVietnamEmptyBanner() {
-    final bool isMobile = MediaQuery.of(context).size.width < 700;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 0),
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 14 : 20, vertical: isMobile ? 12 : 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF141414),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFDC2626).withOpacity(0.3), width: 1.0),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF991B1B).withOpacity(0.18),
-            const Color(0xFF141414),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDC2626).withOpacity(0.2),
-              shape: BoxShape.circle,
-            ),
-            child: const Text('🇻🇳', style: TextStyle(fontSize: 22)),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Lịch Thi Đấu Bóng Đá Việt Nam',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  'Hôm nay chưa có trận diễn ra. Các trận đấu V.League 1 & 2, Cúp Quốc Gia, C1/C2 Châu Á (Nam Định, CAHN...) và ĐT Việt Nam (AFF Cup, Vòng loại World Cup) sẽ tự động cập nhật khi có lịch phát sóng.',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.65),
-                    fontSize: isMobile ? 10.5 : 11.5,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // =========================================================================
-  // BILLBOARD COMPONENT
-  // =========================================================================
-  Widget _buildBillboard(MatchModel match, {bool isCurrent = true}) {
-    return Container(
-      height: 350,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F0F0F),
-        gradient: LinearGradient(
-          colors: [Color(0xFF1E1428), Color(0xFF0A0F1D), Color(0xFF0F0F0F)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
-        ),
-      ),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Dark Vignette Gradient Left-to-Right
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F0F0F), Color(0xCC0F0F0F), Colors.transparent],
-                stops: [0.0, 0.55, 1.0],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-            ),
-          ),
-          // Dark Vignette Gradient Bottom-to-Top
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F0F0F), Colors.transparent],
-                stops: [0.0, 0.6],
-                begin: Alignment.bottomCenter,
-                end: Alignment.center,
-              ),
-            ),
-          ),
-
-          // Billboard Content
-          Padding(
-            padding: const EdgeInsets.fromLTRB(32, 24, 32, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                // Badges
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
-                      decoration: BoxDecoration(
-                        color: match.isVietnam ? const Color(0xFFDC2626) : const Color(0xFFE50914),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        match.isVietnam
-                            ? '🇻🇳 BÓNG ĐÁ VIỆT NAM'
-                            : (match.isMuFavorite
-                                ? '⭐ MANCHESTER UNITED'
-                                : (match.favoriteBadgeText.isNotEmpty
-                                    ? '⭐ ${match.favoriteBadgeText}'
-                                    : 'TOP 1 TÂM ĐIỂM')),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      match.league.toUpperCase(),
-                      style: const TextStyle(
-                        color: Color(0xFFF59E0B),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      match.isOngoingNow ? '• LIVE ${match.liveMinuteLabel}' : '• ${match.time}',
-                      style: TextStyle(
-                        color: match.isOngoingNow ? const Color(0xFFF43F5E) : Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-
-                // Aesthetic Dual Team Logos + VS Badge
-                _buildBillboardTeamLogos(match),
-
-                // Match Title
-                Text(
-                  '${match.homeTeam}  vs  ${match.awayTeam}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                const SizedBox(height: 6),
-
-                // Subtitle
-                Text(
-                  match.isOngoingNow
-                      ? 'Đang thi đấu trực tiếp • Bình luận tiếng Việt Full HD 60fps'
-                      : 'Trực tiếp chất lượng cao • Bình luận tiếng Việt độc quyền',
-                  style: const TextStyle(color: Colors.white60, fontSize: 12),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Actions: Netflix White "PHÁT NGAY" button + Info
-                Focus(
-                  canRequestFocus: false, // wrapper chỉ bắt phím/sự kiện, không nhận focus
-                  skipTraversal: true,
-                  onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
-                      _scrollToTopOnBillboardFocus();
-                      return KeyEventResult.handled;
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: Row(
-                    children: [
-                      TvFocusableCard(
-                        focusNode: isCurrent ? _billboardPlayFocusNode : null,
-                        verticalScrollAlignment: 0.0,
-                        onFocusChange: (hasFocus) {
-                          if (hasFocus) _scrollToTopOnBillboardFocus();
-                        },
-                        onTap: () => _onMatchSelected(match),
-                        borderRadius: BorderRadius.circular(6),
-                        scale: 1.05,
-                        focusBorderColor: Colors.white,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.play_arrow_rounded, color: Colors.black, size: 22),
-                              SizedBox(width: 6),
-                              Text(
-                                'PHÁT NGAY',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(width: 12),
-
-                      TvFocusableCard(
-                        verticalScrollAlignment: 0.0,
-                        onFocusChange: (hasFocus) {
-                          if (hasFocus) _scrollToTopOnBillboardFocus();
-                        },
-                        onTap: () => _onMatchSelected(match),
-                        borderRadius: BorderRadius.circular(6),
-                        scale: 1.05,
-                        focusBorderColor: Colors.white,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF333333).withOpacity(0.8),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.info_outline_rounded, color: Colors.white, size: 18),
-                              SizedBox(width: 6),
-                              Text(
-                                'CHỌN LUỒNG & BLV',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillboardTeamLogos(MatchModel match) {
-    final isMobile = MediaQuery.of(context).size.width < 700;
-    final double logoSize = isMobile ? 64 : 96;
-
-    return Padding(
-      padding: EdgeInsets.only(top: isMobile ? 8 : 12, bottom: isMobile ? 6 : 10),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildHeroLogoItem(match.homeLogo, match.homeTeam, size: logoSize),
-          Container(
-            margin: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 16),
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 14, vertical: isMobile ? 4 : 6),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE50914), Color(0xFF991B1B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE50914).withOpacity(0.5),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ],
-            ),
-            child: Text(
-              'VS',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: isMobile ? 12 : 16,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.0,
-              ),
-            ),
-          ),
-          _buildHeroLogoItem(match.awayLogo, match.awayTeam, size: logoSize),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroLogoItem(String logoUrl, String teamName, {double size = 96}) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFF1E293B).withOpacity(0.92),
-        border: Border.all(color: Colors.white.withOpacity(0.35), width: 2.0),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.65),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-          BoxShadow(
-            color: const Color(0xFF38BDF8).withOpacity(0.25),
-            blurRadius: 16,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(6),
-      child: logoUrl.isNotEmpty
-          ? ClipOval(
-              child: CachedNetworkImage(
-                imageUrl: logoUrl,
-                fit: BoxFit.contain,
-                memCacheWidth: 250,
-                memCacheHeight: 250,
-                errorWidget: (_, __, ___) => Center(
-                  child: Icon(Icons.shield_rounded, size: size * 0.5, color: Colors.white54),
-                ),
-              ),
-            )
-          : Center(
-              child: Icon(Icons.shield_rounded, size: size * 0.5, color: Colors.white54),
-            ),
     );
   }
 
@@ -1076,7 +534,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // CONTINUE WATCHING HORIZONTAL ROW (16:9 ratio + Netflix Red Progress Bar)
   // =========================================================================
-  Widget _buildContinueWatchingRow() {
+  Widget _buildContinueWatchingRow({bool isFirstSection = false}) {
     return NetflixScrollableRow(
       height: 140,
       itemCount: _continueWatching.length,
@@ -1084,6 +542,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           final item = _continueWatching[idx];
           return RepaintBoundary(
             child: TvFocusableCard(
+              focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
               onTap: () => _playContinueWatchingAtIndex(idx),
               borderRadius: BorderRadius.circular(6),
               scale: 1.05,
@@ -1197,7 +656,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // FAVORITES HORIZONTAL ROW (Poster Ratio)
   // =========================================================================
-  Widget _buildFavoritesRow() {
+  Widget _buildFavoritesRow({bool isFirstSection = false}) {
     return NetflixScrollableRow(
       height: 180,
       itemCount: _favorites.length,
@@ -1205,6 +664,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         final item = _favorites[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
+            focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
             onTap: () => _onFavoriteItemTap(item),
             borderRadius: BorderRadius.circular(6),
             scale: 1.05,
@@ -1295,7 +755,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // MATCHES HORIZONTAL ROW (Netflix Card Style)
   // =========================================================================
-  Widget _buildMatchesRow(List<MatchModel> matches) {
+  Widget _buildMatchesRow(List<MatchModel> matches, {bool isFirstSection = false}) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
     final double cardWidth = isMobile ? 195 : 250;
     final double rowHeight = isMobile ? 112 : 155;
@@ -1307,6 +767,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         final match = matches[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
+            focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
             onTap: () => _onMatchSelected(match),
             borderRadius: BorderRadius.circular(6),
             scale: 1.05,

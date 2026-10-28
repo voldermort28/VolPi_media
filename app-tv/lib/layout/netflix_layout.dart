@@ -152,12 +152,12 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
     // 2. Chuyển trực tiếp vào điểm đón chuẩn của Tab hiện tại
     switch (_currentTabIndex) {
-      case 0: // Trang chủ: Thẻ "PHÁT NGAY" trên Billboard
+      case 0: // Trang chủ: Thẻ nội dung đầu tiên trên Home
         final homeState = _homeKey.currentState;
         if (homeState != null && homeState.mounted) {
-          final playNode = homeState.billboardPlayFocusNode;
-          if (playNode.canRequestFocus && isUsable(playNode)) {
-            playNode.requestFocus();
+          final firstNode = homeState.firstCardFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
             return;
           }
         }
