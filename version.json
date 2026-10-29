@@ -1,10 +1,10 @@
 {
-  "version": "2.2.14",
-  "build": 80,
-  "tag_name": "v2.2.14",
-  "changelog": "• VolPi Media v2.2.14 - Khắc Phục Triệt Để Hiện Tượng Trôi/Cuộn Màn Hình Khi Bấm Mũi Tên Sang Phải:\n- Chống trôi dọc khi duyệt ngang: Chỉ kích hoạt cuộn dọc khi thẻ thực sự bị khuất ở cạnh trên hoặc dưới viewport; khi bấm mũi tên Sang Phải/Trái trong cùng một hàng danh mục, màn hình dọc giữ cố định 100%, không còn bị trôi tụt xuống dưới.\n- Giữ focus vững chắc trong hàng: Mở rộng bộ đệm hàng ngang (cacheExtent 3500px) đảm bảo toàn bộ thẻ trong hàng luôn sẵn sàng đón focus; chặn không cho focus rớt ra ngoài hay nhảy xuống hàng dưới khi duyệt đến thẻ cuối cùng.\n- Điều hướng TV Remote mượt mà, ổn định trên Android TV và macOS.",
+  "version": "2.2.15",
+  "build": 81,
+  "tag_name": "v2.2.15",
+  "changelog": "• VolPi Media v2.2.15 - Tự Động Cuộn Dọc Khi Điều Hướng Giữa Các Hàng Trên Android TV:\n- Cuộn dọc thông minh theo hàng: Khi bấm mũi tên Lên/Xuống giữa các hàng khác nhau, màn hình tự động cuộn mượt mà để hàng mới và các hàng tiếp theo hiển thị đầy đủ trong tầm nhìn.\n- Khóa cuộn dọc tuyệt đối khi duyệt ngang: Bấm Trái/Phải bên trong một hàng giữ nguyên vị trí dọc 100%, không bị rung lắc hay trôi màn hình.\n- Trải nghiệm duyệt nội dung mượt mà, tự nhiên chuẩn Android TV Leanback.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-29T14:55:00Z"
+  "published_at": "2026-10-30T00:25:00Z"
 }

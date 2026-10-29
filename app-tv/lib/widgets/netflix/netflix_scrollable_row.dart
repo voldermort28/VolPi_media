@@ -20,10 +20,10 @@ class NetflixScrollableRow extends StatefulWidget {
   });
 
   @override
-  State<NetflixScrollableRow> createState() => _NetflixScrollableRowState();
+  State<NetflixScrollableRow> createState() => NetflixScrollableRowState();
 }
 
-class _NetflixScrollableRowState extends State<NetflixScrollableRow> {
+class NetflixScrollableRowState extends State<NetflixScrollableRow> {
   final ScrollController _scrollController = ScrollController();
   bool _canScrollLeft = false;
   bool _canScrollRight = false;

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'netflix/netflix_scrollable_row.dart';
 
 bool get _isMacOS => !kIsWeb && Platform.isMacOS;
 
@@ -39,6 +40,7 @@ class TvFocusableCard extends StatefulWidget {
 }
 
 class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAliveClientMixin {
+  static NetflixScrollableRowState? _lastFocusedRow;
   late FocusNode _focusNode;
   bool _isFocused = false;
   Timer? _holdTimer;
@@ -95,32 +97,48 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
                 scrollable.axisDirection == AxisDirection.up;
 
             if (isVertical) {
-              final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
-              if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
-                final double cardTop = renderObj.localToGlobal(Offset.zero).dy;
-                final double cardBottom = cardTop + renderObj.size.height;
-                final double vpTop = scrollableBox.localToGlobal(Offset.zero).dy;
-                final double vpBottom = vpTop + scrollableBox.size.height;
+              final currentRow = context.findAncestorStateOfType<NetflixScrollableRowState>();
+              final bool isSameRow = currentRow != null && _lastFocusedRow == currentRow;
+              _lastFocusedRow = currentRow;
 
-                // Chỉ cuộn dọc khi thẻ thực sự bị khuất ở cạnh trên hoặc cạnh dưới viewport.
-                // Tuyệt đối KHÔNG cuộn dọc khi người dùng đang di chuyển ngang trong cùng một hàng,
-                // loại bỏ hoàn toàn hiện tượng màn hình bị trôi hoặc giật xuống khi bấm mũi tên sang phải.
-                const double topSafetyMargin = 70.0; // Chừa chỗ nhìn rõ tiêu đề danh mục phía trên
-                const double bottomSafetyMargin = 40.0;
-
-                final bool isClippedTop = scrollable.position.pixels > 0 && cardTop < (vpTop + topSafetyMargin);
-                final bool isClippedBottom = cardBottom > (vpBottom - bottomSafetyMargin);
-
-                if (isClippedTop || isClippedBottom) {
-                  final double alignment = isClippedTop
-                      ? (widget.verticalScrollAlignment ?? 0.12)
-                      : 0.85;
+              if (currentRow != null) {
+                // Thẻ nằm trong 1 hàng ngang NetflixScrollableRow:
+                // Nếu đổi hàng (Lên / Xuống) -> luôn cuộn dọc mượt mà để hàng mới và các hàng bên dưới lộ diện
+                if (!isSameRow) {
                   scrollable.position.ensureVisible(
                     renderObj,
-                    alignment: alignment,
-                    duration: const Duration(milliseconds: 160),
+                    alignment: widget.verticalScrollAlignment ?? 0.12,
+                    duration: const Duration(milliseconds: 180),
                     curve: Curves.easeOutQuad,
                   );
+                }
+                // Nếu là cùng 1 hàng (isSameRow == true) -> người dùng bấm Trái/Phải di chuyển trong hàng -> KHÔNG cuộn dọc!
+              } else {
+                // Ngoài hàng ngang (dialog, IPTV grid, anime episode selector...): chỉ cuộn khi bị che khuất
+                final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
+                if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
+                  final double cardTop = renderObj.localToGlobal(Offset.zero).dy;
+                  final double cardBottom = cardTop + renderObj.size.height;
+                  final double vpTop = scrollableBox.localToGlobal(Offset.zero).dy;
+                  final double vpBottom = vpTop + scrollableBox.size.height;
+
+                  const double topSafetyMargin = 70.0;
+                  const double bottomSafetyMargin = 40.0;
+
+                  final bool isClippedTop = scrollable.position.pixels > 0 && cardTop < (vpTop + topSafetyMargin);
+                  final bool isClippedBottom = cardBottom > (vpBottom - bottomSafetyMargin);
+
+                  if (isClippedTop || isClippedBottom) {
+                    final double alignment = isClippedTop
+                        ? (widget.verticalScrollAlignment ?? 0.12)
+                        : 0.85;
+                    scrollable.position.ensureVisible(
+                      renderObj,
+                      alignment: alignment,
+                      duration: const Duration(milliseconds: 160),
+                      curve: Curves.easeOutQuad,
+                    );
+                  }
                 }
               }
             } else {
