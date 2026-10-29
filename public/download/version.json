@@ -1,10 +1,10 @@
 {
-  "version": "2.2.15",
-  "build": 81,
-  "tag_name": "v2.2.15",
-  "changelog": "• VolPi Media v2.2.15 - Tự Động Cuộn Dọc Khi Điều Hướng Giữa Các Hàng Trên Android TV:\n- Cuộn dọc thông minh theo hàng: Khi bấm mũi tên Lên/Xuống giữa các hàng khác nhau, màn hình tự động cuộn mượt mà để hàng mới và các hàng tiếp theo hiển thị đầy đủ trong tầm nhìn.\n- Khóa cuộn dọc tuyệt đối khi duyệt ngang: Bấm Trái/Phải bên trong một hàng giữ nguyên vị trí dọc 100%, không bị rung lắc hay trôi màn hình.\n- Trải nghiệm duyệt nội dung mượt mà, tự nhiên chuẩn Android TV Leanback.",
+  "version": "2.2.16",
+  "build": 82,
+  "tag_name": "v2.2.16",
+  "changelog": "• VolPi Media v2.2.16 - Sửa Triệt Để Lỗi Cuộn Dọc Khi Bấm Phím Xuống Trên Android TV:\n- Cuộn dọc chính xác theo hàng: Sử dụng context của toàn bộ hàng ngang (NetflixScrollableRow) thay vì thẻ con bên trong khi cuộn dọc, loại bỏ hoàn toàn hiện tượng bấm nút Xuống làm màn hình bị giật ngược lên đỉnh trang.\n- Khóa cuộn dọc tuyệt đối khi duyệt ngang: Bấm Trái/Phải bên trong một hàng giữ nguyên vị trí dọc 100%, không bị rung lắc hay trôi màn hình.\n- Điều hướng TV Remote mượt mà, chính xác theo chuẩn Android TV Leanback.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-30T00:25:00Z"
+  "published_at": "2026-10-30T00:48:00Z"
 }

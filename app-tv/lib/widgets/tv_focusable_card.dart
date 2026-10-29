@@ -85,36 +85,66 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
           final renderObj = context.findRenderObject();
           if (renderObj == null || renderObj is! RenderBox || !renderObj.attached || !renderObj.hasSize) return;
 
-          ScrollableState? scrollable = Scrollable.maybeOf(context);
-          while (scrollable != null) {
-            // Không bao giờ cuộn PageView (billboard carousel) vì sẽ làm lệch toàn bộ banner trang
-            if (scrollable.widget is PageView || scrollable.position.runtimeType.toString().contains('Page')) {
-              scrollable = Scrollable.maybeOf(scrollable.context);
-              continue;
+          final currentRow = context.findAncestorStateOfType<NetflixScrollableRowState>();
+          final bool isSameRow = currentRow != null && _lastFocusedRow == currentRow;
+          _lastFocusedRow = currentRow;
+
+          if (currentRow != null) {
+            // Thẻ nằm trong hàng ngang NetflixScrollableRow:
+            // 1. Duyệt dọc (đổi hàng Lên/Xuống): gọi Scrollable.ensureVisible trên currentRow.context
+            //    (RenderBox của toàn bộ hàng ngang nằm trực tiếp trong thanh cuộn dọc SingleChildScrollView).
+            //    Tránh gọi ensureVisible bằng renderObj của thẻ vì thẻ nằm trong viewport ngang,
+            //    khiến Flutter lấy offset trục ngang (0.0) áp vào trục dọc làm màn hình bị kéo giật lên đỉnh!
+            if (!isSameRow && currentRow.mounted) {
+              Scrollable.ensureVisible(
+                currentRow.context,
+                alignment: widget.verticalScrollAlignment ?? 0.12,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutQuad,
+              );
             }
 
-            final isVertical = scrollable.axisDirection == AxisDirection.down ||
-                scrollable.axisDirection == AxisDirection.up;
+            // 2. Duyệt ngang (Trái/Phải trong cùng hàng):
+            //    Chỉ cuộn thanh cuộn ngang của hàng khi thẻ thực sự bị khuất mép trái hoặc phải.
+            ScrollableState? horizontalScrollable = Scrollable.maybeOf(context);
+            while (horizontalScrollable != null) {
+              final isHorizontal = horizontalScrollable.axisDirection == AxisDirection.left ||
+                  horizontalScrollable.axisDirection == AxisDirection.right;
+              if (isHorizontal) {
+                final RenderBox? scrollableBox = horizontalScrollable.context.findRenderObject() as RenderBox?;
+                if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
+                  final double cardLeft = renderObj.localToGlobal(Offset.zero).dx;
+                  final double cardRight = cardLeft + renderObj.size.width;
+                  final double vpLeft = scrollableBox.localToGlobal(Offset.zero).dx;
+                  final double vpRight = vpLeft + scrollableBox.size.width;
 
-            if (isVertical) {
-              final currentRow = context.findAncestorStateOfType<NetflixScrollableRowState>();
-              final bool isSameRow = currentRow != null && _lastFocusedRow == currentRow;
-              _lastFocusedRow = currentRow;
-
-              if (currentRow != null) {
-                // Thẻ nằm trong 1 hàng ngang NetflixScrollableRow:
-                // Nếu đổi hàng (Lên / Xuống) -> luôn cuộn dọc mượt mà để hàng mới và các hàng bên dưới lộ diện
-                if (!isSameRow) {
-                  scrollable.position.ensureVisible(
-                    renderObj,
-                    alignment: widget.verticalScrollAlignment ?? 0.12,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutQuad,
-                  );
+                  if (cardLeft < vpLeft || cardRight > vpRight) {
+                    final double alignment = (cardLeft < vpLeft) ? 0.0 : 1.0;
+                    horizontalScrollable.position.ensureVisible(
+                      renderObj,
+                      alignment: alignment,
+                      duration: const Duration(milliseconds: 140),
+                      curve: Curves.easeOutQuad,
+                    );
+                  }
                 }
-                // Nếu là cùng 1 hàng (isSameRow == true) -> người dùng bấm Trái/Phải di chuyển trong hàng -> KHÔNG cuộn dọc!
-              } else {
-                // Ngoài hàng ngang (dialog, IPTV grid, anime episode selector...): chỉ cuộn khi bị che khuất
+                break;
+              }
+              horizontalScrollable = Scrollable.maybeOf(horizontalScrollable.context);
+            }
+          } else {
+            // Thẻ ngoài hàng ngang (IPTV grid, dialog, profile...):
+            ScrollableState? scrollable = Scrollable.maybeOf(context);
+            while (scrollable != null) {
+              if (scrollable.widget is PageView || scrollable.position.runtimeType.toString().contains('Page')) {
+                scrollable = Scrollable.maybeOf(scrollable.context);
+                continue;
+              }
+
+              final isVertical = scrollable.axisDirection == AxisDirection.down ||
+                  scrollable.axisDirection == AxisDirection.up;
+
+              if (isVertical) {
                 final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
                 if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
                   final double cardTop = renderObj.localToGlobal(Offset.zero).dy;
@@ -132,8 +162,8 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
                     final double alignment = isClippedTop
                         ? (widget.verticalScrollAlignment ?? 0.12)
                         : 0.85;
-                    scrollable.position.ensureVisible(
-                      renderObj,
+                    Scrollable.ensureVisible(
+                      context,
                       alignment: alignment,
                       duration: const Duration(milliseconds: 160),
                       curve: Curves.easeOutQuad,
@@ -141,28 +171,8 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
                   }
                 }
               }
-            } else {
-              // Hàng ngang: Chỉ cuộn khi thẻ bị che hoặc vượt ra ngoài màn hình.
-              // Nếu thẻ đã hiển thị đầy đủ trong viewport thì giữ nguyên 100%, không bị giật sang mép trái.
-              final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
-              if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
-                final double cardLeft = renderObj.localToGlobal(Offset.zero).dx;
-                final double cardRight = cardLeft + renderObj.size.width;
-                final double vpLeft = scrollableBox.localToGlobal(Offset.zero).dx;
-                final double vpRight = vpLeft + scrollableBox.size.width;
-
-                if (cardLeft < vpLeft || cardRight > vpRight) {
-                  final double alignment = (cardLeft < vpLeft) ? 0.0 : 1.0;
-                  scrollable.position.ensureVisible(
-                    renderObj,
-                    alignment: alignment,
-                    duration: const Duration(milliseconds: 140),
-                    curve: Curves.easeOutQuad,
-                  );
-                }
-              }
+              scrollable = Scrollable.maybeOf(scrollable.context);
             }
-            scrollable = Scrollable.maybeOf(scrollable.context);
           }
         });
       }
