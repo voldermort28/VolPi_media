@@ -95,12 +95,34 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
                 scrollable.axisDirection == AxisDirection.up;
 
             if (isVertical) {
-              scrollable.position.ensureVisible(
-                renderObj,
-                alignment: widget.verticalScrollAlignment ?? 0.12,
-                duration: const Duration(milliseconds: 140),
-                curve: Curves.easeOutQuad,
-              );
+              final RenderBox? scrollableBox = scrollable.context.findRenderObject() as RenderBox?;
+              if (scrollableBox != null && scrollableBox.attached && scrollableBox.hasSize) {
+                final double cardTop = renderObj.localToGlobal(Offset.zero).dy;
+                final double cardBottom = cardTop + renderObj.size.height;
+                final double vpTop = scrollableBox.localToGlobal(Offset.zero).dy;
+                final double vpBottom = vpTop + scrollableBox.size.height;
+
+                // Chỉ cuộn dọc khi thẻ thực sự bị khuất ở cạnh trên hoặc cạnh dưới viewport.
+                // Tuyệt đối KHÔNG cuộn dọc khi người dùng đang di chuyển ngang trong cùng một hàng,
+                // loại bỏ hoàn toàn hiện tượng màn hình bị trôi hoặc giật xuống khi bấm mũi tên sang phải.
+                const double topSafetyMargin = 70.0; // Chừa chỗ nhìn rõ tiêu đề danh mục phía trên
+                const double bottomSafetyMargin = 40.0;
+
+                final bool isClippedTop = scrollable.position.pixels > 0 && cardTop < (vpTop + topSafetyMargin);
+                final bool isClippedBottom = cardBottom > (vpBottom - bottomSafetyMargin);
+
+                if (isClippedTop || isClippedBottom) {
+                  final double alignment = isClippedTop
+                      ? (widget.verticalScrollAlignment ?? 0.12)
+                      : 0.85;
+                  scrollable.position.ensureVisible(
+                    renderObj,
+                    alignment: alignment,
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOutQuad,
+                  );
+                }
+              }
             } else {
               // Hàng ngang: Chỉ cuộn khi thẻ bị che hoặc vượt ra ngoài màn hình.
               // Nếu thẻ đã hiển thị đầy đủ trong viewport thì giữ nguyên 100%, không bị giật sang mép trái.

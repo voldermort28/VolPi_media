@@ -1,10 +1,10 @@
 {
-  "version": "2.2.13",
-  "build": 79,
-  "tag_name": "v2.2.13",
-  "changelog": "• VolPi Media v2.2.13 - Tối Ưu Triệt Để Trang Chủ & Loại Bỏ Hoàn Toàn Lỗi Nhảy Con Trỏ:\n- Loại bỏ Hero Banner trên Trang Chủ: Khắc phục triệt để lỗi tự động cuộn trang và giật focus do banner tự chuyển động gây ra; giao diện Trang chủ trực quan, tốc độ phản hồi cực nhanh.\n- Focus mượt mà từ Sidebar vào Trang chủ: Con trỏ remote tiếp đất chính xác vào thẻ nội dung đầu tiên trên cùng bên trái (Tiếp tục xem / Yêu thích / Trực tiếp), không còn nhảy lung tung.\n- Giữ nguyên Hero Banner phong cách Netflix trên các màn hình khác (như Anime & Phim).\n- Sửa lỗi build CI.",
+  "version": "2.2.14",
+  "build": 80,
+  "tag_name": "v2.2.14",
+  "changelog": "• VolPi Media v2.2.14 - Khắc Phục Triệt Để Hiện Tượng Trôi/Cuộn Màn Hình Khi Bấm Mũi Tên Sang Phải:\n- Chống trôi dọc khi duyệt ngang: Chỉ kích hoạt cuộn dọc khi thẻ thực sự bị khuất ở cạnh trên hoặc dưới viewport; khi bấm mũi tên Sang Phải/Trái trong cùng một hàng danh mục, màn hình dọc giữ cố định 100%, không còn bị trôi tụt xuống dưới.\n- Giữ focus vững chắc trong hàng: Mở rộng bộ đệm hàng ngang (cacheExtent 3500px) đảm bảo toàn bộ thẻ trong hàng luôn sẵn sàng đón focus; chặn không cho focus rớt ra ngoài hay nhảy xuống hàng dưới khi duyệt đến thẻ cuối cùng.\n- Điều hướng TV Remote mượt mà, ổn định trên Android TV và macOS.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-28T18:55:00Z"
+  "published_at": "2026-10-29T14:55:00Z"
 }

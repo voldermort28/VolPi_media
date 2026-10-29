@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class NetflixScrollableRow extends StatefulWidget {
   final double height;
@@ -113,10 +114,35 @@ class _NetflixScrollableRowState extends State<NetflixScrollableRow> {
                 controller: _scrollController,
                 padding: widget.padding,
                 scrollDirection: Axis.horizontal,
-                cacheExtent: 350,
+                cacheExtent: 3500,
                 itemCount: widget.itemCount,
                 separatorBuilder: (_, __) => SizedBox(width: widget.itemSpacing),
-                itemBuilder: widget.itemBuilder,
+                itemBuilder: (context, idx) {
+                  final child = widget.itemBuilder(context, idx);
+                  return Focus(
+                    canRequestFocus: false,
+                    skipTraversal: true,
+                    onKeyEvent: (node, event) {
+                      final isDownOrRepeat = event is KeyDownEvent || event is KeyRepeatEvent;
+                      if (!isDownOrRepeat) return KeyEventResult.ignored;
+
+                      if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+                        if (idx >= widget.itemCount - 1) {
+                          // Đã ở phần tử cuối cùng của hàng ngang:
+                          // Chặn tuyệt đối không cho focus thoát khỏi hàng và nhảy xuống hàng dưới làm trôi màn hình!
+                          return KeyEventResult.handled;
+                        }
+                      } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                        if (idx == 0) {
+                          // Ở đầu hàng ngang: Cho phép sự kiện nổi lên để NetflixLayout bắt và nhảy sang Sidebar
+                          return KeyEventResult.ignored;
+                        }
+                      }
+                      return KeyEventResult.ignored;
+                    },
+                    child: child,
+                  );
+                },
               ),
             ),
 
