@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
   socoliveBaseUrl: "https://socolive2.top",
   vlxxBaseUrl: "https://vlxx.phd",
   viet69BaseUrl: "https://viet69.be",
+  xnhauBaseUrl: "https://xnhau.pink",
   yumeiBaseUrl: "https://yumei-anime.com",
   autoCleanCache: true,
 };
@@ -54,6 +55,12 @@ function saveConfig(newConfig) {
       currentConfig.viet69BaseUrl = currentConfig.viet69BaseUrl.trim().replace(/\/+$/, "");
       if (!currentConfig.viet69BaseUrl.startsWith("http://") && !currentConfig.viet69BaseUrl.startsWith("https://")) {
         currentConfig.viet69BaseUrl = "https://" + currentConfig.viet69BaseUrl;
+      }
+    }
+    if (currentConfig.xnhauBaseUrl) {
+      currentConfig.xnhauBaseUrl = currentConfig.xnhauBaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.xnhauBaseUrl.startsWith("http://") && !currentConfig.xnhauBaseUrl.startsWith("https://")) {
+        currentConfig.xnhauBaseUrl = "https://" + currentConfig.xnhauBaseUrl;
       }
     }
     if (currentConfig.yumeiBaseUrl) {

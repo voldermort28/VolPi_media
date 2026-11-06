@@ -10,11 +10,13 @@ const config = require("./config");
 const unifiedAddon = require("./addon");
 const vlxxAddon = require("./addons/vlxxAddon");
 const viet69Addon = require("./addons/viet69Addon");
+const xnhauAddon = require("./addons/xnhauAddon");
 const xoilacAddon = require("./addons/xoilacAddon");
 const socoliveAddon = require("./addons/socoliveAddon");
 const yumeiAddon = require("./addons/yumeiAddon");
 const vlxxScraper = require("./scrapers/vlxx");
 const viet69Scraper = require("./scrapers/viet69");
+const xnhauScraper = require("./scrapers/xnhau");
 const xoilacScraper = require("./scrapers/xoilac");
 const socoliveScraper = require("./scrapers/socolive");
 const yumeiScraper = require("./scrapers/yumei");
@@ -560,13 +562,14 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, yumeiBaseUrl, socoliveBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
       socoliveScraper.clearCache();
       vlxxScraper.clearCache();
       viet69Scraper.clearCache();
+      xnhauScraper.clearCache();
       yumeiScraper.clearCache();
       logoCache.clear();
       vlxxPosterCache.clear();
@@ -758,6 +761,23 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
       }
       const $ = cheerio.load(response.data);
       const items = $(".item-video, .clip-link");
+      return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
+    } else if (type === "xnhau") {
+      const response = await axios.get(cleanUrl, {
+        headers: {
+          "User-Agent": xnhauScraper.USER_AGENT,
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $(".list-videos .item");
       return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
     } else if (type === "yumei") {
       const response = await axios.get(cleanUrl + "/thu-vien", {
@@ -1191,6 +1211,7 @@ app.get("/thumb/yumei/:id.svg", async (req, res) => {
 
 app.use("/vlxx", getRouter(vlxxAddon));
 app.use("/viet69", getRouter(viet69Addon));
+app.use("/xnhau", getRouter(xnhauAddon));
 app.use("/xoilac", getRouter(xoilacAddon));
 app.use("/socolive", getRouter(socoliveAddon));
 app.use("/yumei", getRouter(yumeiAddon));
@@ -1204,6 +1225,19 @@ app.get("/thumb/viet69/:id.jpg", async (req, res) => {
   try {
     const rawId = req.params.id;
     const info = await viet69Scraper.getVideoInfo(rawId);
+    if (info && info.poster) {
+      return res.redirect(info.poster);
+    }
+    return res.status(404).send("Not found");
+  } catch (e) {
+    return res.status(404).send("Not found");
+  }
+});
+
+app.get("/thumb/xnhau/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const info = await xnhauScraper.getVideoInfo(rawId);
     if (info && info.poster) {
       return res.redirect(info.poster);
     }
@@ -1332,6 +1366,21 @@ app.get("/seg", async (req, res) => {
   }
 });
 
+app.get(["/xnhau/stream/:id/:server.mp4", "/xnhau/stream/:id/master.mp4", "/xnhau/stream/:id"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const server = req.params.server || "1";
+    const rawUrl = await xnhauScraper.getVideoStreamUrl(id, server);
+    if (!rawUrl) {
+      return res.status(404).send("Stream not found");
+    }
+    return res.redirect(rawUrl);
+  } catch (err) {
+    console.error("Error loading xNhau stream:", err.message);
+    return res.status(500).send("Error loading stream");
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log("\n======================================================");
   console.log("🚀 Stremio Addon Server running on port " + PORT);
@@ -1340,6 +1389,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("👉 Xôi Lạc Only:    http://localhost:" + PORT + "/xoilac/manifest.json");
   console.log("👉 VLXX Only:       http://localhost:" + PORT + "/vlxx/manifest.json");
   console.log("👉 Viet69 Only:     http://localhost:" + PORT + "/viet69/manifest.json");
+  console.log("👉 xNhau Only:      http://localhost:" + PORT + "/xnhau/manifest.json");
   console.log("👉 Combo Tất Cả:    http://localhost:" + PORT + "/manifest.json");
   console.log("======================================================\n");
 });

@@ -319,6 +319,60 @@ class ApiService {
   }
 
   // =========================================================================
+  // 3.2 XNHAU / KHO PHIM RIÊNG TƯ MỚI (TAB XNHAU)
+  // =========================================================================
+
+  Future<List<MovieModel>> getXnhauCatalog({String? searchQuery, int skip = 0, String? genre}) async {
+    String url = skip > 0
+        ? '$baseUrl/xnhau/catalog/movie/xnhau-catalog/skip=$skip.json'
+        : '$baseUrl/xnhau/catalog/movie/xnhau-catalog.json';
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/xnhau/catalog/movie/xnhau-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/xnhau/catalog/movie/xnhau-catalog/search=$encoded.json';
+    } else if (genre != null && genre.isNotEmpty && genre != 'Tất cả') {
+      final encodedGenre = Uri.encodeComponent(genre);
+      url = skip > 0
+          ? '$baseUrl/xnhau/catalog/movie/xnhau-catalog/genre=$encodedGenre&skip=$skip.json'
+          : '$baseUrl/xnhau/catalog/movie/xnhau-catalog/genre=$encodedGenre.json';
+    }
+
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data['metas'] != null) {
+          final List list = data['metas'];
+          return list.map((item) => MovieModel.fromJson(item)).toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  /// Get direct MP4 stream URLs for xNhau
+  List<StreamChannel> getXnhauStreams(String rawId) {
+    final cleanId = rawId.replaceFirst('xnhau:', '');
+    return [
+      StreamChannel(
+        name: 'xNhau',
+        title: 'Server #1 (Full HD - Trực tiếp)',
+        url: '$baseUrl/xnhau/stream/$cleanId/1.mp4',
+        headers: {},
+      ),
+      StreamChannel(
+        name: 'xNhau',
+        title: 'Server #2 (Chuẩn SD - Dự phòng)',
+        url: '$baseUrl/xnhau/stream/$cleanId/2.mp4',
+        headers: {},
+      ),
+    ];
+  }
+
+  // =========================================================================
   // 4. IPTV / TRUYỀN HÌNH TRỰC TUYẾN
   // =========================================================================
 

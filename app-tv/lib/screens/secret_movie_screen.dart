@@ -33,7 +33,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
-  // Tab 0: VLFilm, Tab 1: Viet69
+  // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: Yêu thích
   int _selectedSourceIndex = 0;
   String _selectedGenre = 'Tất cả';
 
@@ -47,6 +47,23 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     'BDSM',
     'Máy bay bà già',
     'Thủ dâm',
+  ];
+
+  final List<String> _xnhauGenres = const [
+    'Tất cả',
+    'Việt Nam',
+    'Tự quay',
+    'Gái Xinh',
+    'Gái Teen',
+    'Thủ dâm',
+    'Học sinh',
+    'Vú bự',
+    'Loạn luân',
+    'Sinh viên',
+    'Đít bự',
+    'Quay lén',
+    'Cặp đôi',
+    'Máy bay',
   ];
 
   List<MovieModel> _movies = [];
@@ -118,9 +135,16 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     if (_selectedSourceIndex == 0) {
       // VLFilm
       results = await widget.apiService.getVlxxCatalog(searchQuery: search, skip: 0);
-    } else {
+    } else if (_selectedSourceIndex == 1) {
       // Viet69
       results = await widget.apiService.getViet69Catalog(
+        searchQuery: search,
+        skip: 0,
+        genre: _selectedGenre,
+      );
+    } else if (_selectedSourceIndex == 2) {
+      // xNhau
+      results = await widget.apiService.getXnhauCatalog(
         searchQuery: search,
         skip: 0,
         genre: _selectedGenre,
@@ -154,8 +178,14 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         searchQuery: _searchQuery,
         skip: currentSkip,
       );
-    } else {
+    } else if (_selectedSourceIndex == 1) {
       nextResults = await widget.apiService.getViet69Catalog(
+        searchQuery: _searchQuery,
+        skip: currentSkip,
+        genre: _selectedGenre,
+      );
+    } else if (_selectedSourceIndex == 2) {
+      nextResults = await widget.apiService.getXnhauCatalog(
         searchQuery: _searchQuery,
         skip: currentSkip,
         genre: _selectedGenre,
@@ -191,7 +221,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _searchController.clear();
       _searchQuery = null;
     });
-    if (index != 2) {
+    if (index != 3) {
       _loadMovies();
     }
   }
@@ -230,12 +260,15 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     }
 
     final String cleanId = id.replaceFirst('movie:', '');
+    final bool isXnhau = cleanId.startsWith('xnhau:');
     final bool isViet69 = cleanId.startsWith('viet69:');
-    final String rawId = cleanId.replaceFirst('viet69:', '').replaceFirst('vlxx:', '');
+    final String rawId = cleanId.replaceFirst('xnhau:', '').replaceFirst('viet69:', '').replaceFirst('vlxx:', '');
 
-    final List<StreamChannel> servers = isViet69
-        ? widget.apiService.getViet69Streams(rawId)
-        : widget.apiService.getVlxxStreams(rawId);
+    final List<StreamChannel> servers = isXnhau
+        ? widget.apiService.getXnhauStreams(rawId)
+        : (isViet69
+            ? widget.apiService.getViet69Streams(rawId)
+            : widget.apiService.getVlxxStreams(rawId));
 
     if (servers.isEmpty) {
       if (streamUrl != null && streamUrl.isNotEmpty) {
@@ -380,10 +413,13 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       }
     }
 
+    final bool isXnhau = _selectedSourceIndex == 2 || movie.id.startsWith('xnhau:');
     final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
-    final List<StreamChannel> servers = isViet69
-        ? widget.apiService.getViet69Streams(movie.rawId)
-        : widget.apiService.getVlxxStreams(movie.rawId);
+    final List<StreamChannel> servers = isXnhau
+        ? widget.apiService.getXnhauStreams(movie.rawId)
+        : (isViet69
+            ? widget.apiService.getViet69Streams(movie.rawId)
+            : widget.apiService.getVlxxStreams(movie.rawId));
 
     if (servers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -429,9 +465,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = _selectedSourceIndex == 2
+    final themeColor = _selectedSourceIndex == 3
         ? const Color(0xFFE11D48)
-        : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E));
+        : (_selectedSourceIndex == 2
+            ? const Color(0xFFEC4899)
+            : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E)));
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -455,7 +493,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                   ),
                   const SizedBox(width: 12),
 
-                  // TAB SWITCHER: VLFilm vs Viet69 vs Yêu thích
+                  // TAB SWITCHER: VLFilm vs Viet69 vs xNhau vs Yêu thích
                   Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
@@ -482,6 +520,13 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         const SizedBox(width: 4),
                         _buildSourceTab(
                           index: 2,
+                          label: 'xNhau',
+                          icon: Icons.flash_on_rounded,
+                          activeColor: const Color(0xFFEC4899),
+                        ),
+                        const SizedBox(width: 4),
+                        _buildSourceTab(
+                          index: 3,
                           label: 'Yêu thích ${_secretFavorites.isNotEmpty ? "(${_secretFavorites.length})" : ""}',
                           icon: Icons.favorite_rounded,
                           activeColor: const Color(0xFFE11D48),
@@ -525,9 +570,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                 focusNode: _searchFocusNode,
                                 style: const TextStyle(color: Colors.white, fontSize: 13),
                                 decoration: InputDecoration(
-                                  hintText: _selectedSourceIndex == 1
-                                      ? 'Nhập từ khóa clip, sinh viên, teen...'
-                                      : 'Nhập từ khóa, mã phim...',
+                                  hintText: _selectedSourceIndex == 2
+                                      ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
+                                      : (_selectedSourceIndex == 1
+                                          ? 'Nhập từ khóa clip, sinh viên, teen...'
+                                          : 'Nhập từ khóa, mã phim...'),
                                   hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                                   border: InputBorder.none,
                                   isDense: true,
@@ -592,49 +639,55 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               ),
             ),
 
-            // Category Bar (Only visible when Viet69 tab is active & not in search mode)
-            if (_selectedSourceIndex == 1 && (_searchQuery == null || _searchQuery!.isEmpty))
+            // Category Bar (Visible when Viet69 or xNhau tab is active & not in search mode)
+            if ((_selectedSourceIndex == 1 || _selectedSourceIndex == 2) && (_searchQuery == null || _searchQuery!.isEmpty))
               Container(
                 height: 40,
                 margin: const EdgeInsets.only(bottom: 6),
-                child: ListView.separated(
-                  controller: _genreScrollController,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _viet69Genres.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (context, idx) {
-                    final genre = _viet69Genres[idx];
-                    final bool isSelected = _selectedGenre == genre;
-                    return TvFocusableCard(
-                      onTap: () => _selectGenre(genre),
-                      borderRadius: BorderRadius.circular(20),
-                      focusBorderColor: const Color(0xFFEA580C),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFFEA580C) : const Color(0xFF1E293B),
+                child: Builder(
+                  builder: (context) {
+                    final genres = _selectedSourceIndex == 1 ? _viet69Genres : _xnhauGenres;
+                    final activeColor = _selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFEC4899);
+                    return ListView.separated(
+                      controller: _genreScrollController,
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: genres.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, idx) {
+                        final genre = genres[idx];
+                        final bool isSelected = _selectedGenre == genre;
+                        return TvFocusableCard(
+                          onTap: () => _selectGenre(genre),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected ? const Color(0xFFEA580C) : Colors.white12,
+                          focusBorderColor: activeColor,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: isSelected ? activeColor : const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: isSelected ? activeColor : Colors.white12,
+                              ),
+                            ),
+                            child: Text(
+                              genre,
+                              style: TextStyle(
+                                color: isSelected ? Colors.white : Colors.white70,
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          genre,
-                          style: TextStyle(
-                            color: isSelected ? Colors.white : Colors.white70,
-                            fontSize: 12,
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 ),
               ),
 
             // Content Grid with Infinite Scroll
-            if (_selectedSourceIndex == 2)
+            if (_selectedSourceIndex == 3)
               Expanded(
                 child: _secretFavorites.isEmpty
                     ? Center(
@@ -805,9 +858,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                   if (_searchQuery == null || _searchQuery!.isEmpty)
                                     SliverToBoxAdapter(
                                       child: _buildSectionTitle(
-                                        _selectedSourceIndex == 1
-                                            ? '🔥 DANH SÁCH VIET69'
-                                            : '🎬 DANH SÁCH VLFILM',
+                                        _selectedSourceIndex == 2
+                                            ? '⚡ DANH SÁCH XNHAU'
+                                            : (_selectedSourceIndex == 1
+                                                ? '🔥 DANH SÁCH VIET69'
+                                                : '🎬 DANH SÁCH VLFILM'),
                                       ),
                                     ),
 

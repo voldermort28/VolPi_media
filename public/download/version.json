@@ -1,10 +1,10 @@
 {
-  "version": "2.2.16",
-  "build": 82,
-  "tag_name": "v2.2.16",
-  "changelog": "• VolPi Media v2.2.16 - Sửa Triệt Để Lỗi Cuộn Dọc Khi Bấm Phím Xuống Trên Android TV:\n- Cuộn dọc chính xác theo hàng: Sử dụng context của toàn bộ hàng ngang (NetflixScrollableRow) thay vì thẻ con bên trong khi cuộn dọc, loại bỏ hoàn toàn hiện tượng bấm nút Xuống làm màn hình bị giật ngược lên đỉnh trang.\n- Khóa cuộn dọc tuyệt đối khi duyệt ngang: Bấm Trái/Phải bên trong một hàng giữ nguyên vị trí dọc 100%, không bị rung lắc hay trôi màn hình.\n- Điều hướng TV Remote mượt mà, chính xác theo chuẩn Android TV Leanback.",
+  "version": "2.2.17",
+  "build": 83,
+  "tag_name": "v2.2.17",
+  "changelog": "• VolPi Media v2.2.17 - Tích Hợp Thêm Tab Riêng Tư xNhau (xnhau.pink):\n- Thêm tab nguồn xNhau hoàn toàn mới trong Kho Phim Riêng Tư, đầy đủ tính năng tương tự VLFilm và Viet69.\n- Hỗ trợ thanh lọc thể loại phong phú: Việt Nam, Tự quay, Gái Xinh, Gái Teen, Thủ dâm, Học sinh, Vú bự, v.v.\n- Tích hợp phát video tốc độ cao Full HD / SD không quảng cáo, tương thích hoàn toàn Remote Android TV, Yêu thích và Lịch sử xem.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-10-30T00:48:00Z"
+  "published_at": "2026-11-07T02:30:00Z"
 }
