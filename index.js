@@ -775,7 +775,7 @@ app.post("/api/telegram/sources/toggle", authService.requireAuth, (req, res) => 
 app.get("/api/telegram/channels/:channelId/videos", async (req, res) => {
   try {
     const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
-    const limit = req.query.limit || 100;
+    const limit = req.query.limit ? Math.max(parseInt(req.query.limit, 10), 2500) : 2500;
     const data = await telegramService.getChannelVideos(req.params.channelId, { forceRefresh, limit });
     res.json(data);
   } catch (err) {

@@ -4,10 +4,35 @@ const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'telegram_config.json');
+const CACHE_FILE_PATH = path.join(__dirname, '..', 'telegram_cache.json');
 
-// Memory Cache with 10-minute TTL for channel video lists
+// Memory Cache with 30-minute TTL for channel video lists
 const channelCache = new Map();
-const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
+function loadDiskCache() {
+  try {
+    if (fs.existsSync(CACHE_FILE_PATH)) {
+      const raw = fs.readFileSync(CACHE_FILE_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      for (const k in data) {
+        channelCache.set(k, data[k]);
+      }
+    }
+  } catch (_) {}
+}
+
+function saveDiskCache() {
+  try {
+    const obj = {};
+    for (const [k, v] of channelCache.entries()) {
+      obj[k] = v;
+    }
+    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj), 'utf-8');
+  } catch (_) {}
+}
+
+loadDiskCache();
 
 // Pending login state for phone code verification
 let pendingPhoneAuth = null;
@@ -488,7 +513,7 @@ async function addSource({ name, url }) {
   let count = 0;
 
   try {
-    const scanResult = await getChannelVideos(channelIdentifier, { forceRefresh: true, limit: 50 });
+    const scanResult = await getChannelVideos(channelIdentifier, { forceRefresh: true, limit: 2500 });
     count = scanResult.videos ? scanResult.videos.length : 0;
     if (!title && scanResult.channelTitle) {
       title = scanResult.channelTitle;
@@ -569,14 +594,14 @@ async function resolveChannelEntity(client, channelIdentifier) {
 /**
  * Fetch and filter video messages from a channel
  */
-async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 100 } = {}) {
+async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 2500 } = {}) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
   const cacheKey = `tg_videos_${channelId}`;
 
   // Check cache
   if (!forceRefresh && channelCache.has(cacheKey)) {
     const entry = channelCache.get(cacheKey);
-    if (Date.now() - entry.time < CACHE_TTL_MS) {
+    if (Date.now() - entry.time < CACHE_TTL_MS && entry.data && entry.data.videos && entry.data.videos.length > 0) {
       return entry.data;
     }
   }
@@ -586,9 +611,13 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 
   const channelTitle = entity.title || entity.username || channelId;
 
-  // Get messages
+  // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
+  const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
+
+  // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
   const messages = await client.getMessages(entity, {
-    limit: parseInt(limit, 10) || 100,
+    limit: targetLimit,
+    waitTime: 0.05,
   });
 
   const videos = [];
@@ -636,7 +665,11 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
         lowerName.endsWith('.webm') ||
         lowerName.endsWith('.avi') ||
         lowerName.endsWith('.ts') ||
-        lowerName.endsWith('.mov')
+        lowerName.endsWith('.mov') ||
+        lowerName.endsWith('.m4v') ||
+        lowerName.endsWith('.flv') ||
+        lowerName.endsWith('.wmv') ||
+        lowerName.endsWith('.3gp')
       ) {
         isVideo = true;
       }
@@ -646,7 +679,7 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 
     // Use message caption or file name as movie title
     let title = (msg.message || '').split('\n')[0].trim();
-    if (!title || title.length > 80 || title.startsWith('http')) {
+    if (!title || title.length > 120 || title.startsWith('http')) {
       title = fileName || 'Video';
     }
 
@@ -680,6 +713,21 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
   };
 
   channelCache.set(cacheKey, { time: Date.now(), data: result });
+  saveDiskCache();
+
+  // Also sync source lastCount in config
+  try {
+    const cfg = loadConfig();
+    const src = (cfg.sources || []).find((s) => s.channelId === channelId);
+    if (src) {
+      src.lastCount = videos.length;
+      if (channelTitle && (!src.name || src.name === channelId)) {
+        src.name = channelTitle;
+      }
+      saveConfig(cfg);
+    }
+  } catch (_) {}
+
   return result;
 }
 

@@ -506,7 +506,7 @@ class ApiService {
   }
 
   /// Fetch video messages from a Telegram channel
-  Future<TelegramChannelVideosResult?> getTelegramVideos(String channelId, {bool forceRefresh = false, int limit = 100}) async {
+  Future<TelegramChannelVideosResult?> getTelegramVideos(String channelId, {bool forceRefresh = false, int limit = 2500}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final encodedId = Uri.encodeComponent(channelId);
     final url = forceRefresh
