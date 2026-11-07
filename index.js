@@ -677,10 +677,29 @@ app.get("/api/telegram/auth/status", async (req, res) => {
   }
 });
 
+app.get("/api/telegram/auth/credentials", authService.requireAuth, (req, res) => {
+  try {
+    const creds = telegramService.getCredentials();
+    res.json({ success: true, ...creds });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/auth/credentials", authService.requireAuth, async (req, res) => {
+  try {
+    const { apiId, apiHash } = req.body;
+    const result = await telegramService.saveCredentials({ apiId, apiHash });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 app.post("/api/telegram/auth/send-code", authService.requireAuth, async (req, res) => {
   try {
-    const { phoneNumber } = req.body;
-    const result = await telegramService.sendPhoneCode(phoneNumber);
+    const { phoneNumber, apiId, apiHash } = req.body;
+    const result = await telegramService.sendPhoneCode(phoneNumber, apiId, apiHash);
     res.json(result);
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
@@ -698,8 +717,8 @@ app.post("/api/telegram/auth/sign-in", authService.requireAuth, async (req, res)
 
 app.post("/api/telegram/auth/bot", authService.requireAuth, async (req, res) => {
   try {
-    const { botToken } = req.body;
-    const result = await telegramService.signInWithBot(botToken);
+    const { botToken, apiId, apiHash } = req.body;
+    const result = await telegramService.signInWithBot(botToken, apiId, apiHash);
     res.json(result);
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

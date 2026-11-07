@@ -15,6 +15,12 @@ let pendingPhoneAuth = null;
 // Global singleton Telegram Client instance
 let telegramClientInstance = null;
 
+function isDefaultOrInvalidApiId(apiId) {
+  if (!apiId) return true;
+  const num = parseInt(apiId, 10);
+  return isNaN(num) || num <= 0 || num === 2496;
+}
+
 function loadConfig() {
   try {
     if (fs.existsSync(CONFIG_PATH)) {
@@ -27,8 +33,8 @@ function loadConfig() {
           type: 'user',
           phoneNumber: null,
           botUsername: null,
-          apiId: 2496,
-          apiHash: '8da85b0d5b162232e5f22de687712c5b',
+          apiId: 0,
+          apiHash: '',
           sessionString: '',
         };
       }
@@ -43,8 +49,8 @@ function loadConfig() {
       type: 'user',
       phoneNumber: null,
       botUsername: null,
-      apiId: 2496,
-      apiHash: '8da85b0d5b162232e5f22de687712c5b',
+      apiId: 0,
+      apiHash: '',
       sessionString: '',
     },
     sources: [],
@@ -139,12 +145,67 @@ function formatDuration(seconds) {
 // TELEGRAM CLIENT CONNECTION & AUTH
 // =========================================================================
 
-async function getClient() {
+function getCredentials() {
+  const cfg = loadConfig();
+  const apiId = cfg.auth?.apiId;
+  const apiHash = cfg.auth?.apiHash;
+  const isCustom = !isDefaultOrInvalidApiId(apiId) && !!apiHash && apiHash.length >= 16;
+  return {
+    apiId: isCustom ? apiId : null,
+    apiHashMasked: isCustom && apiHash ? `${apiHash.slice(0, 4)}••••${apiHash.slice(-4)}` : '',
+    isConfigured: isCustom,
+  };
+}
+
+async function saveCredentials({ apiId, apiHash }) {
+  const cleanId = parseInt(apiId, 10);
+  const cleanHash = (apiHash || '').trim();
+
+  if (isNaN(cleanId) || cleanId <= 0 || cleanId === 2496) {
+    throw new Error('API ID không hợp lệ (mã mẫu 2496 đã bị Telegram khóa). Vui lòng lấy api_id chính chủ từ my.telegram.org');
+  }
+  if (!cleanHash || cleanHash.length < 16) {
+    throw new Error('API Hash không hợp lệ. Vui lòng lấy chuỗi api_hash từ my.telegram.org');
+  }
+
+  const cfg = loadConfig();
+  cfg.auth.apiId = cleanId;
+  cfg.auth.apiHash = cleanHash;
+  saveConfig(cfg);
+
+  // Reset client instance so it will reconnect with new credentials next time
+  if (telegramClientInstance) {
+    try {
+      await telegramClientInstance.disconnect();
+    } catch (_) {}
+    telegramClientInstance = null;
+  }
+
+  return {
+    success: true,
+    apiId: cleanId,
+    apiHashMasked: `${cleanHash.slice(0, 4)}••••${cleanHash.slice(-4)}`,
+    isConfigured: true,
+  };
+}
+
+async function getClient(forceNew = false) {
   const cfg = loadConfig();
   const { apiId, apiHash, sessionString } = cfg.auth;
 
-  if (telegramClientInstance && telegramClientInstance.connected) {
+  if (isDefaultOrInvalidApiId(apiId) || !apiHash) {
+    throw new Error('Chưa thiết lập Telegram API ID & API Hash chính chủ. Vui lòng lấy từ my.telegram.org và lưu cấu hình trước.');
+  }
+
+  if (!forceNew && telegramClientInstance && telegramClientInstance.connected) {
     return telegramClientInstance;
+  }
+
+  if (telegramClientInstance) {
+    try {
+      await telegramClientInstance.disconnect();
+    } catch (_) {}
+    telegramClientInstance = null;
   }
 
   const session = new StringSession(sessionString || '');
@@ -166,7 +227,7 @@ async function getAuthStatus() {
   let isAuthorized = false;
   let meInfo = null;
 
-  if (auth.sessionString) {
+  if (auth.sessionString && !isDefaultOrInvalidApiId(auth.apiId) && auth.apiHash) {
     try {
       const client = await getClient();
       isAuthorized = await client.checkAuthorization();
@@ -186,6 +247,8 @@ async function getAuthStatus() {
     }
   }
 
+  const isCustomApi = !isDefaultOrInvalidApiId(auth.apiId) && !!auth.apiHash && auth.apiHash.length >= 16;
+
   return {
     connected: isAuthorized,
     type: auth.type || 'user',
@@ -193,41 +256,67 @@ async function getAuthStatus() {
     phoneNumber: auth.phoneNumber,
     botUsername: auth.botUsername,
     hasSession: !!auth.sessionString,
+    apiConfigured: isCustomApi,
+    apiId: isCustomApi ? auth.apiId : null,
+    apiHashMasked: isCustomApi && auth.apiHash ? `${auth.apiHash.slice(0, 4)}••••${auth.apiHash.slice(-4)}` : '',
   };
 }
 
-async function sendPhoneCode(phoneNumber) {
+async function sendPhoneCode(phoneNumber, customApiId, customApiHash) {
   const cleanPhone = (phoneNumber || '').replace(/[\s-]/g, '');
   if (!cleanPhone.startsWith('+')) {
     throw new Error('Số điện thoại phải có mã quốc gia, ví dụ: +84912345678');
   }
 
+  if (customApiId && customApiHash) {
+    await saveCredentials({ apiId: customApiId, apiHash: customApiHash });
+  }
+
   const cfg = loadConfig();
-  const { apiId, apiHash } = cfg.auth;
+  if (isDefaultOrInvalidApiId(cfg.auth.apiId) || !cfg.auth.apiHash) {
+    throw new Error('Vui lòng thiết lập API ID & API Hash từ my.telegram.org trước khi gửi mã OTP.');
+  }
 
   const client = await getClient();
-  const { phoneCodeHash } = await client.sendCode(
-    {
-      apiId: parseInt(apiId, 10),
-      apiHash,
-    },
-    cleanPhone
-  );
+  try {
+    const { phoneCodeHash } = await client.sendCode(
+      {
+        apiId: parseInt(cfg.auth.apiId, 10),
+        apiHash: cfg.auth.apiHash,
+      },
+      cleanPhone
+    );
 
-  pendingPhoneAuth = {
-    phoneNumber: cleanPhone,
-    phoneCodeHash,
-    time: Date.now(),
-  };
+    pendingPhoneAuth = {
+      phoneNumber: cleanPhone,
+      phoneCodeHash,
+      time: Date.now(),
+    };
 
-  return {
-    success: true,
-    phoneNumber: cleanPhone,
-    phoneCodeHash,
-  };
+    return {
+      success: true,
+      phoneNumber: cleanPhone,
+      phoneCodeHash,
+    };
+  } catch (err) {
+    console.error('[TelegramService] sendPhoneCode error:', err);
+    if (err.message && err.message.includes('API_ID_INVALID')) {
+      throw new Error('API ID hoặc API Hash không hợp lệ (Telegram từ chối 400 API_ID_INVALID). Vui lòng kiểm tra lại tại my.telegram.org.');
+    }
+    if (err.message && err.message.includes('PHONE_NUMBER_INVALID')) {
+      throw new Error('Số điện thoại không hợp lệ hoặc chưa đăng ký tài khoản Telegram.');
+    }
+    if (err.message && err.message.includes('PHONE_NUMBER_BANNED')) {
+      throw new Error('Số điện thoại này đã bị Telegram khóa (Banned).');
+    }
+    if (err.message && err.message.includes('FLOOD_WAIT')) {
+      throw new Error(`Telegram yêu cầu tạm chờ vì gửi mã nhiều lần (${err.message})`);
+    }
+    throw err;
+  }
 }
 
-async function signInWithPhoneCode({ phoneNumber, phoneCode, password }) {
+async function signInWithPhoneCode({ phoneNumber, phoneCode, phoneCodeHash, password }) {
   const cleanPhone = (phoneNumber || pendingPhoneAuth?.phoneNumber || '').replace(/[\s-]/g, '');
   const cleanCode = (phoneCode || '').trim();
 
@@ -235,26 +324,25 @@ async function signInWithPhoneCode({ phoneNumber, phoneCode, password }) {
     throw new Error('Thiếu số điện thoại hoặc mã xác thực');
   }
 
-  const phoneCodeHash = pendingPhoneAuth?.phoneCodeHash;
-  if (!phoneCodeHash) {
+  const hash = phoneCodeHash || pendingPhoneAuth?.phoneCodeHash;
+  if (!hash) {
     throw new Error('Phiên xác thực đã hết hạn, vui lòng gửi lại mã OTP');
   }
 
   const cfg = loadConfig();
-  const { apiId, apiHash } = cfg.auth;
   const client = await getClient();
 
   try {
     await client.invoke(
       new Api.auth.SignIn({
         phoneNumber: cleanPhone,
-        phoneCodeHash,
+        phoneCodeHash: hash,
         phoneCode: cleanCode,
       })
     );
   } catch (err) {
     // Check if 2FA password is required
-    if (err.message && err.message.includes('SESSION_PASSWORD_NEEDED')) {
+    if (err.message && (err.message.includes('SESSION_PASSWORD_NEEDED') || err.errorMessage === 'SESSION_PASSWORD_NEEDED')) {
       if (!password) {
         return { success: false, needPassword: true, error: 'Tài khoản có bật 2FA, vui lòng nhập Mật Khẩu 2 Bước' };
       }
@@ -262,6 +350,10 @@ async function signInWithPhoneCode({ phoneNumber, phoneCode, password }) {
       const passwordResult = await client.invoke(new Api.account.GetPassword());
       const passwordSRP = await computeCheck(passwordResult, password);
       await client.invoke(new Api.auth.CheckPassword({ password: passwordSRP }));
+    } else if (err.message && err.message.includes('PHONE_CODE_INVALID')) {
+      throw new Error('Mã OTP không chính xác, vui lòng kiểm tra lại tin nhắn Telegram.');
+    } else if (err.message && err.message.includes('PHONE_CODE_EXPIRED')) {
+      throw new Error('Mã OTP đã hết hạn, vui lòng nhấn Gửi lại mã mới.');
     } else {
       throw err;
     }
@@ -280,31 +372,44 @@ async function signInWithPhoneCode({ phoneNumber, phoneCode, password }) {
   return {
     success: true,
     user: {
-      id: me.id.toString(),
-      firstName: me.firstName,
-      username: me.username,
+      id: me.id ? me.id.toString() : '',
+      firstName: me.firstName || '',
+      username: me.username || '',
     },
   };
 }
 
-async function signInWithBot(botToken) {
+async function signInWithBot(botToken, customApiId, customApiHash) {
   const cleanToken = (botToken || '').trim();
   if (!cleanToken) {
     throw new Error('Vui lòng nhập Bot Token từ @BotFather');
   }
 
+  if (customApiId && customApiHash) {
+    await saveCredentials({ apiId: customApiId, apiHash: customApiHash });
+  }
+
   const cfg = loadConfig();
-  const { apiId, apiHash } = cfg.auth;
+  if (isDefaultOrInvalidApiId(cfg.auth.apiId) || !cfg.auth.apiHash) {
+    throw new Error('Vui lòng thiết lập API ID & API Hash từ my.telegram.org trước khi kết nối Bot.');
+  }
 
   // Create temporary client for bot
   const session = new StringSession('');
-  const client = new TelegramClient(session, parseInt(apiId, 10), apiHash, {
+  const client = new TelegramClient(session, parseInt(cfg.auth.apiId, 10), cfg.auth.apiHash, {
     connectionRetries: 5,
   });
 
-  await client.start({
-    botAuthToken: cleanToken,
-  });
+  try {
+    await client.start({
+      botAuthToken: cleanToken,
+    });
+  } catch (err) {
+    if (err.message && err.message.includes('API_ID_INVALID')) {
+      throw new Error('API ID hoặc API Hash không hợp lệ (Telegram từ chối 400 API_ID_INVALID).');
+    }
+    throw err;
+  }
 
   const me = await client.getMe();
   const sessionString = client.session.save();
@@ -320,7 +425,7 @@ async function signInWithBot(botToken) {
   return {
     success: true,
     bot: {
-      id: me.id.toString(),
+      id: me.id ? me.id.toString() : '',
       username: me.username,
       firstName: me.firstName,
     },
@@ -694,6 +799,8 @@ module.exports = {
   loadConfig,
   saveConfig,
   extractChannelIdentifier,
+  getCredentials,
+  saveCredentials,
   getClient,
   getAuthStatus,
   sendPhoneCode,
