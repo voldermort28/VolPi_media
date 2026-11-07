@@ -54,25 +54,17 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
       'icon': Icons.live_tv_rounded,
       'label': 'Truyền Hình (IPTV)',
     },
-    {
-      'icon': Icons.cloud_circle_rounded,
-      'label': 'Google Drive',
-    },
-    {
-      'icon': Icons.send_rounded,
-      'label': 'Telegram Phim',
-    },
   ];
 
   KeyEventResult _handleSidebarItemKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      if (index < 6) {
+      if (index < 4) {
         widget.focusNodes?[index + 1].requestFocus();
         return KeyEventResult.handled;
-      } else if (index == 6) {
-        // Move from Telegram (6) to Làm mới (7)
+      } else if (index == 4) {
+        // Move from IPTV (4) to Làm mới (7)
         widget.focusNodes?[7].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 7) {
@@ -88,15 +80,15 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      if (index > 0 && index <= 6) {
+      if (index > 0 && index <= 4) {
         widget.focusNodes?[index - 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 0) {
         // Reached top of sidebar
         return KeyEventResult.handled;
       } else if (index == 7) {
-        // Move from Làm mới (7) up to Telegram (6)
-        widget.focusNodes?[6].requestFocus();
+        // Move from Làm mới (7) up to IPTV (4)
+        widget.focusNodes?[4].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 8) {
         // Move from Cập nhật (8) up to Làm mới (7)

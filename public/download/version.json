@@ -1,10 +1,10 @@
 {
-  "version": "2.2.26",
-  "build": 92,
-  "tag_name": "v2.2.26",
-  "changelog": "• VolPi Media v2.2.26:\n- Tối ưu hiệu năng Telegram với cơ chế Lazy Paging & Infinite Scroll: Chỉ nạp 40 video ban đầu, cuộn đến đâu tải mượt đến đó, hoàn toàn triệt tiêu tình trạng giật lag trên TV.\n- Hỗ trợ phân trang API và tìm kiếm phim tức thì trên toàn bộ kho video Telegram.",
+  "version": "2.2.27",
+  "build": 93,
+  "tag_name": "v2.2.27",
+  "changelog": "• VolPi Media v2.2.27:\n- Chuyển tab Google Drive và Telegram Phim vào khu vực Riêng tư (bảo vệ bằng mã PIN).\n- Tinh gọn thanh điều hướng TV với 5 tab công khai chính (Trang chủ, Xôi Lạc, Socolive, Anime & Phim, Truyền hình IPTV).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-08T02:42:00Z"
+  "published_at": "2026-11-07T20:10:09Z"
 }

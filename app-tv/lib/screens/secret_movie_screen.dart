@@ -12,6 +12,8 @@ import '../widgets/movie_action_dialog.dart';
 import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
+import 'gdrive_screen.dart';
+import 'telegram_screen.dart';
 
 class SecretMovieScreen extends StatefulWidget {
   final ApiService apiService;
@@ -33,9 +35,19 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
-  // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: Yêu thích
+  // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: Google Drive, Tab 4: Telegram Phim, Tab 5: Yêu thích
   int _selectedSourceIndex = 0;
   String _selectedGenre = 'Tất cả';
+
+  final GlobalKey<GDriveScreenState> _gdriveKey = GlobalKey<GDriveScreenState>();
+  final GlobalKey<TelegramScreenState> _telegramKey = GlobalKey<TelegramScreenState>();
+
+  int get _contentStackIndex {
+    if (_selectedSourceIndex < 3) return 0;
+    if (_selectedSourceIndex == 3) return 1;
+    if (_selectedSourceIndex == 4) return 2;
+    return 3;
+  }
 
   final List<String> _viet69Genres = const [
     'Tất cả',
@@ -123,6 +135,15 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   Future<void> _loadMovies({String? search}) async {
+    if (_selectedSourceIndex >= 3) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _isLoadingMore = false;
@@ -163,6 +184,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   Future<void> _loadMoreMovies() async {
+    if (_selectedSourceIndex >= 3) return;
     if (_isLoadingMore || !_hasMore) return;
 
     setState(() {
@@ -221,8 +243,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _searchController.clear();
       _searchQuery = null;
     });
-    if (index != 3) {
+    if (index < 3) {
       _loadMovies();
+    } else if (index == 5) {
+      _loadSecretData();
     }
   }
 
@@ -465,11 +489,15 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = _selectedSourceIndex == 3
+    final themeColor = _selectedSourceIndex == 5
         ? const Color(0xFFE11D48)
-        : (_selectedSourceIndex == 2
-            ? const Color(0xFFEC4899)
-            : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E)));
+        : (_selectedSourceIndex == 4
+            ? const Color(0xFF0EA5E9)
+            : (_selectedSourceIndex == 3
+                ? const Color(0xFF0284C7)
+                : (_selectedSourceIndex == 2
+                    ? const Color(0xFFEC4899)
+                    : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E)))));
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -493,7 +521,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                   ),
                   const SizedBox(width: 12),
 
-                  // TAB SWITCHER: VLFilm vs Viet69 vs xNhau vs Yêu thích
+                  // TAB SWITCHER: VLFilm vs Viet69 vs xNhau vs Google Drive vs Telegram Phim vs Yêu thích
                   Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFF1E293B),
@@ -527,6 +555,20 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         const SizedBox(width: 4),
                         _buildSourceTab(
                           index: 3,
+                          label: 'Google Drive',
+                          icon: Icons.cloud_circle_rounded,
+                          activeColor: const Color(0xFF0284C7),
+                        ),
+                        const SizedBox(width: 4),
+                        _buildSourceTab(
+                          index: 4,
+                          label: 'Telegram Phim',
+                          icon: Icons.send_rounded,
+                          activeColor: const Color(0xFF0EA5E9),
+                        ),
+                        const SizedBox(width: 4),
+                        _buildSourceTab(
+                          index: 5,
                           label: 'Yêu thích ${_secretFavorites.isNotEmpty ? "(${_secretFavorites.length})" : ""}',
                           icon: Icons.favorite_rounded,
                           activeColor: const Color(0xFFE11D48),
@@ -536,7 +578,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                   ),
 
                   const SizedBox(width: 12),
-                  if (_searchQuery != null && _searchQuery!.isNotEmpty)
+                  if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3)
                     Expanded(
                       child: Text(
                         'Tìm: "$_searchQuery"',
@@ -547,77 +589,78 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                   else
                     const Spacer(),
 
-                  // Search toggle button or search input
-                  if (_isSearching)
-                    Expanded(
-                      flex: 3,
-                      child: Container(
-                        height: 38,
-                        margin: const EdgeInsets.symmetric(horizontal: 10),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: themeColor, width: 1.5),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.search, color: Colors.white54, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: _searchController,
-                                focusNode: _searchFocusNode,
-                                style: const TextStyle(color: Colors.white, fontSize: 13),
-                                decoration: InputDecoration(
-                                  hintText: _selectedSourceIndex == 2
-                                      ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
-                                      : (_selectedSourceIndex == 1
-                                          ? 'Nhập từ khóa clip, sinh viên, teen...'
-                                          : 'Nhập từ khóa, mã phim...'),
-                                  hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                                  border: InputBorder.none,
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
+                  // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2)
+                  if (_selectedSourceIndex < 3) ...[
+                    if (_isSearching)
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          height: 38,
+                          margin: const EdgeInsets.symmetric(horizontal: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: themeColor, width: 1.5),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.search, color: Colors.white54, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  decoration: InputDecoration(
+                                    hintText: _selectedSourceIndex == 2
+                                        ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
+                                        : (_selectedSourceIndex == 1
+                                            ? 'Nhập từ khóa clip, sinh viên, teen...'
+                                            : 'Nhập từ khóa, mã phim...'),
+                                    hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  ),
+                                  onSubmitted: (_) => _submitSearch(),
                                 ),
-                                onSubmitted: (_) => _submitSearch(),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close, color: Colors.white54, size: 18),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: _clearSearch,
-                            ),
-                          ],
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: _clearSearch,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      TvFocusableCard(
+                        onTap: () {
+                          setState(() {
+                            _isSearching = true;
+                          });
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            _searchFocusNode.requestFocus();
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          color: const Color(0xFF1E293B),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.search, color: Colors.white70, size: 16),
+                              SizedBox(width: 6),
+                              Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                         ),
                       ),
-                    )
-                  else
-                    TvFocusableCard(
-                      onTap: () {
-                        setState(() {
-                          _isSearching = true;
-                        });
-                        Future.delayed(const Duration(milliseconds: 100), () {
-                          _searchFocusNode.requestFocus();
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(10),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        color: const Color(0xFF1E293B),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.search, color: Colors.white70, size: 16),
-                            SizedBox(width: 6),
-                            Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  const SizedBox(width: 10),
+                    const SizedBox(width: 10),
+                  ],
 
                   // Exit & Lock button
                   TvFocusableCard(
@@ -686,99 +729,252 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                 ),
               ),
 
-            // Content Grid with Infinite Scroll
-            if (_selectedSourceIndex == 3)
-              Expanded(
-                child: _secretFavorites.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.favorite_border_rounded, size: 56, color: Colors.white24),
-                            const SizedBox(height: 14),
-                            const Text(
-                              'Chưa có video nào trong danh sách Yêu thích',
-                              style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Nhấn giữ phím OK trên remote khi xem video để thêm vào Yêu thích ❤️',
-                              style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          int crossAxisCount = 2;
-                          if (constraints.maxWidth > 1200) {
-                            crossAxisCount = 6;
-                          } else if (constraints.maxWidth > 900) {
-                            crossAxisCount = 5;
-                          } else if (constraints.maxWidth > 650) {
-                            crossAxisCount = 4;
-                          } else if (constraints.maxWidth > 450) {
-                            crossAxisCount = 3;
-                          }
-
-                          return CustomScrollView(
-                            controller: _scrollController,
-                            cacheExtent: 350,
-                            slivers: [
-                              SliverPadding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                sliver: SliverGrid(
-                                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: crossAxisCount,
-                                    crossAxisSpacing: 12,
-                                    mainAxisSpacing: 16,
-                                    childAspectRatio: 0.68,
-                                  ),
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, idx) {
-                                      final fav = _secretFavorites[idx];
-                                      return _buildSecretFavoriteGridCard(fav, idx, themeColor);
-                                    },
-                                    childCount: _secretFavorites.length,
-                                    addAutomaticKeepAlives: true,
-                                  ),
+            // Content Stack (0: Adult Catalog, 1: Google Drive, 2: Telegram, 3: Yêu thích)
+            Expanded(
+              child: IndexedStack(
+                index: _contentStackIndex,
+                children: [
+                  // 0: Adult Movies Catalog (tabs 0: VLFilm, 1: Viet69, 2: xNhau)
+                  ExcludeFocus(
+                    excluding: _contentStackIndex != 0,
+                    child: _isLoading
+                        ? Center(child: CircularProgressIndicator(color: themeColor))
+                        : _movies.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.search_off, size: 48, color: Colors.white38),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      _searchQuery != null
+                                          ? 'Không tìm thấy phim phù hợp với "$_searchQuery"'
+                                          : 'Không tìm thấy nội dung.',
+                                      style: const TextStyle(color: Colors.white54, fontSize: 14),
+                                    ),
+                                    if (_searchQuery != null) ...[
+                                      const SizedBox(height: 16),
+                                      TvFocusableCard(
+                                        onTap: _clearSearch,
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          color: const Color(0xFF1E293B),
+                                          child: const Text('Xem tất cả phim', style: TextStyle(color: Colors.white, fontSize: 13)),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
+                              )
+                            : LayoutBuilder(
+                                builder: (context, constraints) {
+                                  int crossAxisCount = 2;
+                                  if (constraints.maxWidth > 1200) {
+                                    crossAxisCount = 6;
+                                  } else if (constraints.maxWidth > 900) {
+                                    crossAxisCount = 5;
+                                  } else if (constraints.maxWidth > 650) {
+                                    crossAxisCount = 4;
+                                  } else if (constraints.maxWidth > 450) {
+                                    crossAxisCount = 3;
+                                  }
+
+                                  return CustomScrollView(
+                                    controller: _scrollController,
+                                    cacheExtent: 350,
+                                    slivers: [
+                                      // 1. Phim Yêu Thích Horizontal Row (khi không tìm kiếm)
+                                      if ((_searchQuery == null || _searchQuery!.isEmpty) && _secretFavorites.isNotEmpty)
+                                        SliverToBoxAdapter(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildSectionTitle(
+                                                '❤️ PHIM YÊU THÍCH',
+                                                count: '${_secretFavorites.length}',
+                                                onSeeAll: () => _switchSource(5),
+                                              ),
+                                              SizedBox(
+                                                height: 180,
+                                                child: ListView.separated(
+                                                  scrollDirection: Axis.horizontal,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                                  itemCount: _secretFavorites.length,
+                                                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                                  itemBuilder: (context, idx) {
+                                                    return _buildHorizontalFavoriteCard(_secretFavorites[idx], idx, themeColor);
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                            ],
+                                          ),
+                                        ),
+
+                                      // 2. Tiếp tục xem / Lịch sử gần đây (khi không tìm kiếm)
+                                      if ((_searchQuery == null || _searchQuery!.isEmpty) && _secretHistory.isNotEmpty)
+                                        SliverToBoxAdapter(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              _buildSectionTitle(
+                                                '🍿 LỊCH SỬ XEM GẦN ĐÂY',
+                                                count: '${_secretHistory.length}',
+                                              ),
+                                              SizedBox(
+                                                height: 145,
+                                                child: ListView.separated(
+                                                  scrollDirection: Axis.horizontal,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                                                  itemCount: _secretHistory.length,
+                                                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                                                  itemBuilder: (context, idx) {
+                                                    return _buildHorizontalRecentCard(_secretHistory[idx], idx, themeColor);
+                                                  },
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                            ],
+                                          ),
+                                        ),
+
+                                      // 3. Tiêu đề Catalog Phim
+                                      if (_searchQuery == null || _searchQuery!.isEmpty)
+                                        SliverToBoxAdapter(
+                                          child: _buildSectionTitle(
+                                            _selectedSourceIndex == 2
+                                                ? '⚡ DANH SÁCH XNHAU'
+                                                : (_selectedSourceIndex == 1
+                                                    ? '🔥 DANH SÁCH VIET69'
+                                                    : '🎬 DANH SÁCH VLFILM'),
+                                          ),
+                                        ),
+
+                                      // 4. Main Catalog Grid
+                                      SliverPadding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                        sliver: SliverGrid(
+                                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                            crossAxisCount: crossAxisCount,
+                                            crossAxisSpacing: 12,
+                                            mainAxisSpacing: 16,
+                                            childAspectRatio: 0.68,
+                                          ),
+                                          delegate: SliverChildBuilderDelegate(
+                                            (context, idx) {
+                                              // Auto-prefetch when reaching near end on TV Remote D-pad
+                                              if (idx >= _movies.length - crossAxisCount &&
+                                                  !_isLoading &&
+                                                  !_isLoadingMore &&
+                                                  _hasMore) {
+                                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                  if (mounted && !_isLoading && !_isLoadingMore && _hasMore) {
+                                                    _loadMoreMovies();
+                                                  }
+                                                });
+                                              }
+
+                                              final movie = _movies[idx];
+                                              return _buildMovieCard(movie, idx, themeColor);
+                                            },
+                                            childCount: _movies.length,
+                                            addAutomaticKeepAlives: true,
+                                          ),
+                                        ),
+                                      ),
+
+                                      // Bottom Loading Indicator
+                                      if (_isLoadingMore)
+                                        SliverToBoxAdapter(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 24),
+                                            child: Center(
+                                              child: Row(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  SizedBox(
+                                                    width: 20,
+                                                    height: 20,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2.5,
+                                                      color: themeColor,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  const Text(
+                                                    'Đang tải thêm nội dung...',
+                                                    style: TextStyle(
+                                                      color: Color(0xFF94A3B8),
+                                                      fontSize: 13,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+
+                                      // End of catalog message
+                                      if (!_hasMore && _movies.isNotEmpty)
+                                        const SliverToBoxAdapter(
+                                          child: Padding(
+                                            padding: const EdgeInsets.symmetric(vertical: 28),
+                                            child: Center(
+                                              child: Text(
+                                                '🎉 Đã hiển thị toàn bộ danh sách',
+                                                style: TextStyle(color: Colors.white38, fontSize: 13),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
                               ),
-                            ],
-                          );
-                        },
-                      ),
-              )
-            else
-              Expanded(
-                child: _isLoading
-                    ? Center(child: CircularProgressIndicator(color: themeColor))
-                    : _movies.isEmpty
+                  ),
+
+                  // 1: Google Drive (tab 3)
+                  ExcludeFocus(
+                    excluding: _contentStackIndex != 1,
+                    child: GDriveScreen(
+                      key: _gdriveKey,
+                      apiService: widget.apiService,
+                      isActive: _contentStackIndex == 1,
+                    ),
+                  ),
+
+                  // 2: Telegram Phim (tab 4)
+                  ExcludeFocus(
+                    excluding: _contentStackIndex != 2,
+                    child: TelegramScreen(
+                      key: _telegramKey,
+                      apiService: widget.apiService,
+                      isActive: _contentStackIndex == 2,
+                    ),
+                  ),
+
+                  // 3: Secret Yêu thích (tab 5)
+                  ExcludeFocus(
+                    excluding: _contentStackIndex != 3,
+                    child: _secretFavorites.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.search_off, size: 48, color: Colors.white38),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _searchQuery != null
-                                      ? 'Không tìm thấy phim phù hợp với "$_searchQuery"'
-                                      : 'Không tìm thấy nội dung.',
-                                  style: const TextStyle(color: Colors.white54, fontSize: 14),
+                                const Icon(Icons.favorite_border_rounded, size: 56, color: Colors.white24),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'Chưa có video nào trong danh sách Yêu thích',
+                                  style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
                                 ),
-                                if (_searchQuery != null) ...[
-                                  const SizedBox(height: 16),
-                                  TvFocusableCard(
-                                    onTap: _clearSearch,
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      color: const Color(0xFF1E293B),
-                                      child: const Text('Xem tất cả phim', style: TextStyle(color: Colors.white, fontSize: 13)),
-                                    ),
-                                  ),
-                                ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Nhấn giữ phím OK trên remote khi xem video để thêm vào Yêu thích ❤️',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.45), fontSize: 12),
+                                  textAlign: TextAlign.center,
+                                ),
                               ],
                             ),
                           )
@@ -799,76 +995,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                 controller: _scrollController,
                                 cacheExtent: 350,
                                 slivers: [
-                                  // 1. Phim Yêu Thích Horizontal Row (khi không tìm kiếm)
-                                  if ((_searchQuery == null || _searchQuery!.isEmpty) && _secretFavorites.isNotEmpty)
-                                    SliverToBoxAdapter(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildSectionTitle(
-                                            '❤️ PHIM YÊU THÍCH',
-                                            count: '${_secretFavorites.length}',
-                                            onSeeAll: () => _switchSource(2),
-                                          ),
-                                          SizedBox(
-                                            height: 180,
-                                            child: ListView.separated(
-                                              scrollDirection: Axis.horizontal,
-                                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                                              itemCount: _secretFavorites.length,
-                                              separatorBuilder: (_, __) => const SizedBox(width: 12),
-                                              itemBuilder: (context, idx) {
-                                                return _buildHorizontalFavoriteCard(_secretFavorites[idx], idx, themeColor);
-                                              },
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                        ],
-                                      ),
-                                    ),
-
-                                  // 2. Tiếp tục xem / Lịch sử gần đây (khi không tìm kiếm)
-                                  if ((_searchQuery == null || _searchQuery!.isEmpty) && _secretHistory.isNotEmpty)
-                                    SliverToBoxAdapter(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          _buildSectionTitle(
-                                            '🍿 LỊCH SỬ XEM GẦN ĐÂY',
-                                            count: '${_secretHistory.length}',
-                                          ),
-                                          SizedBox(
-                                            height: 145,
-                                            child: ListView.separated(
-                                              scrollDirection: Axis.horizontal,
-                                              padding: const EdgeInsets.symmetric(horizontal: 20),
-                                              itemCount: _secretHistory.length,
-                                              separatorBuilder: (_, __) => const SizedBox(width: 12),
-                                              itemBuilder: (context, idx) {
-                                                return _buildHorizontalRecentCard(_secretHistory[idx], idx, themeColor);
-                                              },
-                                            ),
-                                          ),
-                                          const SizedBox(height: 16),
-                                        ],
-                                      ),
-                                    ),
-
-                                  // 3. Tiêu đề Catalog Phim
-                                  if (_searchQuery == null || _searchQuery!.isEmpty)
-                                    SliverToBoxAdapter(
-                                      child: _buildSectionTitle(
-                                        _selectedSourceIndex == 2
-                                            ? '⚡ DANH SÁCH XNHAU'
-                                            : (_selectedSourceIndex == 1
-                                                ? '🔥 DANH SÁCH VIET69'
-                                                : '🎬 DANH SÁCH VLFILM'),
-                                      ),
-                                    ),
-
-                                  // 4. Main Catalog Grid
                                   SliverPadding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                                     sliver: SliverGrid(
                                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                         crossAxisCount: crossAxisCount,
@@ -878,77 +1006,22 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                       ),
                                       delegate: SliverChildBuilderDelegate(
                                         (context, idx) {
-                                          // Auto-prefetch when reaching near end on TV Remote D-pad
-                                          if (idx >= _movies.length - crossAxisCount &&
-                                              !_isLoading &&
-                                              !_isLoadingMore &&
-                                              _hasMore) {
-                                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                                              if (mounted && !_isLoading && !_isLoadingMore && _hasMore) {
-                                                _loadMoreMovies();
-                                              }
-                                            });
-                                          }
-
-                                          final movie = _movies[idx];
-                                          return _buildMovieCard(movie, idx, themeColor);
+                                          final fav = _secretFavorites[idx];
+                                          return _buildSecretFavoriteGridCard(fav, idx, themeColor);
                                         },
-                                        childCount: _movies.length,
+                                        childCount: _secretFavorites.length,
                                         addAutomaticKeepAlives: true,
                                       ),
                                     ),
                                   ),
-
-                                  // Bottom Loading Indicator
-                                  if (_isLoadingMore)
-                                    SliverToBoxAdapter(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 24),
-                                        child: Center(
-                                          child: Row(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2.5,
-                                                  color: themeColor,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              const Text(
-                                                'Đang tải thêm nội dung...',
-                                                style: TextStyle(
-                                                  color: Color(0xFF94A3B8),
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-
-                                  // End of catalog message
-                                  if (!_hasMore && _movies.isNotEmpty)
-                                    const SliverToBoxAdapter(
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 28),
-                                        child: Center(
-                                          child: Text(
-                                            '🎉 Đã hiển thị toàn bộ danh sách',
-                                            style: TextStyle(color: Colors.white38, fontSize: 13),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
                                 ],
                               );
                             },
                           ),
+                  ),
+                ],
               ),
+            ),
           ],
         ),
       ),
