@@ -763,38 +763,6 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
                   const SizedBox(height: 8),
 
-                  // 3. Switch to V1
-                  InkWell(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _switchToOldUI();
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      height: 42,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
-                      ),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.restore_page_rounded, size: 18, color: Color(0xFF38BDF8)),
-                          SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Giao diện Cũ (V1)',
-                              style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
                   // Profile
                   InkWell(
                     onTap: () {

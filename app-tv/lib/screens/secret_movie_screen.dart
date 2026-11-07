@@ -249,9 +249,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         category: 'secret',
         updatedAt: DateTime.now().toIso8601String(),
       );
-      final choice = await ResumePlaybackDialog.show(context, fakeItem);
+      final choice = await ResumePlaybackDialog.show(context, fakeItem, hasNextEpisode: false);
       if (choice == null || !mounted) return;
-      if (choice) {
+      if (choice == ResumeChoice.resume) {
         startPosition = Duration(milliseconds: posMs);
       } else {
         startPosition = Duration.zero;
@@ -403,9 +403,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
     Duration? startPosition;
     if (saved != null && saved.isInProgress && replaceContext == null) {
-      final choice = await ResumePlaybackDialog.show(context, saved);
-      if (choice == null) return;
-      if (choice) {
+      final choice = await ResumePlaybackDialog.show(context, saved, hasNextEpisode: false);
+      if (choice == null || !mounted) return;
+      if (choice == ResumeChoice.resume) {
         startPosition = Duration(milliseconds: saved.positionMs);
       } else {
         startPosition = Duration.zero;

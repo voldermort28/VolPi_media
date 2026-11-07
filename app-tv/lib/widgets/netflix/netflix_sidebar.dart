@@ -72,11 +72,7 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         widget.focusNodes?[6].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 6) {
-        // Move from Cập nhật (6) to V1 Switch (7)
-        widget.focusNodes?[7].requestFocus();
-        return KeyEventResult.handled;
-      } else if (index == 7) {
-        // Move from V1 Switch (7) to Profile (8)
+        // Move from Cập nhật (6) to Profile (8)
         widget.focusNodes?[8].requestFocus();
         return KeyEventResult.handled;
       } else if (index >= 8) {
@@ -98,13 +94,9 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         // Move from Cập nhật (6) up to Làm mới (5)
         widget.focusNodes?[5].requestFocus();
         return KeyEventResult.handled;
-      } else if (index == 7) {
-        // Move from V1 Switch (7) up to Cập nhật (6)
-        widget.focusNodes?[6].requestFocus();
-        return KeyEventResult.handled;
       } else if (index == 8) {
-        // Move from Profile (8) up to V1 Switch (7)
-        widget.focusNodes?[7].requestFocus();
+        // Move from Profile (8) up to Cập nhật (6)
+        widget.focusNodes?[6].requestFocus();
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -413,55 +405,6 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                   leftPadding: 10,
                                   child: const Text(
                                     'Cập nhật ứng dụng',
-                                    softWrap: false,
-                                    style: TextStyle(
-                                      color: Color(0xFF38BDF8),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // 3. Switch back to V1
-                      Focus(
-                        onKeyEvent: (node, event) => _handleSidebarItemKey(7, event),
-                        child: TvFocusableCard(
-                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 7)
-                              ? widget.focusNodes![7]
-                              : null,
-                          onTap: widget.onSwitchToOldUI,
-                          borderRadius: BorderRadius.circular(8),
-                          focusBorderColor: const Color(0xFF38BDF8),
-                          scale: 1.02,
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: const Color(0xFF38BDF8).withOpacity(0.4),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.restore_page_rounded,
-                                  size: 18,
-                                  color: Color(0xFF38BDF8),
-                                ),
-                                _buildExpandingLabel(
-                                  width: 140,
-                                  leftPadding: 10,
-                                  child: const Text(
-                                    'Giao diện Cũ (V1)',
                                     softWrap: false,
                                     style: TextStyle(
                                       color: Color(0xFF38BDF8),

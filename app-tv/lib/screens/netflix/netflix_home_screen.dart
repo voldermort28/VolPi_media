@@ -232,6 +232,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     if (match != null) {
       return int.tryParse(match.group(1)!) ?? 1;
     }
+    final subMatch = RegExp(r'[Tt]ập\s*(\d+)').firstMatch(item.subtitle);
+    if (subMatch != null) {
+      return int.tryParse(subMatch.group(1)!) ?? 1;
+    }
     return 1;
   }
 
@@ -240,19 +244,37 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     final item = _continueWatching[index];
     final targetContext = replaceContext ?? context;
 
-    Duration startPos = Duration(milliseconds: item.positionMs);
-    if (replaceContext == null) {
-      final choice = await ResumePlaybackDialog.show(context, item);
-      if (choice == null || !mounted) return;
-      startPos = choice ? Duration(milliseconds: item.positionMs) : Duration.zero;
-      if (!choice) {
-        WatchHistoryService.instance.clearProgress(item.id);
-      }
-    }
-
     final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
     final epNum = _extractEpisodeNumber(item);
     final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:') || item.id.startsWith('yumei:')) && cleanId.isNotEmpty;
+
+    Duration startPos = Duration(milliseconds: item.positionMs);
+    if (replaceContext == null) {
+      final choice = await ResumePlaybackDialog.show(
+        context,
+        item,
+        hasNextEpisode: isAnimeSeries,
+        nextEpisodeNumber: isAnimeSeries ? epNum + 1 : null,
+      );
+      if (choice == null || !mounted) return;
+      if (choice == ResumeChoice.nextEpisode) {
+        if (isAnimeSeries) {
+          _loadAndPlayEpisode(
+            animeId: cleanId,
+            animeTitle: item.title,
+            poster: item.poster,
+            season: item.season > 0 ? item.season : 1,
+            episode: epNum + 1,
+            continueIndex: index,
+          );
+          return;
+        }
+      }
+      startPos = (choice == ResumeChoice.resume) ? Duration(milliseconds: item.positionMs) : Duration.zero;
+      if (choice == ResumeChoice.restart) {
+        WatchHistoryService.instance.clearProgress(item.id);
+      }
+    }
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(

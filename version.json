@@ -1,10 +1,10 @@
 {
-  "version": "2.2.18",
-  "build": 84,
-  "tag_name": "v2.2.18",
-  "changelog": "• VolPi Media v2.2.18 - Bổ Sung Nút Next Tập Tiếp Theo & Bảng Chọn Tập Cho Phim Series:\n- Nút Next tập tiếp theo: Thiết kế nút Next nổi bật kèm số tập (ví dụ: Next: Tập 2), bấm phím OK là lập tức chuyển sang tập kế tiếp nhanh chóng.\n- Bảng Chọn tập ngay trong trình phát: Cho phép xem danh sách và chuyển đổi bất kỳ tập nào của bộ phim series trực tiếp trên player mà không cần thoát ra ngoài.\n- Tối ưu điều hướng TV Remote mượt mà, tiện lợi trên Android TV và các thiết bị.",
+  "version": "2.2.19",
+  "build": 85,
+  "tag_name": "v2.2.19",
+  "changelog": "• VolPi Media v2.2.19:\n- Thêm nút 'Tập tiếp theo' trực tiếp trong bảng Tiếp tục xem phim (Resume dialog) cho phim nhiều tập/series.\n- Tạm thời ẩn nút Bỏ qua Intro (+85s) trong trình phát video.\n- Bổ sung cử chỉ Double Tap 2 nửa màn hình (trái lui 10s, phải tiến 10s) trên iOS (iPhone/iPad) chuẩn YouTube kèm hiệu ứng vòng sóng tích luỹ giây.\n- Ẩn nút Chuyển về Giao diện Cũ (V1) trên thanh Sidebar và Mobile Drawer.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-08T00:15:00Z"
+  "published_at": "2026-11-08T00:38:00Z"
 }

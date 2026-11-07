@@ -81,6 +81,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   // Double-tap Quick Seek Indicators
   bool _showDoubleTapLeft = false;
   bool _showDoubleTapRight = false;
+  int _doubleTapAccumulatedSeconds = 0;
   Timer? _doubleTapTimer;
 
   // Remote Progressive Seeking (Giữ nút tua nhanh dần trên Android TV)
@@ -158,7 +159,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     list.add(_playPauseFocusNode);
     if (!widget.isLive) {
       list.add(_forward10FocusNode);
-      list.add(_skipIntroFocusNode);
     }
     if (widget.onNext != null) list.add(_nextFocusNode);
     if (widget.episodes != null && widget.episodes!.isNotEmpty && widget.onSelectEpisode != null) {
@@ -1041,26 +1041,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _onDoubleTapSide(bool isRight) {
     if (!_isInitialized || widget.isLive) return;
-    if (isRight) {
-      _seekRelative(10);
-      _doubleTapTimer?.cancel();
-      setState(() {
+
+    // Reset accumulation if switching sides
+    if ((isRight && _showDoubleTapLeft) || (!isRight && _showDoubleTapRight)) {
+      _doubleTapAccumulatedSeconds = 0;
+    }
+    _doubleTapAccumulatedSeconds += 10;
+    _seekRelative(isRight ? 10 : -10);
+    _doubleTapTimer?.cancel();
+
+    setState(() {
+      if (isRight) {
         _showDoubleTapRight = true;
         _showDoubleTapLeft = false;
-      });
-    } else {
-      _seekRelative(-10);
-      _doubleTapTimer?.cancel();
-      setState(() {
+      } else {
         _showDoubleTapLeft = true;
         _showDoubleTapRight = false;
-      });
-    }
-    _doubleTapTimer = Timer(const Duration(milliseconds: 650), () {
+      }
+    });
+
+    _doubleTapTimer = Timer(const Duration(milliseconds: 700), () {
       if (mounted) {
         setState(() {
           _showDoubleTapLeft = false;
           _showDoubleTapRight = false;
+          _doubleTapAccumulatedSeconds = 0;
         });
       }
     });
@@ -1737,13 +1742,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 2. DOUBLE-TAP SEEK ZONES (iOS only - Left 35% & Right 35%)
+              // 2. DOUBLE-TAP SEEK ZONES (iOS only - Left 50% & Right 50% screen)
               if (_isIOS) ...[
                 Positioned(
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  width: screenSize.width * 0.35,
+                  width: screenSize.width * 0.5,
                   child: GestureDetector(
                     onDoubleTap: () {
                       if (_isScreenLocked) return;
@@ -1754,14 +1759,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
                     onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
                     behavior: HitTestBehavior.translucent,
-                    child: Container(),
+                    child: Container(color: Colors.transparent),
                   ),
                 ),
                 Positioned(
                   right: 0,
                   top: 0,
                   bottom: 0,
-                  width: screenSize.width * 0.35,
+                  width: screenSize.width * 0.5,
                   child: GestureDetector(
                     onDoubleTap: () {
                       if (_isScreenLocked) return;
@@ -1772,49 +1777,79 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
                     onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
                     behavior: HitTestBehavior.translucent,
-                    child: Container(),
+                    child: Container(color: Colors.transparent),
                   ),
                 ),
               ],
 
-              // 3. DOUBLE-TAP RIPPLE INDICATORS (iOS only)
+              // 3. DOUBLE-TAP RIPPLE INDICATORS (YouTube-style curved side overlay)
               if (_isIOS && _showDoubleTapLeft)
                 Positioned(
-                  left: screenSize.width * 0.15,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(40),
-                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.replay_10_rounded, color: Color(0xFF38BDF8), size: 36),
-                        SizedBox(width: 8),
-                        Text('-10s', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      ],
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.45,
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.12),
+                        borderRadius: BorderRadius.horizontal(
+                          right: Radius.elliptical(screenSize.width * 0.45, screenSize.height * 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.fast_rewind_rounded, color: Colors.white, size: 44),
+                            const SizedBox(height: 8),
+                            Text(
+                              '-${_doubleTapAccumulatedSeconds}s',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
               if (_isIOS && _showDoubleTapRight)
                 Positioned(
-                  right: screenSize.width * 0.15,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(40),
-                      border: Border.all(color: const Color(0xFF38BDF8), width: 1.5),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('+10s', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        SizedBox(width: 8),
-                        Icon(Icons.forward_10_rounded, color: Color(0xFF38BDF8), size: 36),
-                      ],
+                  right: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: screenSize.width * 0.45,
+                  child: IgnorePointer(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.12),
+                        borderRadius: BorderRadius.horizontal(
+                          left: Radius.elliptical(screenSize.width * 0.45, screenSize.height * 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.fast_forward_rounded, color: Colors.white, size: 44),
+                            const SizedBox(height: 8),
+                            Text(
+                              '+${_doubleTapAccumulatedSeconds}s',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -2110,15 +2145,37 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                       ),
 
-                      // Center: Tap empty area to dismiss controls immediately
+                      // Center: Tap empty area to dismiss controls immediately, or double tap to seek 10s
                       Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: () {
-                            if (_isScreenLocked) return;
-                            _toggleControls();
-                          },
-                          child: const SizedBox.expand(),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: () {
+                                  if (_isScreenLocked) return;
+                                  _toggleControls();
+                                },
+                                onDoubleTap: _isIOS && !_isScreenLocked
+                                    ? () => _onDoubleTapSide(false)
+                                    : null,
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                            Expanded(
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.translucent,
+                                onTap: () {
+                                  if (_isScreenLocked) return;
+                                  _toggleControls();
+                                },
+                                onDoubleTap: _isIOS && !_isScreenLocked
+                                    ? () => _onDoubleTapSide(true)
+                                    : null,
+                                child: const SizedBox.expand(),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -2315,36 +2372,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 26),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    TvFocusableCard(
-                                      focusNode: _skipIntroFocusNode,
-                                      onTap: () => _seekDirectOffset(85, customHudText: '+85s (Bỏ qua Intro)'),
-                                      scale: 1.05,
-                                      borderRadius: BorderRadius.circular(16),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF38BDF8).withOpacity(0.15),
-                                          borderRadius: BorderRadius.circular(16),
-                                          border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 0.8),
-                                        ),
-                                        child: const Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.fast_forward_rounded, color: Color(0xFF38BDF8), size: 16),
-                                            SizedBox(width: 4),
-                                            Text(
-                                              '+85s Intro',
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
                                       ),
                                     ),
                                   ],

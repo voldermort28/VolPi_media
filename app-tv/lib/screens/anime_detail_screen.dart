@@ -68,9 +68,19 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
       if (resumeDirectly) {
         startPosition = Duration(milliseconds: saved.positionMs);
       } else if (replaceContext == null) {
-        final choice = await ResumePlaybackDialog.show(context, saved);
-        if (choice == null) return; // Hủy
-        if (choice) {
+        final hasNext = index + 1 < episodes.length;
+        final choice = await ResumePlaybackDialog.show(
+          context,
+          saved,
+          hasNextEpisode: hasNext,
+          nextEpisodeNumber: hasNext ? episodes[index + 1].episode : null,
+        );
+        if (choice == null || !mounted) return; // Hủy
+        if (choice == ResumeChoice.nextEpisode) {
+          _playEpisodeAtIndex(index + 1);
+          return;
+        }
+        if (choice == ResumeChoice.resume) {
           startPosition = Duration(milliseconds: saved.positionMs);
         } else {
           startPosition = Duration.zero;
