@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import '../models/anime_model.dart';
 import '../models/match_model.dart';
 import '../models/watch_history_model.dart';
 import '../services/player_settings_service.dart';
@@ -27,6 +28,9 @@ class VideoPlayerScreen extends StatefulWidget {
   final String? mediaPoster;
   final int episode;
   final int season;
+  final List<EpisodeModel>? episodes;
+  final int currentEpisodeIndex;
+  final ValueChanged<int>? onSelectEpisode;
 
   const VideoPlayerScreen({
     super.key,
@@ -44,6 +48,9 @@ class VideoPlayerScreen extends StatefulWidget {
     this.mediaPoster = '',
     this.episode = 0,
     this.season = 0,
+    this.episodes,
+    this.currentEpisodeIndex = -1,
+    this.onSelectEpisode,
   });
 
   @override
@@ -100,6 +107,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isHoveringControls = false;
   DateTime? _lastMouseMoveTime;
   bool _showStreamSelector = false;
+  bool _showEpisodeSelector = false;
 
   // TV Remote Focus Nodes
   final FocusNode _playPauseFocusNode = FocusNode();
@@ -109,11 +117,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _replay10FocusNode = FocusNode();
   final FocusNode _forward10FocusNode = FocusNode();
   final FocusNode _skipIntroFocusNode = FocusNode();
+  final FocusNode _episodesButtonFocusNode = FocusNode();
   final FocusNode _channelsButtonFocusNode = FocusNode();
   final FocusNode _backButtonFocusNode = FocusNode();
   final FocusNode _rotateFocusNode = FocusNode();
   final FocusNode _lockFocusNode = FocusNode();
   final List<FocusNode> _channelFocusNodes = [];
+  final List<FocusNode> _episodeFocusNodes = [];
   bool _lastFocusedOnSeekBar = true;
 
   // Screen Orientation & Touch Lock (Mobile / iOS / Tablet)
@@ -151,6 +161,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       list.add(_skipIntroFocusNode);
     }
     if (widget.onNext != null) list.add(_nextFocusNode);
+    if (widget.episodes != null && widget.episodes!.isNotEmpty && widget.onSelectEpisode != null) {
+      list.add(_episodesButtonFocusNode);
+    }
     if (_effectiveChannels.isNotEmpty) list.add(_channelsButtonFocusNode);
     return list;
   }
@@ -175,6 +188,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
+  void _initEpisodeFocusNodes() {
+    for (final node in _episodeFocusNodes) {
+      node.dispose();
+    }
+    _episodeFocusNodes.clear();
+    final count = widget.episodes?.length ?? 0;
+    for (int i = 0; i < count; i++) {
+      _episodeFocusNodes.add(FocusNode());
+    }
+  }
+
+  void _focusCurrentEpisode() {
+    if (!mounted || !_showEpisodeSelector || _episodeFocusNodes.isEmpty) return;
+    int activeIdx = widget.currentEpisodeIndex;
+    if (activeIdx < 0 && widget.episode > 0 && widget.episodes != null) {
+      activeIdx = widget.episodes!.indexWhere((e) => e.episode == widget.episode);
+    }
+    if (activeIdx < 0 || activeIdx >= _episodeFocusNodes.length) activeIdx = 0;
+    if (activeIdx < _episodeFocusNodes.length) {
+      _episodeFocusNodes[activeIdx].requestFocus();
+    }
+  }
+
   void _exitPlayer() {
     if (_isScreenLocked) {
       setState(() {
@@ -194,6 +230,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       });
       _startLockOverlayTimer();
       _showBriefPlaybackHud('LOCK', 'Màn hình đang khóa');
+      return;
+    }
+    if (_showEpisodeSelector) {
+      setState(() {
+        _showEpisodeSelector = false;
+      });
+      _episodesButtonFocusNode.requestFocus();
+      _startHideControlsTimer();
       return;
     }
     if (_showStreamSelector) {
@@ -567,12 +611,15 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _startHideControlsTimer() {
     _hideControlsTimer?.cancel();
-    final duration = _showStreamSelector ? const Duration(seconds: 15) : const Duration(seconds: 5);
+    final duration = (_showStreamSelector || _showEpisodeSelector)
+        ? const Duration(seconds: 15)
+        : const Duration(seconds: 5);
     _hideControlsTimer = Timer(duration, () {
       if (mounted && _controller.value.isPlaying && !_isDragging && !_isHoldingSeek && !_isHoveringControls) {
         setState(() {
           _showControls = false;
           _showStreamSelector = false;
+          _showEpisodeSelector = false;
         });
       }
     });
@@ -1078,6 +1125,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _replay10FocusNode.dispose();
     _forward10FocusNode.dispose();
     _skipIntroFocusNode.dispose();
+    _episodesButtonFocusNode.dispose();
     _channelsButtonFocusNode.dispose();
     _backButtonFocusNode.dispose();
     _rotateFocusNode.dispose();
@@ -1086,6 +1134,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       n.dispose();
     }
     _channelFocusNodes.clear();
+    for (final n in _episodeFocusNodes) {
+      n.dispose();
+    }
+    _episodeFocusNodes.clear();
     super.dispose();
   }
 
@@ -1185,7 +1237,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
 
             // Keyboard Shortcuts for macOS & Desktop (Arrow Left/Right to Seek, Arrow Up/Down for Volume)
-            if (_isMacOrDesktop && !_showStreamSelector) {
+            if (_isMacOrDesktop && !_showStreamSelector && !_showEpisodeSelector) {
               if (isLeft) {
                 if (widget.isLive) {
                   _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
@@ -1236,9 +1288,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
                 return KeyEventResult.handled;
               }
-              if (_showStreamSelector) {
+              if (_showStreamSelector || _showEpisodeSelector) {
                 setState(() {
                   _showStreamSelector = false;
+                  _showEpisodeSelector = false;
                 });
               }
               if (_isHoldingSeek && _holdSeekDirection == 1) {
@@ -1255,9 +1308,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _showBriefPlaybackHud('CHANNEL', 'Đang phát trực tiếp');
                 return KeyEventResult.handled;
               }
-              if (_showStreamSelector) {
+              if (_showStreamSelector || _showEpisodeSelector) {
                 setState(() {
                   _showStreamSelector = false;
+                  _showEpisodeSelector = false;
                 });
               }
               if (_isHoldingSeek && _holdSeekDirection == -1) {
@@ -2299,15 +2353,86 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                     TvFocusableCard(
                                       focusNode: _nextFocusNode,
                                       onTap: widget.onNext!,
-                                      scale: 1.15,
-                                      borderRadius: BorderRadius.circular(24),
+                                      scale: 1.08,
+                                      borderRadius: BorderRadius.circular(18),
                                       child: Container(
-                                        padding: const EdgeInsets.all(8),
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.12),
-                                          shape: BoxShape.circle,
+                                          color: const Color(0xFFE50914).withOpacity(0.2),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(
+                                            color: const Color(0xFFE50914).withOpacity(0.6),
+                                            width: 0.8,
+                                          ),
                                         ),
-                                        child: const Icon(Icons.skip_next_rounded, color: Colors.white, size: 26),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.skip_next_rounded, color: Colors.white, size: 18),
+                                            const SizedBox(width: 5),
+                                            Text(
+                                              widget.episode > 0 ? 'Next Tập ${widget.episode + 1}' : 'Next (Tập tiếp)',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  if (widget.episodes != null && widget.episodes!.isNotEmpty && widget.onSelectEpisode != null) ...[
+                                    const SizedBox(width: 14),
+                                    TvFocusableCard(
+                                      focusNode: _episodesButtonFocusNode,
+                                      onTap: () {
+                                        setState(() {
+                                          _showEpisodeSelector = !_showEpisodeSelector;
+                                          if (_showEpisodeSelector) {
+                                            _showStreamSelector = false;
+                                          }
+                                        });
+                                        if (_showEpisodeSelector) {
+                                          _initEpisodeFocusNodes();
+                                          _startHideControlsTimer();
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            _focusCurrentEpisode();
+                                          });
+                                        } else {
+                                          _startHideControlsTimer();
+                                        }
+                                      },
+                                      scale: 1.08,
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: _showEpisodeSelector
+                                              ? const Color(0xFF0284C7)
+                                              : Colors.white.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(
+                                            color: _showEpisodeSelector ? const Color(0xFF38BDF8) : Colors.white24,
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: const Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.video_library_rounded, color: Colors.white, size: 15),
+                                            SizedBox(width: 6),
+                                            Text(
+                                              'Chọn tập',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -2515,6 +2640,147 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                 ),
                               );
                             },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 5.6 VERTICAL EPISODE SELECTOR PANEL (DANH SÁCH TẬP PHIM CHO SERIES)
+              if (_showEpisodeSelector && widget.episodes != null && widget.episodes!.isNotEmpty)
+                Positioned(
+                  bottom: 96,
+                  right: 28,
+                  child: MouseRegion(
+                    onEnter: (_) {
+                      _isHoveringControls = true;
+                      _hideControlsTimer?.cancel();
+                    },
+                    onExit: (_) {
+                      _isHoveringControls = false;
+                      _startHideControlsTimer();
+                    },
+                    child: Container(
+                      width: 440,
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0F172A).withOpacity(0.96),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFF38BDF8), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.8),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.video_library_rounded, color: Color(0xFF38BDF8), size: 18),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'DANH SÁCH TẬP (${widget.episodes!.length} TẬP)',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _showEpisodeSelector = false;
+                                  });
+                                  _episodesButtonFocusNode.requestFocus();
+                                  _startHideControlsTimer();
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.close_rounded, color: Colors.white70, size: 16),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Flexible(
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              padding: EdgeInsets.zero,
+                              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 80,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                mainAxisExtent: 38,
+                              ),
+                              itemCount: widget.episodes!.length,
+                              itemBuilder: (context, index) {
+                                final ep = widget.episodes![index];
+                                final bool isSelected = ep.episode == widget.episode ||
+                                    (widget.currentEpisodeIndex >= 0 && index == widget.currentEpisodeIndex);
+                                final node = index < _episodeFocusNodes.length ? _episodeFocusNodes[index] : null;
+                                return Focus(
+                                  onKeyEvent: (focusNode, event) {
+                                    if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft && index % 5 == 0) {
+                                      setState(() {
+                                        _showEpisodeSelector = false;
+                                      });
+                                      _episodesButtonFocusNode.requestFocus();
+                                      _startHideControlsTimer();
+                                      return KeyEventResult.handled;
+                                    }
+                                    return KeyEventResult.ignored;
+                                  },
+                                  child: TvFocusableCard(
+                                    focusNode: node,
+                                    onTap: () {
+                                      setState(() {
+                                        _showEpisodeSelector = false;
+                                      });
+                                      widget.onSelectEpisode?.call(index);
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      alignment: Alignment.center,
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color(0xFF0284C7)
+                                            : Colors.white.withOpacity(0.08),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: isSelected ? const Color(0xFF38BDF8) : Colors.white12,
+                                          width: isSelected ? 1.5 : 0.8,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Tập ${ep.episode}',
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.white : Colors.white70,
+                                          fontSize: 12,
+                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ),
                         ],

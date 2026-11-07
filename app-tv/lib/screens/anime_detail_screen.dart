@@ -133,6 +133,9 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         mediaPoster: ep.thumbnail.isNotEmpty ? ep.thumbnail : anime.poster,
         episode: ep.episode,
         season: ep.season,
+        episodes: episodes,
+        currentEpisodeIndex: index,
+        onSelectEpisode: (newIdx) => _playEpisodeAtIndex(newIdx, replaceContext: playerCtx),
         onNext: index + 1 < episodes.length
             ? () => _playEpisodeAtIndex(index + 1, replaceContext: playerCtx)
             : null,
