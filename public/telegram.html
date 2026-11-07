@@ -834,13 +834,64 @@
     }
 
     // 3. Preview Modal
+    let allPreviewVideos = [];
+    let previewDisplayCount = 50;
+
+    function renderPreviewItems() {
+      const contentEl = document.getElementById('modal-preview-content');
+      const displayed = allPreviewVideos.slice(0, previewDisplayCount);
+      const total = allPreviewVideos.length;
+
+      let html = displayed.map(v => `
+        <div class="p-3 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-sky-400 flex-shrink-0">
+              <i data-lucide="film" class="w-5 h-5"></i>
+            </div>
+            <div class="overflow-hidden">
+              <h5 class="font-bold text-slate-200 truncate">${v.title}</h5>
+              <p class="text-[11px] text-slate-400 font-mono mt-0.5">${v.fileName || ''}</p>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <span class="text-sky-300 font-bold block">${v.formattedSize || ''}</span>
+            <span class="text-[10px] text-slate-400">${v.formattedDuration || ''}</span>
+          </div>
+        </div>
+      `).join('');
+
+      if (previewDisplayCount < total) {
+        html += `
+          <div class="pt-3 pb-1 text-center">
+            <button onclick="loadMorePreview()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold border border-slate-700 transition cursor-pointer">
+              Tải thêm 50 video (Đang hiện ${displayed.length} / ${total})
+            </button>
+          </div>
+        `;
+      } else if (total > 50) {
+        html += `
+          <div class="pt-3 pb-1 text-center text-slate-500 text-[11px]">
+            Đã hiển thị toàn bộ ${total} video
+          </div>
+        `;
+      }
+
+      contentEl.innerHTML = html;
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function loadMorePreview() {
+      previewDisplayCount += 50;
+      renderPreviewItems();
+    }
+
     async function previewChannel(channelId, title) {
       const modal = document.getElementById('modal-preview');
       const titleEl = document.getElementById('modal-preview-title');
       const contentEl = document.getElementById('modal-preview-content');
 
       titleEl.textContent = title || 'Danh Sách Phim Trong Kênh';
-      contentEl.innerHTML = `<div class="text-center py-8"><i data-lucide="loader-2" class="w-6 h-6 animate-spin text-sky-400 mx-auto"></i><p class="text-xs text-slate-400 mt-2">Đang quét danh sách video trong kênh...</p></div>`;
+      contentEl.innerHTML = `<div class="text-center py-8"><i data-lucide="loader-2" class="w-6 h-6 animate-spin text-sky-400 mx-auto"></i><p class="text-xs text-slate-400 mt-2">Đang tải danh sách video trong kênh...</p></div>`;
       modal.classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
 
@@ -849,24 +900,10 @@
         const data = await res.json();
 
         if (data.videos && data.videos.length > 0) {
+          allPreviewVideos = data.videos;
+          previewDisplayCount = 50;
           titleEl.textContent = `${title || 'Danh Sách Phim'} (${data.videos.length} video)`;
-          contentEl.innerHTML = data.videos.map(v => `
-            <div class="p-3 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-3 text-xs">
-              <div class="flex items-center gap-3 overflow-hidden">
-                <div class="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center text-sky-400 flex-shrink-0">
-                  <i data-lucide="film" class="w-5 h-5"></i>
-                </div>
-                <div class="overflow-hidden">
-                  <h5 class="font-bold text-slate-200 truncate">${v.title}</h5>
-                  <p class="text-[11px] text-slate-400 font-mono mt-0.5">${v.fileName || ''}</p>
-                </div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <span class="text-sky-300 font-bold block">${v.formattedSize || ''}</span>
-                <span class="text-[10px] text-slate-400">${v.formattedDuration || ''}</span>
-              </div>
-            </div>
-          `).join('');
+          renderPreviewItems();
         } else {
           contentEl.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">Không tìm thấy video nào trong kênh này hoặc tài khoản chưa có quyền đọc.</div>`;
         }

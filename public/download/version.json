@@ -1,10 +1,10 @@
 {
-  "version": "2.2.25",
-  "build": 91,
-  "tag_name": "v2.2.25",
-  "changelog": "• VolPi Media v2.2.25:\n- Mở rộng giới hạn quét video Telegram từ 100 lên 2.500+ messages: Hiển thị trọn vẹn toàn bộ kho hàng ngàn video trong kênh.\n- Tối ưu bộ đệm lưu trữ cache Telegram sang đĩa cứng (disk cache) giúp nạp danh sách 1.500+ video tức thì chỉ trong vài mili-giây.\n- Bổ sung cơ chế chống FloodWait khi quét sâu các kênh phim Telegram đồ sộ.",
+  "version": "2.2.26",
+  "build": 92,
+  "tag_name": "v2.2.26",
+  "changelog": "• VolPi Media v2.2.26:\n- Tối ưu hiệu năng Telegram với cơ chế Lazy Paging & Infinite Scroll: Chỉ nạp 40 video ban đầu, cuộn đến đâu tải mượt đến đó, hoàn toàn triệt tiêu tình trạng giật lag trên TV.\n- Hỗ trợ phân trang API và tìm kiếm phim tức thì trên toàn bộ kho video Telegram.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-08T02:35:00Z"
+  "published_at": "2026-11-08T02:42:00Z"
 }

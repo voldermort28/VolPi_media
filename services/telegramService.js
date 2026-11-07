@@ -594,141 +594,185 @@ async function resolveChannelEntity(client, channelIdentifier) {
 /**
  * Fetch and filter video messages from a channel
  */
-async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 2500 } = {}) {
+async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 2500, page = null, pageSize = 50, search = '' } = {}) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
   const cacheKey = `tg_videos_${channelId}`;
+
+  let fullResult = null;
 
   // Check cache
   if (!forceRefresh && channelCache.has(cacheKey)) {
     const entry = channelCache.get(cacheKey);
     if (Date.now() - entry.time < CACHE_TTL_MS && entry.data && entry.data.videos && entry.data.videos.length > 0) {
-      return entry.data;
+      fullResult = entry.data;
     }
   }
 
-  const client = await getClient();
-  const entity = await resolveChannelEntity(client, channelId);
+  if (!fullResult) {
+    const client = await getClient();
+    const entity = await resolveChannelEntity(client, channelId);
 
-  const channelTitle = entity.title || entity.username || channelId;
+    const channelTitle = entity.title || entity.username || channelId;
 
-  // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
-  const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
+    // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
+    const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
 
-  // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
-  const messages = await client.getMessages(entity, {
-    limit: targetLimit,
-    waitTime: 0.05,
-  });
-
-  const videos = [];
-
-  for (const msg of messages) {
-    if (!msg.media) continue;
-
-    const media = msg.media;
-    let document = null;
-
-    if (media.document) {
-      document = media.document;
-    }
-
-    if (!document) continue;
-
-    // Check if video by mimeType or extension
-    const mimeType = document.mimeType || '';
-    let fileName = '';
-    let duration = 0;
-    let width = 0;
-    let height = 0;
-    let isVideo = mimeType.startsWith('video/');
-
-    if (document.attributes) {
-      for (const attr of document.attributes) {
-        if (attr.className === 'DocumentAttributeFilename') {
-          fileName = attr.fileName || '';
-        }
-        if (attr.className === 'DocumentAttributeVideo') {
-          isVideo = true;
-          duration = attr.duration || 0;
-          width = attr.w || 0;
-          height = attr.h || 0;
-        }
-      }
-    }
-
-    // Check file extension
-    const lowerName = fileName.toLowerCase();
-    if (!isVideo) {
-      if (
-        lowerName.endsWith('.mp4') ||
-        lowerName.endsWith('.mkv') ||
-        lowerName.endsWith('.webm') ||
-        lowerName.endsWith('.avi') ||
-        lowerName.endsWith('.ts') ||
-        lowerName.endsWith('.mov') ||
-        lowerName.endsWith('.m4v') ||
-        lowerName.endsWith('.flv') ||
-        lowerName.endsWith('.wmv') ||
-        lowerName.endsWith('.3gp')
-      ) {
-        isVideo = true;
-      }
-    }
-
-    if (!isVideo) continue;
-
-    // Use message caption or file name as movie title
-    let title = (msg.message || '').split('\n')[0].trim();
-    if (!title || title.length > 120 || title.startsWith('http')) {
-      title = fileName || 'Video';
-    }
-
-    const size = parseInt(document.size || 0, 10);
-    const hasThumb = !!(document.thumbs && document.thumbs.length > 0);
-
-    videos.push({
-      id: msg.id,
-      channelId,
-      title,
-      fileName,
-      caption: msg.message || '',
-      size,
-      formattedSize: formatBytes(size),
-      duration,
-      formattedDuration: formatDuration(duration),
-      width,
-      height,
-      mimeType: mimeType || 'video/mp4',
-      thumbnailUrl: hasThumb ? `/api/telegram/thumb/${encodeURIComponent(channelId)}/${msg.id}` : null,
-      date: msg.date ? msg.date * 1000 : Date.now(),
+    // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
+    const messages = await client.getMessages(entity, {
+      limit: targetLimit,
+      waitTime: 0.05,
     });
+
+    const videos = [];
+
+    for (const msg of messages) {
+      if (!msg.media) continue;
+
+      const media = msg.media;
+      let document = null;
+
+      if (media.document) {
+        document = media.document;
+      }
+
+      if (!document) continue;
+
+      // Check if video by mimeType or extension
+      const mimeType = document.mimeType || '';
+      let fileName = '';
+      let duration = 0;
+      let width = 0;
+      let height = 0;
+      let isVideo = mimeType.startsWith('video/');
+
+      if (document.attributes) {
+        for (const attr of document.attributes) {
+          if (attr.className === 'DocumentAttributeFilename') {
+            fileName = attr.fileName || '';
+          }
+          if (attr.className === 'DocumentAttributeVideo') {
+            isVideo = true;
+            duration = attr.duration || 0;
+            width = attr.w || 0;
+            height = attr.h || 0;
+          }
+        }
+      }
+
+      // Check file extension
+      const lowerName = fileName.toLowerCase();
+      if (!isVideo) {
+        if (
+          lowerName.endsWith('.mp4') ||
+          lowerName.endsWith('.mkv') ||
+          lowerName.endsWith('.webm') ||
+          lowerName.endsWith('.avi') ||
+          lowerName.endsWith('.ts') ||
+          lowerName.endsWith('.mov') ||
+          lowerName.endsWith('.m4v') ||
+          lowerName.endsWith('.flv') ||
+          lowerName.endsWith('.wmv') ||
+          lowerName.endsWith('.3gp')
+        ) {
+          isVideo = true;
+        }
+      }
+
+      if (!isVideo) continue;
+
+      // Use message caption or file name as movie title
+      let title = (msg.message || '').split('\n')[0].trim();
+      if (!title || title.length > 120 || title.startsWith('http')) {
+        title = fileName || 'Video';
+      }
+
+      const size = parseInt(document.size || 0, 10);
+      const hasThumb = !!(document.thumbs && document.thumbs.length > 0);
+
+      videos.push({
+        id: msg.id,
+        channelId,
+        title,
+        fileName,
+        caption: msg.message || '',
+        size,
+        formattedSize: formatBytes(size),
+        duration,
+        formattedDuration: formatDuration(duration),
+        width,
+        height,
+        mimeType: mimeType || 'video/mp4',
+        thumbnailUrl: hasThumb ? `/api/telegram/thumb/${encodeURIComponent(channelId)}/${msg.id}` : null,
+        date: msg.date ? msg.date * 1000 : Date.now(),
+      });
+    }
+
+    fullResult = {
+      channelId,
+      channelTitle,
+      videos,
+      total: videos.length,
+      timestamp: Date.now(),
+    };
+
+    channelCache.set(cacheKey, { time: Date.now(), data: fullResult });
+    saveDiskCache();
+
+    // Also sync source lastCount in config
+    try {
+      const cfg = loadConfig();
+      const src = (cfg.sources || []).find((s) => s.channelId === channelId);
+      if (src) {
+        src.lastCount = videos.length;
+        if (channelTitle && (!src.name || src.name === channelId)) {
+          src.name = channelTitle;
+        }
+        saveConfig(cfg);
+      }
+    } catch (_) {}
   }
 
-  const result = {
-    channelId,
-    channelTitle,
-    videos,
-    total: videos.length,
-    timestamp: Date.now(),
+  // Filter by search if provided
+  let filteredVideos = fullResult.videos || [];
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    filteredVideos = filteredVideos.filter(
+      (v) =>
+        (v.title && v.title.toLowerCase().includes(q)) ||
+        (v.fileName && v.fileName.toLowerCase().includes(q)) ||
+        (v.caption && v.caption.toLowerCase().includes(q))
+    );
+  }
+
+  // Return paginated slice if page is requested
+  if (page !== null && page !== undefined && page !== '') {
+    const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+    const size = Math.max(parseInt(pageSize, 10) || 50, 1);
+    const total = filteredVideos.length;
+    const totalPages = Math.ceil(total / size);
+    const start = (pageNum - 1) * size;
+    const pagedVideos = filteredVideos.slice(start, start + size);
+
+    return {
+      channelId: fullResult.channelId,
+      channelTitle: fullResult.channelTitle,
+      videos: pagedVideos,
+      total,
+      page: pageNum,
+      pageSize: size,
+      totalPages,
+      hasMore: start + size < total,
+      timestamp: fullResult.timestamp,
+    };
+  }
+
+  return {
+    channelId: fullResult.channelId,
+    channelTitle: fullResult.channelTitle,
+    videos: filteredVideos,
+    total: filteredVideos.length,
+    timestamp: fullResult.timestamp,
   };
-
-  channelCache.set(cacheKey, { time: Date.now(), data: result });
-  saveDiskCache();
-
-  // Also sync source lastCount in config
-  try {
-    const cfg = loadConfig();
-    const src = (cfg.sources || []).find((s) => s.channelId === channelId);
-    if (src) {
-      src.lastCount = videos.length;
-      if (channelTitle && (!src.name || src.name === channelId)) {
-        src.name = channelTitle;
-      }
-      saveConfig(cfg);
-    }
-  } catch (_) {}
-
-  return result;
 }
 
 // =========================================================================

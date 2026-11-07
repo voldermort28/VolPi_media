@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
@@ -32,20 +33,61 @@ class TelegramScreenState extends State<TelegramScreen> {
   final FocusNode _sourceButtonFocusNode = FocusNode(debugLabel: 'TelegramSourceButton');
   final FocusNode _firstCardFocusNode = FocusNode(debugLabel: 'TelegramFirstCard');
 
+  // Smooth pagination / lazy load on scroll
+  final ScrollController _scrollController = ScrollController();
+  static const int _pageSize = 40;
+  int _displayLimit = _pageSize;
+  bool _isLoadingMore = false;
+
   FocusNode get firstCardFocusNode => _firstCardFocusNode;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadSources();
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _sourceButtonFocusNode.dispose();
     _firstCardFocusNode.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+      _loadMoreVideos();
+    }
+  }
+
+  void _loadMoreVideos() {
+    final filtered = _getFilteredVideos();
+    if (!_isLoadingMore && _displayLimit < filtered.length) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (!mounted) return;
+        setState(() {
+          _displayLimit = math.min(_displayLimit + _pageSize, filtered.length);
+          _isLoadingMore = false;
+        });
+      });
+    }
+  }
+
+  List<TelegramVideoModel> _getFilteredVideos() {
+    if (_searchQuery.isEmpty) return _videos;
+    return _videos.where((v) {
+      return v.title.toLowerCase().contains(_searchQuery) ||
+          v.fileName.toLowerCase().contains(_searchQuery) ||
+          v.caption.toLowerCase().contains(_searchQuery);
+    }).toList();
   }
 
   Future<void> refresh() async {
@@ -95,7 +137,11 @@ class TelegramScreenState extends State<TelegramScreen> {
       _selectedSource = source;
       _searchQuery = '';
       _searchController.clear();
+      _displayLimit = _pageSize;
     });
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
     _loadVideos(source.channelId, forceRefresh: forceRefresh);
   }
 
@@ -104,6 +150,7 @@ class TelegramScreenState extends State<TelegramScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _displayLimit = _pageSize;
     });
 
     try {
@@ -344,7 +391,11 @@ class TelegramScreenState extends State<TelegramScreen> {
                       onChanged: (val) {
                         setState(() {
                           _searchQuery = val.trim().toLowerCase();
+                          _displayLimit = _pageSize;
                         });
+                        if (_scrollController.hasClients) {
+                          _scrollController.jumpTo(0);
+                        }
                       },
                     ),
                   ),
@@ -354,7 +405,11 @@ class TelegramScreenState extends State<TelegramScreen> {
                         setState(() {
                           _searchQuery = '';
                           _searchController.clear();
+                          _displayLimit = _pageSize;
                         });
+                        if (_scrollController.hasClients) {
+                          _scrollController.jumpTo(0);
+                        }
                       },
                       child: const Icon(Icons.close_rounded, color: Colors.white54, size: 16),
                     ),
@@ -461,12 +516,7 @@ class TelegramScreenState extends State<TelegramScreen> {
       );
     }
 
-    final filteredVideos = _videos.where((v) {
-      if (_searchQuery.isEmpty) return true;
-      return v.title.toLowerCase().contains(_searchQuery) ||
-          v.fileName.toLowerCase().contains(_searchQuery) ||
-          v.caption.toLowerCase().contains(_searchQuery);
-    }).toList();
+    final filteredVideos = _getFilteredVideos();
 
     if (filteredVideos.isEmpty) {
       return Center(
@@ -477,21 +527,79 @@ class TelegramScreenState extends State<TelegramScreen> {
       );
     }
 
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 200,
-        childAspectRatio: 0.82,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-      ),
-      itemCount: filteredVideos.length,
-      itemBuilder: (ctx, index) {
-        final video = filteredVideos[index];
-        final isFirst = index == 0;
-        return _buildMovieCard(video, isFirst: isFirst);
-      },
+    final displayedCount = math.min(_displayLimit, filteredVideos.length);
+    final displayedVideos = filteredVideos.sublist(0, displayedCount);
+
+    return CustomScrollView(
+      controller: _scrollController,
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 200,
+              childAspectRatio: 0.82,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (ctx, index) {
+                final video = displayedVideos[index];
+                final isFirst = index == 0;
+                // Proactively trigger next page as user nears the bottom of the current batch
+                if (index >= displayedCount - 6) {
+                  _loadMoreVideos();
+                }
+                return _buildMovieCard(video, isFirst: isFirst);
+              },
+              childCount: displayedCount,
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: _buildPaginationFooter(displayedCount, filteredVideos.length),
+        ),
+      ],
     );
+  }
+
+  Widget _buildPaginationFooter(int displayed, int total) {
+    if (displayed < total) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF38BDF8)),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'Cuộn xuống để tải thêm... (Đang hiển thị $displayed / $total video)',
+                style: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (total > _pageSize) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            '✓ Đã hiển thị toàn bộ $total video trong kênh',
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox(height: 16);
   }
 
   Widget _buildMovieCard(TelegramVideoModel video, {bool isFirst = false}) {

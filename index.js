@@ -776,7 +776,16 @@ app.get("/api/telegram/channels/:channelId/videos", async (req, res) => {
   try {
     const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
     const limit = req.query.limit ? Math.max(parseInt(req.query.limit, 10), 2500) : 2500;
-    const data = await telegramService.getChannelVideos(req.params.channelId, { forceRefresh, limit });
+    const page = req.query.page;
+    const pageSize = req.query.pageSize;
+    const search = req.query.search || req.query.q || "";
+    const data = await telegramService.getChannelVideos(req.params.channelId, {
+      forceRefresh,
+      limit,
+      page,
+      pageSize,
+      search,
+    });
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: err.message });
