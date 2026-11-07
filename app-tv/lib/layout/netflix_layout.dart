@@ -5,6 +5,8 @@ import '../api/api_service.dart';
 import '../models/update_model.dart';
 import '../screens/football_screen.dart';
 import '../screens/iptv_screen.dart';
+import '../screens/gdrive_screen.dart';
+import '../screens/telegram_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
 import '../screens/secret_movie_screen.dart';
@@ -27,7 +29,7 @@ class NetflixLayout extends StatefulWidget {
 
 class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Socolive, 3: Anime, 4: IPTV
+  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Socolive, 3: Anime, 4: IPTV, 5: Google Drive, 6: Telegram
 
   // Tab GlobalKeys to trigger reloads from Header bar
   final GlobalKey<NetflixHomeScreenState> _homeKey = GlobalKey<NetflixHomeScreenState>();
@@ -35,11 +37,13 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<FootballScreenState> _socoliveKey = GlobalKey<FootballScreenState>();
   final GlobalKey<NetflixAnimeScreenState> _animeKey = GlobalKey<NetflixAnimeScreenState>();
   final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
+  final GlobalKey<GDriveScreenState> _gdriveKey = GlobalKey<GDriveScreenState>();
+  final GlobalKey<TelegramScreenState> _telegramKey = GlobalKey<TelegramScreenState>();
 
   bool _isRefreshingHeader = false;
 
-  // TV Remote navigation FocusNodes for sidebar (5 tabs + Refresh + Update + V1 switch + Profile = 9)
-  final List<FocusNode> _sidebarFocusNodes = List.generate(9, (_) => FocusNode());
+  // TV Remote navigation FocusNodes for sidebar (7 tabs + Refresh + Update + V1 switch + Profile = 11)
+  final List<FocusNode> _sidebarFocusNodes = List.generate(11, (_) => FocusNode());
   final FocusScopeNode _contentFocusScopeNode = FocusScopeNode();
   final Map<int, FocusNode> _lastContentFocusPerTab = {};
 
@@ -206,6 +210,28 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           }
         }
         break;
+
+      case 5: // Google Drive: Thẻ đầu tiên trong thư mục
+        final gdriveState = _gdriveKey.currentState;
+        if (gdriveState != null && gdriveState.mounted) {
+          final firstNode = gdriveState.firstCardFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
+
+      case 6: // Telegram: Phim đầu tiên trong kênh
+        final tgState = _telegramKey.currentState;
+        if (tgState != null && tgState.mounted) {
+          final firstNode = tgState.firstCardFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
     }
 
     // 3. Fallback: Thẻ hiển thị trên cùng - bên trái nhất của vùng nội dung nhìn thấy
@@ -264,6 +290,12 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           break;
         case 4:
           await _iptvKey.currentState?.refresh();
+          break;
+        case 5:
+          await _gdriveKey.currentState?.refresh();
+          break;
+        case 6:
+          await _telegramKey.currentState?.refresh();
           break;
       }
       if (mounted) {
@@ -476,6 +508,26 @@ class _NetflixLayoutState extends State<NetflixLayout> {
             isActive: _currentTabIndex == 4,
           ),
         ),
+
+        // Tab 5: Google Drive
+        ExcludeFocus(
+          excluding: _currentTabIndex != 5,
+          child: GDriveScreen(
+            key: _gdriveKey,
+            apiService: widget.apiService,
+            isActive: _currentTabIndex == 5,
+          ),
+        ),
+
+        // Tab 6: Telegram Phim
+        ExcludeFocus(
+          excluding: _currentTabIndex != 6,
+          child: TelegramScreen(
+            key: _telegramKey,
+            apiService: widget.apiService,
+            isActive: _currentTabIndex == 6,
+          ),
+        ),
       ],
     );
   }
@@ -490,6 +542,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       'Socolive TV',
       'Anime & Phim',
       'Truyền Hình (IPTV)',
+      'Google Drive',
+      'Telegram Phim',
     ];
     final currentTitle = _currentTabIndex < titles.length ? titles[_currentTabIndex] : 'VolPi Media';
 
@@ -590,6 +644,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       {'icon': Icons.sports_rounded, 'label': 'Socolive TV'},
       {'icon': Icons.auto_awesome_rounded, 'label': 'Anime & Phim'},
       {'icon': Icons.live_tv_rounded, 'label': 'Truyền Hình (IPTV)'},
+      {'icon': Icons.cloud_circle_rounded, 'label': 'Google Drive'},
+      {'icon': Icons.send_rounded, 'label': 'Telegram Phim'},
     ];
 
     return Drawer(

@@ -5,6 +5,8 @@ export '../models/match_model.dart';
 import '../models/anime_model.dart';
 import '../models/movie_model.dart';
 import '../models/iptv_channel_model.dart';
+import '../models/gdrive_model.dart';
+import '../models/telegram_model.dart';
 
 class ApiService {
   static const String defaultHost = 'https://stremio.laboon.vn';
@@ -425,6 +427,113 @@ class ApiService {
     } catch (_) {
       return false;
     }
+  }
+
+  // =========================================================================
+  // 5. GOOGLE DRIVE (PUBLIC & PRIVATE FOLDERS)
+  // =========================================================================
+
+  /// Fetch all configured Google Drive sources from server
+  Future<List<GDriveSourceModel>> getGDriveSources({bool forceRefresh = false}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final url = forceRefresh ? '$baseUrl/api/gdrive/sources?_t=$timestamp' : '$baseUrl/api/gdrive/sources';
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is List) {
+          return data
+              .where((item) => item is Map<String, dynamic> || item is Map)
+              .map<GDriveSourceModel>((item) => GDriveSourceModel.fromJson(Map<String, dynamic>.from(item as Map)))
+              .where((s) => s.enabled)
+              .toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetch folder contents (subfolders + video files)
+  Future<GDriveFolderContentResult?> getGDriveFolderContents(String folderId, {bool forceRefresh = false}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final url = forceRefresh
+        ? '$baseUrl/api/gdrive/folders/$folderId?forceRefresh=true&_t=$timestamp'
+        : '$baseUrl/api/gdrive/folders/$folderId';
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is Map<String, dynamic> || data is Map) {
+          return GDriveFolderContentResult.fromJson(Map<String, dynamic>.from(data as Map));
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get direct stream URL with Range (HTTP 206) proxy support
+  String getGDriveStreamUrl(String fileId) {
+    return '$baseUrl/api/gdrive/stream/$fileId';
+  }
+
+  /// Get subtitle URL
+  String getGDriveSubtitleUrl(String subtitleFileId) {
+    return '$baseUrl/api/gdrive/subtitle/$subtitleFileId';
+  }
+
+  // =========================================================================
+  // 6. TELEGRAM CHANNELS & VIDEOS
+  // =========================================================================
+
+  /// Fetch all configured Telegram sources from server
+  Future<List<TelegramSourceModel>> getTelegramSources({bool forceRefresh = false}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final url = forceRefresh ? '$baseUrl/api/telegram/sources?_t=$timestamp' : '$baseUrl/api/telegram/sources';
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is List) {
+          return data
+              .where((item) => item is Map<String, dynamic> || item is Map)
+              .map<TelegramSourceModel>((item) => TelegramSourceModel.fromJson(Map<String, dynamic>.from(item as Map)))
+              .where((s) => s.enabled)
+              .toList();
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  /// Fetch video messages from a Telegram channel
+  Future<TelegramChannelVideosResult?> getTelegramVideos(String channelId, {bool forceRefresh = false, int limit = 100}) async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final encodedId = Uri.encodeComponent(channelId);
+    final url = forceRefresh
+        ? '$baseUrl/api/telegram/channels/$encodedId/videos?forceRefresh=true&limit=$limit&_t=$timestamp'
+        : '$baseUrl/api/telegram/channels/$encodedId/videos?limit=$limit';
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data is Map<String, dynamic> || data is Map) {
+          return TelegramChannelVideosResult.fromJson(Map<String, dynamic>.from(data as Map));
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Get direct video stream URL with Range (HTTP 206) MTProto chunk proxy
+  String getTelegramStreamUrl(String channelId, int messageId) {
+    final encodedId = Uri.encodeComponent(channelId);
+    return '$baseUrl/api/telegram/stream/$encodedId/$messageId';
+  }
+
+  /// Get video thumbnail URL from Telegram
+  String getTelegramThumbUrl(String channelId, int messageId) {
+    final encodedId = Uri.encodeComponent(channelId);
+    return '$baseUrl/api/telegram/thumb/$encodedId/$messageId';
   }
 }
 

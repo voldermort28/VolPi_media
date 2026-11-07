@@ -22,6 +22,8 @@ const socoliveScraper = require("./scrapers/socolive");
 const yumeiScraper = require("./scrapers/yumei");
 const iptvService = require("./services/iptvService");
 const authService = require("./services/authService");
+const gdriveService = require("./services/gdriveService");
+const telegramService = require("./services/telegramService");
 
 const app = express();
 const PORT = process.env.PORT || 7000;
@@ -57,6 +59,16 @@ app.get(["/login", "/login.html"], (req, res) => {
 // Serve Dedicated IPTV Portal Page (Protected)
 app.get(["/iptv", "/iptv.html"], authService.requireAuth, (req, res) => {
   return res.sendFile(path.join(__dirname, "public", "iptv.html"));
+});
+
+// Serve Dedicated Google Drive Management Page (Protected)
+app.get(["/gdrive", "/gdrive.html"], authService.requireAuth, (req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "gdrive.html"));
+});
+
+// Serve Dedicated Telegram Management Page (Protected)
+app.get(["/telegram", "/telegram.html"], authService.requireAuth, (req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "telegram.html"));
 });
 
 // Serve Main Web Dashboard (Protected)
@@ -554,6 +566,210 @@ app.post("/api/iptv/refresh", authService.requireAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// =========================================================================
+// GOOGLE DRIVE API ENDPOINTS
+// =========================================================================
+
+app.get("/api/gdrive/auth/status", (req, res) => {
+  res.json(gdriveService.getOAuthStatus());
+});
+
+app.post("/api/gdrive/auth/credentials", authService.requireAuth, (req, res) => {
+  const { clientId, clientSecret } = req.body;
+  res.json(gdriveService.setOAuthCredentials(clientId, clientSecret));
+});
+
+app.get("/api/gdrive/auth/url", authService.requireAuth, (req, res) => {
+  try {
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/gdrive/auth/callback`;
+    const url = gdriveService.getOAuthUrl(redirectUri);
+    res.json({ url });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get("/api/gdrive/auth/callback", async (req, res) => {
+  const code = req.query.code;
+  if (!code) return res.redirect("/gdrive?error=no_code");
+  try {
+    const redirectUri = `${req.protocol}://${req.get("host")}/api/gdrive/auth/callback`;
+    await gdriveService.handleOAuthCallback(code, redirectUri);
+    res.redirect("/gdrive?success=connected");
+  } catch (err) {
+    console.error("OAuth callback error:", err.message);
+    res.redirect(`/gdrive?error=${encodeURIComponent(err.message)}`);
+  }
+});
+
+app.post("/api/gdrive/auth/disconnect", authService.requireAuth, (req, res) => {
+  res.json(gdriveService.disconnectOAuth());
+});
+
+app.get("/api/gdrive/sources", async (req, res) => {
+  try {
+    const sources = await gdriveService.getSources();
+    res.json(sources);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/gdrive/sources/add", authService.requireAuth, async (req, res) => {
+  try {
+    const result = await gdriveService.addSource(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/gdrive/sources/delete", authService.requireAuth, (req, res) => {
+  try {
+    const { id } = req.body;
+    const result = gdriveService.deleteSource(id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/gdrive/sources/toggle", authService.requireAuth, (req, res) => {
+  try {
+    const { id, enabled } = req.body;
+    const result = gdriveService.toggleSource(id, enabled);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/gdrive/folders/:folderId", async (req, res) => {
+  try {
+    const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
+    const data = await gdriveService.getFolderContents(req.params.folderId, { forceRefresh });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/gdrive/stream/:fileId", (req, res) => {
+  gdriveService.streamVideo(req.params.fileId, req, res);
+});
+
+app.get("/api/gdrive/subtitle/:fileId", (req, res) => {
+  gdriveService.streamSubtitle(req.params.fileId, res);
+});
+
+// =========================================================================
+// TELEGRAM CHANNELS & VIDEO STREAMING API
+// =========================================================================
+
+app.get("/api/telegram/auth/status", async (req, res) => {
+  try {
+    const status = await telegramService.getAuthStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/telegram/auth/send-code", authService.requireAuth, async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    const result = await telegramService.sendPhoneCode(phoneNumber);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/auth/sign-in", authService.requireAuth, async (req, res) => {
+  try {
+    const result = await telegramService.signInWithPhoneCode(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/auth/bot", authService.requireAuth, async (req, res) => {
+  try {
+    const { botToken } = req.body;
+    const result = await telegramService.signInWithBot(botToken);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/auth/disconnect", authService.requireAuth, async (req, res) => {
+  try {
+    const result = await telegramService.disconnect();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/telegram/sources", async (req, res) => {
+  try {
+    const sources = await telegramService.getSources();
+    res.json(sources);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/telegram/sources/add", authService.requireAuth, async (req, res) => {
+  try {
+    const result = await telegramService.addSource(req.body);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/sources/delete", authService.requireAuth, (req, res) => {
+  try {
+    const { id } = req.body;
+    const result = telegramService.deleteSource(id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post("/api/telegram/sources/toggle", authService.requireAuth, (req, res) => {
+  try {
+    const { id, enabled } = req.body;
+    const result = telegramService.toggleSource(id, enabled);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/telegram/channels/:channelId/videos", async (req, res) => {
+  try {
+    const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
+    const limit = req.query.limit || 100;
+    const data = await telegramService.getChannelVideos(req.params.channelId, { forceRefresh, limit });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get("/api/telegram/stream/:channelId/:messageId", (req, res) => {
+  telegramService.streamMedia(req.params.channelId, req.params.messageId, req, res);
+});
+
+app.get("/api/telegram/thumb/:channelId/:messageId", (req, res) => {
+  telegramService.streamThumbnail(req.params.channelId, req.params.messageId, res);
 });
 
 app.get("/api/config", (req, res) => {

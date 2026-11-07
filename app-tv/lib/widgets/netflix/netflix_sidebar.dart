@@ -54,49 +54,57 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
       'icon': Icons.live_tv_rounded,
       'label': 'Truyền Hình (IPTV)',
     },
+    {
+      'icon': Icons.cloud_circle_rounded,
+      'label': 'Google Drive',
+    },
+    {
+      'icon': Icons.send_rounded,
+      'label': 'Telegram Phim',
+    },
   ];
 
   KeyEventResult _handleSidebarItemKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      if (index < 4) {
+      if (index < 6) {
         widget.focusNodes?[index + 1].requestFocus();
         return KeyEventResult.handled;
-      } else if (index == 4) {
-        // Move from IPTV (4) to Làm mới (5)
-        widget.focusNodes?[5].requestFocus();
-        return KeyEventResult.handled;
-      } else if (index == 5) {
-        // Move from Làm mới (5) to Cập nhật (6)
-        widget.focusNodes?[6].requestFocus();
-        return KeyEventResult.handled;
       } else if (index == 6) {
-        // Move from Cập nhật (6) to Profile (8)
+        // Move from Telegram (6) to Làm mới (7)
+        widget.focusNodes?[7].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 7) {
+        // Move from Làm mới (7) to Cập nhật (8)
         widget.focusNodes?[8].requestFocus();
         return KeyEventResult.handled;
-      } else if (index >= 8) {
+      } else if (index == 8) {
+        // Move from Cập nhật (8) to Profile (10)
+        widget.focusNodes?[10].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index >= 10) {
         // Reached bottom of sidebar
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      if (index > 0 && index <= 4) {
+      if (index > 0 && index <= 6) {
         widget.focusNodes?[index - 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 0) {
         // Reached top of sidebar
         return KeyEventResult.handled;
-      } else if (index == 5) {
-        // Move from Làm mới (5) up to IPTV (4)
-        widget.focusNodes?[4].requestFocus();
-        return KeyEventResult.handled;
-      } else if (index == 6) {
-        // Move from Cập nhật (6) up to Làm mới (5)
-        widget.focusNodes?[5].requestFocus();
+      } else if (index == 7) {
+        // Move from Làm mới (7) up to Telegram (6)
+        widget.focusNodes?[6].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 8) {
-        // Move from Profile (8) up to Cập nhật (6)
-        widget.focusNodes?[6].requestFocus();
+        // Move from Cập nhật (8) up to Làm mới (7)
+        widget.focusNodes?[7].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 10) {
+        // Move from Profile (10) up to Cập nhật (8)
+        widget.focusNodes?[8].requestFocus();
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -316,10 +324,10 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                     children: [
                       // 1. Làm mới dữ liệu
                       Focus(
-                        onKeyEvent: (node, event) => _handleSidebarItemKey(5, event),
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(7, event),
                         child: TvFocusableCard(
-                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 5)
-                              ? widget.focusNodes![5]
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 7)
+                              ? widget.focusNodes![7]
                               : null,
                           onTap: widget.onRefresh ?? () {},
                           borderRadius: BorderRadius.circular(8),
@@ -374,10 +382,10 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
 
                       // 2. Cập nhật ứng dụng
                       Focus(
-                        onKeyEvent: (node, event) => _handleSidebarItemKey(6, event),
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(8, event),
                         child: TvFocusableCard(
-                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 6)
-                              ? widget.focusNodes![6]
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 8)
+                              ? widget.focusNodes![8]
                               : null,
                           onTap: widget.onCheckUpdate ?? () {},
                           borderRadius: BorderRadius.circular(8),
@@ -423,10 +431,10 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
 
                       // 4. Profile / Secret
                       Focus(
-                        onKeyEvent: (node, event) => _handleSidebarItemKey(8, event),
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(10, event),
                         child: TvFocusableCard(
-                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 8)
-                              ? widget.focusNodes![8]
+                          focusNode: (widget.focusNodes != null && widget.focusNodes!.length > 10)
+                              ? widget.focusNodes![10]
                               : null,
                           onTap: widget.onProfilePressed,
                           borderRadius: BorderRadius.circular(8),

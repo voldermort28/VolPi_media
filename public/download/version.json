@@ -1,10 +1,10 @@
 {
-  "version": "2.2.19",
-  "build": 85,
-  "tag_name": "v2.2.19",
-  "changelog": "• VolPi Media v2.2.19:\n- Thêm nút 'Tập tiếp theo' trực tiếp trong bảng Tiếp tục xem phim (Resume dialog) cho phim nhiều tập/series.\n- Tạm thời ẩn nút Bỏ qua Intro (+85s) trong trình phát video.\n- Bổ sung cử chỉ Double Tap 2 nửa màn hình (trái lui 10s, phải tiến 10s) trên iOS (iPhone/iPad) chuẩn YouTube kèm hiệu ứng vòng sóng tích luỹ giây.\n- Ẩn nút Chuyển về Giao diện Cũ (V1) trên thanh Sidebar và Mobile Drawer.",
+  "version": "2.2.22",
+  "build": 88,
+  "tag_name": "v2.2.22",
+  "changelog": "• VolPi Media v2.2.22:\n- Tối ưu quét toàn bộ thư mục con (Recursive Subfolder Crawl) cho Google Drive: Tự động thu thập toàn bộ video trong các thư mục lồng nhau nhiều cấp độ.\n- Cập nhật giao diện Web (/gdrive) và App TV: Hiển thị thống kê tổng số video kèm thẻ tên thư mục con (📁 folderPath) cho từng phim.\n- Tự động ghép phụ đề .srt/.vtt theo từng thư mục con tương ứng.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-08T00:38:00Z"
+  "published_at": "2026-11-08T01:53:00Z"
 }
