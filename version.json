@@ -1,10 +1,10 @@
 {
-  "version": "2.2.22",
-  "build": 88,
-  "tag_name": "v2.2.22",
-  "changelog": "• VolPi Media v2.2.22:\n- Tối ưu quét toàn bộ thư mục con (Recursive Subfolder Crawl) cho Google Drive: Tự động thu thập toàn bộ video trong các thư mục lồng nhau nhiều cấp độ.\n- Cập nhật giao diện Web (/gdrive) và App TV: Hiển thị thống kê tổng số video kèm thẻ tên thư mục con (📁 folderPath) cho từng phim.\n- Tự động ghép phụ đề .srt/.vtt theo từng thư mục con tương ứng.",
+  "version": "2.2.23",
+  "build": 89,
+  "tag_name": "v2.2.23",
+  "changelog": "• VolPi Media v2.2.23:\n- Sửa lỗi giải mã dữ liệu Google Drive Public Web: Đã quét và gom trọn vẹn 201+ video trong toàn bộ các thư mục con.\n- Tối ưu crawler song song 10 thư mục đồng thời, tốc độ quét toàn bộ kho phim chỉ còn ~8 giây.\n- Tăng thời gian chờ tải dữ liệu lên 30 giây để xử lý các kho phim đồ sộ mượt mà.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-08T01:53:00Z"
+  "published_at": "2026-11-08T02:12:00Z"
 }

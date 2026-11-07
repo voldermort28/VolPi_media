@@ -460,7 +460,7 @@ class ApiService {
         ? '$baseUrl/api/gdrive/folders/$folderId?forceRefresh=true&_t=$timestamp'
         : '$baseUrl/api/gdrive/folders/$folderId';
     try {
-      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is Map<String, dynamic> || data is Map) {
@@ -513,7 +513,7 @@ class ApiService {
         ? '$baseUrl/api/telegram/channels/$encodedId/videos?forceRefresh=true&limit=$limit&_t=$timestamp'
         : '$baseUrl/api/telegram/channels/$encodedId/videos?limit=$limit';
     try {
-      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 30));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is Map<String, dynamic> || data is Map) {

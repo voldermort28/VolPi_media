@@ -389,62 +389,107 @@ async function fetchViaApi(folderId, accessToken) {
  */
 async function fetchViaPublicWeb(folderId) {
   const url = `https://drive.google.com/drive/folders/${folderId}`;
-  const res = await axios.get(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-    },
-    timeout: 15000,
-  });
+  try {
+    const res = await axios.get(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+      },
+      timeout: 10000,
+    });
 
-  const html = res.data;
-  const files = [];
+    const html = res.data;
+    const files = [];
 
-  // Match _DRIVE_ivd data or embedded JSON arrays in script tags
-  // Pattern: window['_DRIVE_ivd'] = '...'; or ["id", ...
-  const match = html.match(/window\['_DRIVE_ivd'\]\s*=\s*'([^']+)'/);
-  if (match && match[1]) {
-    try {
-      const decoded = decodeURIComponent(JSON.parse(`"${match[1]}"`));
-      const parsed = JSON.parse(decoded);
-      // Items are usually in parsed[0]
-      if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
-        for (const item of parsed[0]) {
-          if (Array.isArray(item) && item[0]) {
-            const id = item[0];
-            const name = item[2] || 'Tập tin';
-            const mimeType = item[3] || '';
-            const size = item[10] || 0;
-            files.push({
-              id,
-              name,
-              mimeType,
-              size,
-              thumbnailLink: item[4] || null,
-            });
+    // Match _DRIVE_ivd data or embedded JSON arrays in script tags
+    // Pattern: window['_DRIVE_ivd'] = '...';
+    const match = html.match(/window\['_DRIVE_ivd'\]\s*=\s*'([^']+)'/);
+    if (match && match[1]) {
+      try {
+        const jsonCompat = match[1].replace(/\\x([0-9a-fA-F]{2})/g, '\\u00$1');
+        const decoded = JSON.parse(`"${jsonCompat}"`);
+        const parsed = JSON.parse(decoded);
+        if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
+          for (const item of parsed[0]) {
+            if (Array.isArray(item) && item[0]) {
+              const id = item[0];
+              const name = item[2] || 'Tập tin';
+              const mimeType = item[3] || '';
+              const size = item[13] || item[27] || item[10] || 0;
+              files.push({
+                id,
+                name,
+                mimeType,
+                size: typeof size === 'number' ? size : 0,
+                thumbnailLink: `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+              });
+            }
           }
         }
+      } catch (err) {
+        console.error('[GDriveService] Error decoding _DRIVE_ivd:', err.message);
       }
-    } catch (_) {}
-  }
-
-  // Alternative fallback pattern: search for standard file entries in HTML
-  if (files.length === 0) {
-    const fileIdRegex = /data-id="([a-zA-Z0-9_-]{20,})"[^>]*data-target="file"/g;
-    let m;
-    while ((m = fileIdRegex.exec(html)) !== null) {
-      files.push({
-        id: m[1],
-        name: 'Video',
-        mimeType: 'video/mp4',
-        size: 0,
-      });
     }
-  }
 
-  return files;
+    // Fallback: match AF_initDataCallback for newer Google Drive web layouts
+    if (files.length === 0) {
+      const regex = /AF_initDataCallback\s*\(\s*\{[^}]*?data\s*:\s*([\s\S]*?)\s*,\s*sideChannel:/g;
+      let m;
+      while ((m = regex.exec(html)) !== null) {
+        try {
+          const parsed = JSON.parse(m[1].trim());
+          const walk = (node) => {
+            if (!Array.isArray(node)) return;
+            if (node.length >= 5 && Array.isArray(node[0]) && typeof node[0][1] === 'string' && node[0][1].length > 20) {
+              const id = node[0][1];
+              const mimeType = typeof node[4] === 'string' ? node[4] : '';
+              let name = 'Tập tin';
+              const nodeStr = JSON.stringify(node);
+              const nameMatch = nodeStr.match(/\[\[\["([^"]+)",null,1\]\]\]/);
+              if (nameMatch) {
+                name = nameMatch[1];
+              }
+              if (id && (mimeType.includes('folder') || mimeType.startsWith('video/') || mimeType.startsWith('audio/'))) {
+                files.push({
+                  id,
+                  name,
+                  mimeType,
+                  size: 0,
+                  thumbnailLink: `https://drive.google.com/thumbnail?id=${id}&sz=w400`,
+                });
+              }
+            }
+            for (const child of node) {
+              walk(child);
+            }
+          };
+          walk(parsed);
+        } catch (_) {}
+      }
+    }
+
+    // Alternative fallback pattern: search for standard file entries in HTML
+    if (files.length === 0) {
+      const fileIdRegex = /data-id="([a-zA-Z0-9_-]{20,})"[^>]*data-target="file"/g;
+      let m;
+      while ((m = fileIdRegex.exec(html)) !== null) {
+        files.push({
+          id: m[1],
+          name: 'Video',
+          mimeType: 'video/mp4',
+          size: 0,
+          thumbnailLink: `https://drive.google.com/thumbnail?id=${m[1]}&sz=w400`,
+        });
+      }
+    }
+
+    return files;
+  } catch (err) {
+    console.error(`[GDriveService] Public web fetch error for ${folderId}:`, err.message);
+    return [];
+  }
 }
 
 /**
@@ -472,7 +517,7 @@ async function fetchFolderItems(folderId, accessToken) {
 /**
  * Get folder contents (recursively scans subfolders up to maxDepth)
  */
-async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 4 } = {}) {
+async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 } = {}) {
   const cleanId = extractFolderId(folderId) || folderId;
   const cacheKey = `folder_rec_${cleanId}`;
 
@@ -497,8 +542,8 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 4 
   const allSubtitles = [];
 
   while (queue.length > 0) {
-    // Process up to 5 folders in parallel
-    const batch = queue.splice(0, 5);
+    // Process up to 10 folders in parallel
+    const batch = queue.splice(0, 10);
     const batchResults = await Promise.all(
       batch.map(async (curr) => {
         if (visited.has(curr.id)) return null;
@@ -534,7 +579,7 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 4 
           }
           allFolders.push(folderObj);
 
-          if (curr.depth < maxDepth && visited.size < 60) {
+          if (curr.depth < maxDepth && visited.size < 100) {
             queue.push({
               id: f.id,
               name: f.name || 'Thư mục con',
