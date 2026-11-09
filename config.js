@@ -6,6 +6,8 @@ const CONFIG_FILE = path.join(__dirname, "config.json");
 const DEFAULT_CONFIG = {
   xoilacBaseUrl: "https://xoilaczzw.cc",
   socoliveBaseUrl: "https://socolive2.top",
+  gavangBaseUrl: "https://gavang1.xyz",
+  veboBaseUrl: "https://vebozbn.cc",
   vlxxBaseUrl: "https://vlxx.phd",
   viet69BaseUrl: "https://viet69.be",
   xnhauBaseUrl: "https://xnhau.pink",
@@ -43,6 +45,18 @@ function saveConfig(newConfig) {
       currentConfig.socoliveBaseUrl = currentConfig.socoliveBaseUrl.trim().replace(/\/+$/, "");
       if (!currentConfig.socoliveBaseUrl.startsWith("http://") && !currentConfig.socoliveBaseUrl.startsWith("https://")) {
         currentConfig.socoliveBaseUrl = "https://" + currentConfig.socoliveBaseUrl;
+      }
+    }
+    if (currentConfig.gavangBaseUrl) {
+      currentConfig.gavangBaseUrl = currentConfig.gavangBaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.gavangBaseUrl.startsWith("http://") && !currentConfig.gavangBaseUrl.startsWith("https://")) {
+        currentConfig.gavangBaseUrl = "https://" + currentConfig.gavangBaseUrl;
+      }
+    }
+    if (currentConfig.veboBaseUrl) {
+      currentConfig.veboBaseUrl = currentConfig.veboBaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.veboBaseUrl.startsWith("http://") && !currentConfig.veboBaseUrl.startsWith("https://")) {
+        currentConfig.veboBaseUrl = "https://" + currentConfig.veboBaseUrl;
       }
     }
     if (currentConfig.vlxxBaseUrl) {

@@ -44,7 +44,7 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
     },
     {
       'icon': Icons.sports_rounded,
-      'label': 'Socolive TV',
+      'label': 'Tổng Hợp Bóng Đá',
     },
     {
       'icon': Icons.auto_awesome_rounded,

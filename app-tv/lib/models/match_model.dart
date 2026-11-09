@@ -14,11 +14,13 @@ class MatchModel {
   final bool isMuFavorite;
   final bool isFavorite;
   final bool isFamous;
+  final bool isMajorLeague;
   final bool isHot;
   final bool isEsports;
   final String favoriteBadgeText;
   final bool isLive;
   final int matchTimestamp;
+  final String source;
 
   MatchModel({
     required this.id,
@@ -36,11 +38,13 @@ class MatchModel {
     this.isMuFavorite = false,
     this.isFavorite = false,
     this.isFamous = false,
+    this.isMajorLeague = false,
     this.isHot = false,
     this.isEsports = false,
     this.favoriteBadgeText = '',
     this.isLive = false,
     this.matchTimestamp = 0,
+    this.source = '',
   });
 
   factory MatchModel.fromJson(Map<String, dynamic> json) {
@@ -49,7 +53,20 @@ class MatchModel {
     final String id = json['id'] ?? '';
     final String slug = (json['slug'] != null && json['slug'].toString().isNotEmpty)
         ? json['slug']
-        : id.replaceFirst(RegExp(r'^(xoilac|socolive):'), '');
+        : id.replaceFirst(RegExp(r'^(xoilac|socolive|gavang|vebo):'), '');
+
+    String detectedSource = json['source'] ?? '';
+    if (detectedSource.isEmpty) {
+      if (id.startsWith('gavang:')) {
+        detectedSource = 'gavang';
+      } else if (id.startsWith('vebo:')) {
+        detectedSource = 'vebo';
+      } else if (id.startsWith('socolive:')) {
+        detectedSource = 'socolive';
+      } else if (id.startsWith('xoilac:')) {
+        detectedSource = 'xoilac';
+      }
+    }
 
     String league = json['league'] ?? 'Bóng đá';
     String time = json['time'] ?? 'Đang diễn ra';
@@ -427,11 +444,13 @@ class MatchModel {
       isMuFavorite: isMu && !esportsDetected && !isLowerOrWomenLeague,
       isFavorite: isFavoriteMatch,
       isFamous: isFamousMatch,
+      isMajorLeague: isMajorLeague,
       isHot: isHotMatch,
       isEsports: esportsDetected,
       favoriteBadgeText: badgeText,
       isLive: live,
       matchTimestamp: ts,
+      source: detectedSource,
     );
   }
 
@@ -541,6 +560,56 @@ class MatchModel {
     ].any((c) => l.contains(c));
 
     return isEnglishPl || isUefaC1;
+  }
+
+  /// Priority score according to user preferences:
+  /// Tier 1: MU (10 live, 15 upcoming)
+  /// Tier 2: Vietnam (20 live, 25 upcoming) - Never demoted to grass league
+  /// Tier 3: Premier League & Champions League (30 live, 35 upcoming)
+  /// Tier 4: Hot matches from website (40 live, 45 upcoming)
+  /// Tier 5: Other Major Leagues (50 live, 55 upcoming)
+  /// Tier 6: Grass leagues live (70)
+  /// Tier 7: Grass leagues upcoming (80)
+  /// Tier 8: Finished matches (1000)
+  int get priorityScore {
+    if (isFinishedMatch) return 1000;
+    final bool ongoing = isOngoingNow;
+
+    if (isMuFavorite) {
+      return ongoing ? 10 : 15;
+    }
+    if (isVietnam) {
+      return ongoing ? 20 : 25;
+    }
+    if (isPremierLeagueOrC1) {
+      return ongoing ? 30 : 35;
+    }
+    if (isHot) {
+      return ongoing ? 40 : 45;
+    }
+    if (isMajorLeague || isFamous || isFavorite) {
+      return ongoing ? 50 : 55;
+    }
+    if (ongoing) {
+      return 70;
+    }
+    return 80;
+  }
+
+  /// Sorts a list of matches according to the priority score and chronological kickoff time.
+  static void sortByPriority(List<MatchModel> matches) {
+    matches.sort((a, b) {
+      final sA = a.priorityScore;
+      final sB = b.priorityScore;
+      if (sA != sB) return sA.compareTo(sB);
+
+      final timeA = a.matchStartTime?.millisecondsSinceEpoch ?? a.matchTimestamp;
+      final timeB = b.matchStartTime?.millisecondsSinceEpoch ?? b.matchTimestamp;
+      if (timeA > 0 && timeB > 0) {
+        return timeA.compareTo(timeB);
+      }
+      return 0;
+    });
   }
 }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../api/api_service.dart';
 import '../models/update_model.dart';
 import '../screens/football_screen.dart';
+import '../screens/football_aggregate_screen.dart';
 import '../screens/anime_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/secret_movie_screen.dart';
@@ -27,7 +28,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
   int _currentTabIndex = 0; // 0: Football, 1: Anime
 
   final GlobalKey<FootballScreenState> _xoilacKey = GlobalKey<FootballScreenState>();
-  final GlobalKey<FootballScreenState> _socoliveKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<FootballAggregateScreenState> _footballAggregateKey = GlobalKey<FootballAggregateScreenState>();
   final GlobalKey<AnimeScreenState> _animeKey = GlobalKey<AnimeScreenState>();
   final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
 
@@ -92,7 +93,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           await _xoilacKey.currentState?.reloadMatches();
           break;
         case 1:
-          await _socoliveKey.currentState?.reloadMatches();
+          await _footballAggregateKey.currentState?.reloadMatches();
           break;
         case 2:
           await _animeKey.currentState?.refresh();
@@ -211,7 +212,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   // TV Nav Tabs
                   _buildTvNavTab(index: 0, label: 'Xôi Lạc TV', icon: Icons.sports_soccer_rounded),
                   const SizedBox(width: 12),
-                  _buildTvNavTab(index: 1, label: 'Socolive TV', icon: Icons.sports_rounded),
+                  _buildTvNavTab(index: 1, label: 'Tổng Hợp Bóng Đá', icon: Icons.sports_rounded),
                   const SizedBox(width: 12),
                   _buildTvNavTab(index: 2, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
                   const SizedBox(width: 12),
@@ -343,11 +344,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   ),
                   ExcludeFocus(
                     excluding: _currentTabIndex != 1,
-                    child: FootballScreen(
-                      key: _socoliveKey,
+                    child: FootballAggregateScreen(
+                      key: _footballAggregateKey,
                       apiService: widget.apiService,
-                      source: 'socolive',
-                      title: 'Socolive TV',
+                      title: 'Tổng Hợp Bóng Đá',
                       isActive: _currentTabIndex == 1,
                     ),
                   ),
@@ -487,11 +487,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ),
           ExcludeFocus(
             excluding: _currentTabIndex != 1,
-            child: FootballScreen(
-              key: _socoliveKey,
+            child: FootballAggregateScreen(
+              key: _footballAggregateKey,
               apiService: widget.apiService,
-              source: 'socolive',
-              title: 'Socolive TV',
+              title: 'Tổng Hợp Bóng Đá',
               isActive: _currentTabIndex == 1,
             ),
           ),
@@ -535,7 +534,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.sports_rounded),
-              label: 'Socolive',
+              label: 'Tổng Hợp',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.auto_awesome_rounded),

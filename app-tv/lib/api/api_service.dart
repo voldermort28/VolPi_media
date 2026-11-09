@@ -28,31 +28,38 @@ class ApiService {
 
   /// Fetches live matches.
   /// If forceRefresh is true, appends timestamp query to bypass any client/CDN cache.
-  /// source can be 'xoilac' or 'socolive'.
+  /// source can be 'xoilac', 'socolive', 'gavang', or 'vebo'.
   Future<List<MatchModel>> getLiveMatches({bool forceRefresh = false, String source = 'xoilac'}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final isSoco = source.toLowerCase() == 'socolive';
+    final src = source.toLowerCase();
 
     // 1. Try direct API endpoint first (richest metadata & logo URLs)
-    final apiUrl = isSoco
-        ? '$baseUrl/api/socolive/matches?_t=$timestamp'
-        : '$baseUrl/api/matches?_t=$timestamp';
+    String apiUrl = '$baseUrl/api/matches?_t=$timestamp';
+    if (src == 'gavang') {
+      apiUrl = '$baseUrl/api/gavang/matches?_t=$timestamp';
+    } else if (src == 'vebo') {
+      apiUrl = '$baseUrl/api/vebo/matches?_t=$timestamp';
+    } else if (src == 'socolive') {
+      apiUrl = '$baseUrl/api/socolive/matches?_t=$timestamp';
+    }
+
     try {
       final res = await _client.get(Uri.parse(apiUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is List && data.isNotEmpty) {
           final matches = data.map((item) => MatchModel.fromJson(item)).toList();
-          _sortMatches(matches);
+          MatchModel.sortByPriority(matches);
           return matches;
         }
       }
     } catch (_) {}
 
     // 2. Fallback to Stremio catalog endpoint
-    final catalogPath = isSoco
-        ? 'socolive/catalog/tv/socolive-catalog.json'
-        : 'xoilac/catalog/tv/xoilac-catalog.json';
+    String catalogPath = 'xoilac/catalog/tv/xoilac-catalog.json';
+    if (src == 'socolive') {
+      catalogPath = 'socolive/catalog/tv/socolive-catalog.json';
+    }
     final catalogUrl = forceRefresh
         ? '$baseUrl/$catalogPath?_t=$timestamp'
         : '$baseUrl/$catalogPath';
@@ -64,7 +71,7 @@ class ApiService {
         if (data['metas'] != null) {
           final List list = data['metas'];
           final matches = list.map((item) => MatchModel.fromJson(item)).toList();
-          _sortMatches(matches);
+          MatchModel.sortByPriority(matches);
           return matches;
         }
       }
@@ -75,40 +82,56 @@ class ApiService {
   }
 
   void _sortMatches(List<MatchModel> matches) {
-    // Sort:
-    // 1. Ongoing matches (kicked off within 90 mins / isOngoingNow) ALWAYS FIRST!
-    // 2. Upcoming matches come before Finished matches (>100 min / 2 tiếng trước)
-    // 3. Level priority: Việt Nam & MU (score 0) -> Famous Leagues & Top Clubs (score 1) -> Others (score 2)
-    // 4. Chronological timeline (earliest kickoff first)
-    matches.sort((a, b) {
-      // 1. Ongoing matches (trong 90') first
-      if (a.isOngoingNow && !b.isOngoingNow) return -1;
-      if (!a.isOngoingNow && b.isOngoingNow) return 1;
-
-      // 2. Upcoming matches before Finished matches (>100 min)
-      if (!a.isFinishedMatch && b.isFinishedMatch) return -1;
-      if (a.isFinishedMatch && !b.isFinishedMatch) return 1;
-
-      // 3. Level priority
-      int scoreA = (a.isVietnam || a.isMuFavorite) ? 0 : ((a.isFamous || a.isFavorite) ? 1 : 2);
-      int scoreB = (b.isVietnam || b.isMuFavorite) ? 0 : ((b.isFamous || b.isFavorite) ? 1 : 2);
-      if (scoreA != scoreB) return scoreA.compareTo(scoreB);
-
-      // 4. Chronological timeline
-      final timeA = a.matchStartTime?.millisecondsSinceEpoch ?? a.matchTimestamp;
-      final timeB = b.matchStartTime?.millisecondsSinceEpoch ?? b.matchTimestamp;
-      if (timeA > 0 && timeB > 0) {
-        return timeA.compareTo(timeB);
-      }
-      return 0;
-    });
+    MatchModel.sortByPriority(matches);
   }
 
   /// Fetches available stream channels (with BLV names and proxy headers) for a match.
   Future<List<StreamChannel>> getMatchStreams(String matchId, {String? source}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final isGavang = matchId.startsWith('gavang:') || (source != null && source.toLowerCase() == 'gavang');
+    final isVebo = matchId.startsWith('vebo:') || (source != null && source.toLowerCase() == 'vebo');
     final isSoco = matchId.startsWith('socolive:') || (source != null && source.toLowerCase() == 'socolive');
-    final streamPath = isSoco ? 'socolive/stream/tv' : 'xoilac/stream/tv';
+
+    // 1. Direct REST stream endpoints for Gà Vàng & Về Bờ
+    if (isGavang) {
+      final directUrl = '$baseUrl/api/gavang/streams/$matchId?_t=$timestamp';
+      try {
+        final res = await _client.get(Uri.parse(directUrl)).timeout(const Duration(seconds: 12));
+        if (res.statusCode == 200) {
+          final data = json.decode(utf8.decode(res.bodyBytes));
+          if (data['streams'] != null && data['streams'] is List) {
+            final List list = data['streams'];
+            if (list.isNotEmpty) {
+              return list.map((item) => StreamChannel.fromJson(item)).toList();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (isVebo) {
+      final directUrl = '$baseUrl/api/vebo/streams/$matchId?_t=$timestamp';
+      try {
+        final res = await _client.get(Uri.parse(directUrl)).timeout(const Duration(seconds: 12));
+        if (res.statusCode == 200) {
+          final data = json.decode(utf8.decode(res.bodyBytes));
+          if (data['streams'] != null && data['streams'] is List) {
+            final List list = data['streams'];
+            if (list.isNotEmpty) {
+              return list.map((item) => StreamChannel.fromJson(item)).toList();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Standard Stremio stream endpoint fallback
+    String streamPath = 'xoilac/stream/tv';
+    if (isGavang || isVebo) {
+      streamPath = 'stream/tv';
+    } else if (isSoco) {
+      streamPath = 'socolive/stream/tv';
+    }
     final url = '$baseUrl/$streamPath/$matchId.json?_t=$timestamp';
 
     try {
@@ -123,6 +146,8 @@ class ApiService {
     } catch (e) {
       // Log error
     }
+    return [];
+  }
     return [];
   }
 

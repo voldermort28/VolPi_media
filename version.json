@@ -1,10 +1,10 @@
 {
-  "version": "2.2.32",
-  "build": 98,
-  "tag_name": "v2.2.32",
-  "changelog": "• VolPi Media v2.2.32:\n- Bổ sung bộ lọc thể loại (filter) đầy đủ cho kho phim VLFilm và Viet69 tương tự như trang web gốc.\n- Chuyển bộ lọc trên iOS và Android Mobile/Tablet sang dạng Dropdown Menu tinh gọn, trực quan.\n- Giữ nguyên thanh thẻ chọn thể loại cuộn ngang cho Android TV để tối ưu điều khiển bằng Remote D-Pad.",
+  "version": "2.2.33",
+  "build": 99,
+  "tag_name": "v2.2.33",
+  "changelog": "• VolPi Media v2.2.33:\n- Nâng cấp Tab Socolive thành Tab Tổng Hợp Bóng Đá đa nguồn.\n- Bổ sung 2 nguồn bóng đá trực tuyến chính chủ: Gà Vàng TV (gavang1.xyz) và Về Bờ TV (vebozbn.cc) dưới dạng các hàng ngang category riêng biệt.\n- Tối ưu thuật toán sắp xếp thông minh theo đúng thói quen: Ưu tiên Manchester United, ĐTQG & CLB Việt Nam, Ngoại Hạng Anh, Cúp C1 và Trận Hot của web.\n- Tự động hạ các giải đấu cỏ (ngoại trừ các trận liên quan đến Việt Nam) xuống mức ưu tiên thấp nhất.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T18:05:00Z"
+  "published_at": "2026-11-09T18:45:00Z"
 }

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../api/api_service.dart';
 import '../models/update_model.dart';
 import '../screens/football_screen.dart';
+import '../screens/football_aggregate_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
@@ -27,12 +28,12 @@ class NetflixLayout extends StatefulWidget {
 
 class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Socolive, 3: Anime, 4: IPTV
+  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Tổng Hợp Bóng Đá, 3: Anime, 4: IPTV
 
   // Tab GlobalKeys to trigger reloads from Header bar
   final GlobalKey<NetflixHomeScreenState> _homeKey = GlobalKey<NetflixHomeScreenState>();
   final GlobalKey<FootballScreenState> _xoilacKey = GlobalKey<FootballScreenState>();
-  final GlobalKey<FootballScreenState> _socoliveKey = GlobalKey<FootballScreenState>();
+  final GlobalKey<FootballAggregateScreenState> _footballAggregateKey = GlobalKey<FootballAggregateScreenState>();
   final GlobalKey<NetflixAnimeScreenState> _animeKey = GlobalKey<NetflixAnimeScreenState>();
   final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
 
@@ -174,10 +175,10 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         }
         break;
 
-      case 2: // Socolive TV: Trận bóng đầu tiên
-        final socoliveState = _socoliveKey.currentState;
-        if (socoliveState != null && socoliveState.mounted) {
-          final firstNode = socoliveState.firstMatchFocusNode;
+      case 2: // Tổng Hợp Bóng Đá: Trận bóng đầu tiên
+        final aggregateState = _footballAggregateKey.currentState;
+        if (aggregateState != null && aggregateState.mounted) {
+          final firstNode = aggregateState.firstMatchFocusNode;
           if (firstNode.canRequestFocus && isUsable(firstNode)) {
             firstNode.requestFocus();
             return;
@@ -257,7 +258,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           await _xoilacKey.currentState?.reloadMatches();
           break;
         case 2:
-          await _socoliveKey.currentState?.reloadMatches();
+          await _footballAggregateKey.currentState?.reloadMatches();
           break;
         case 3:
           await _animeKey.currentState?.refresh();
@@ -441,14 +442,13 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           ),
         ),
 
-        // Tab 2: Socolive TV
+        // Tab 2: Tổng Hợp Bóng Đá
         ExcludeFocus(
           excluding: _currentTabIndex != 2,
-          child: FootballScreen(
-            key: _socoliveKey,
+          child: FootballAggregateScreen(
+            key: _footballAggregateKey,
             apiService: widget.apiService,
-            source: 'socolive',
-            title: 'Socolive TV',
+            title: 'Tổng Hợp Bóng Đá',
             isActive: _currentTabIndex == 2,
           ),
         ),
@@ -487,7 +487,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     final titles = [
       'Trang chủ',
       'Xôi Lạc TV',
-      'Socolive TV',
+      'Tổng Hợp Bóng Đá',
       'Anime & Phim',
       'Truyền Hình (IPTV)',
     ];
@@ -587,7 +587,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
     final menuItems = [
       {'icon': Icons.home_rounded, 'label': 'Trang chủ'},
       {'icon': Icons.sports_soccer_rounded, 'label': 'Xôi Lạc TV'},
-      {'icon': Icons.sports_rounded, 'label': 'Socolive TV'},
+      {'icon': Icons.sports_rounded, 'label': 'Tổng Hợp Bóng Đá'},
       {'icon': Icons.auto_awesome_rounded, 'label': 'Anime & Phim'},
       {'icon': Icons.live_tv_rounded, 'label': 'Truyền Hình (IPTV)'},
     ];

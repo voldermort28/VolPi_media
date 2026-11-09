@@ -19,6 +19,8 @@ const viet69Scraper = require("./scrapers/viet69");
 const xnhauScraper = require("./scrapers/xnhau");
 const xoilacScraper = require("./scrapers/xoilac");
 const socoliveScraper = require("./scrapers/socolive");
+const gavangScraper = require("./scrapers/gavang");
+const veboScraper = require("./scrapers/vebo");
 const yumeiScraper = require("./scrapers/yumei");
 const iptvService = require("./services/iptvService");
 const authService = require("./services/authService");
@@ -464,6 +466,44 @@ app.get("/api/socolive/matches", async (req, res) => {
   }
 });
 
+app.get("/api/gavang/matches", async (req, res) => {
+  try {
+    const matches = await gavangScraper.getLiveMatches();
+    res.json(matches || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/vebo/matches", async (req, res) => {
+  try {
+    const matches = await veboScraper.getLiveMatches();
+    res.json(matches || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get("/api/gavang/streams/:id", async (req, res) => {
+  try {
+    const slug = req.params.id.replace(/^gavang:/, "");
+    const streams = await gavangScraper.getMatchStreams(slug);
+    res.json({ streams: streams || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message, streams: [] });
+  }
+});
+
+app.get("/api/vebo/streams/:id", async (req, res) => {
+  try {
+    const slug = req.params.id.replace(/^vebo:/, "");
+    const streams = await veboScraper.getMatchStreams(slug);
+    res.json({ streams: streams || [] });
+  } catch (e) {
+    res.status(500).json({ error: e.message, streams: [] });
+  }
+});
+
 // -------------------------------------------------------------
 // IPTV API ENDPOINTS
 // Stream Proxy to bypass CORS / Referer restrictions
@@ -815,11 +855,13 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
       socoliveScraper.clearCache();
+      gavangScraper.clearCache();
+      veboScraper.clearCache();
       vlxxScraper.clearCache();
       viet69Scraper.clearCache();
       xnhauScraper.clearCache();
@@ -1068,6 +1110,33 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
         return res.json({ success: true, count: items.length, redirectedUrl: finalOrigin });
       } else {
         return res.json({ success: false, error: "Trang web phản hồi nhưng không tìm thấy danh sách trận đấu của Socolive" });
+      }
+    } else if (type === "gavang") {
+      const response = await axios.get(cleanUrl + "/wp-json/gavang33live/v1/matches?gavang33live_v=2.0.13.24", {
+        headers: {
+          "User-Agent": gavangScraper.USER_AGENT,
+          "Referer": cleanUrl,
+        },
+        timeout: 8000,
+      });
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        return res.json({ success: true, count: response.data.data.length, redirectedUrl: cleanUrl });
+      } else {
+        return res.json({ success: false, error: "Không tìm thấy dữ liệu trận đấu Gà Vàng từ domain này" });
+      }
+    } else if (type === "vebo") {
+      const response = await axios.get(cleanUrl, {
+        headers: {
+          "User-Agent": veboScraper.USER_AGENT,
+        },
+        timeout: 8000,
+      });
+      const $ = cheerio.load(response.data);
+      const items = $(".match-football-item, .grid-matches__item");
+      if (items.length > 0) {
+        return res.json({ success: true, count: items.length, redirectedUrl: cleanUrl });
+      } else {
+        return res.json({ success: false, error: "Không tìm thấy danh sách trận đấu Về Bờ từ domain này" });
       }
     }
 

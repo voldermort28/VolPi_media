@@ -2,6 +2,8 @@ const { addonBuilder } = require('stremio-addon-sdk');
 const vlxxScraper = require('./scrapers/vlxx');
 const xoilacScraper = require('./scrapers/xoilac');
 const socoliveScraper = require('./scrapers/socolive');
+const gavangScraper = require('./scrapers/gavang');
+const veboScraper = require('./scrapers/vebo');
 const yumeiScraper = require('./scrapers/yumei');
 
 const manifest = {
@@ -11,7 +13,7 @@ const manifest = {
   description: 'Addon tổng hợp xem Anime Vietsub (Pokemon, Tokusatsu, Super Sentai, Power Rangers), Trực tiếp bóng đá Xôi Lạc TV & Socolive TV và Phim VLFilm',
   resources: ['catalog', 'meta', 'stream'],
   types: ['series', 'movie', 'tv'],
-  idPrefixes: ['vlxx:', 'xoilac:', 'socolive:', 'yumei:'],
+  idPrefixes: ['vlxx:', 'xoilac:', 'socolive:', 'gavang:', 'vebo:', 'yumei:'],
   catalogs: [
     // --- SERIES CATALOGS (Chỉ Phim Bộ) ---
     {
@@ -316,6 +318,40 @@ builder.defineMetaHandler(async (args) => {
       };
     }
 
+    if (id.startsWith('gavang:')) {
+      const slug = id.replace('gavang:', '');
+      const details = await gavangScraper.getMatchDetails(slug);
+      return {
+        meta: {
+          id: details.id,
+          name: details.name,
+          poster: details.homeLogo || details.awayLogo || '',
+          background: details.homeLogo || details.awayLogo || '',
+          posterShape: 'landscape',
+          description: details.description,
+          genres: details.genres,
+          type: 'tv',
+        },
+      };
+    }
+
+    if (id.startsWith('vebo:')) {
+      const slug = id.replace('vebo:', '');
+      const details = await veboScraper.getMatchDetails(slug);
+      return {
+        meta: {
+          id: details.id,
+          name: details.name,
+          poster: details.homeLogo || details.awayLogo || '',
+          background: details.homeLogo || details.awayLogo || '',
+          posterShape: 'landscape',
+          description: details.description,
+          genres: details.genres,
+          type: 'tv',
+        },
+      };
+    }
+
     return { meta: null };
   } catch (err) {
     console.error('Meta handler error:', err);
@@ -366,6 +402,18 @@ builder.defineStreamHandler(async (args) => {
     if (id.startsWith('socolive:')) {
       const slug = id.replace('socolive:', '');
       const streams = await socoliveScraper.getMatchStreams(slug);
+      return { streams };
+    }
+
+    if (id.startsWith('gavang:')) {
+      const slug = id.replace('gavang:', '');
+      const streams = await gavangScraper.getMatchStreams(slug);
+      return { streams };
+    }
+
+    if (id.startsWith('vebo:')) {
+      const slug = id.replace('vebo:', '');
+      const streams = await veboScraper.getMatchStreams(slug);
       return { streams };
     }
 

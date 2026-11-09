@@ -434,63 +434,60 @@ async function getLiveMatches() {
       matchObj.priority = getTeamPriority(matchObj);
       matchObj.isVietnam = matchObj.priority.isVietnam;
       matchObj.isFamous = matchObj.priority.isFamous;
+      matchObj.isMu = matchObj.priority.badgeText && matchObj.priority.badgeText.includes('MANCHESTER UNITED');
+      matchObj.isMuFavorite = matchObj.isMu;
+
+      // Check EPL / C1 and Major League
+      const t = `${matchObj.league || ''} ${matchObj.title || ''} ${matchObj.homeTeam || ''} ${matchObj.awayTeam || ''}`.toLowerCase();
+      const isWomen = (t.includes('women') || t.includes('nữ')) && !matchObj.isVietnam;
+      const isYouthOrReserve = (t.includes('u17') || t.includes('u18') || t.includes('u19') || t.includes('u21') || t.includes('reserve') || t.includes('youth') || t.includes('trẻ')) && !matchObj.isVietnam;
+
+      const nonEnglish = [
+        'kuwait', 'ai cập', 'egypt', 'belarus', 'nga', 'russia', 'scotland', 'israel',
+        'ukraine', 'ireland', 'wales', 'canada', 'úc', 'australia', 'kazakhstan',
+        'singapore', 'thái', 'thai', 'indo', 'ấn độ', 'india', 'nam phi', 'hàn quốc',
+        'korea', 'qatar', 'uae', 'saudi', 'iraq', 'armenia', 'georgia', 'azerbaijan',
+        'mongolia', 'mông cổ', 'hong kong', 'bắc ireland', 'northern ireland', 'cymru'
+      ];
+
+      const isC1 = !isWomen && !isYouthOrReserve && (
+        t.includes('uefa champions') || t.includes('cúp c1') || t.includes('c1 châu âu') || /\bucl\b/.test(t) || t.includes('champions league')
+      );
+      const isEpl = !isWomen && !isYouthOrReserve && (
+        t.includes('premier league') || t.includes('ngoại hạng anh') || /\bepl\b/.test(t) || t.includes('english premier league')
+      ) && !nonEnglish.some((c) => t.includes(c));
+
+      matchObj.isPremierLeagueOrC1 = isC1 || isEpl;
+
+      // Compute 8-tier priority score
+      if (matchObj.isFinished) {
+        matchObj.priorityScore = 1000;
+      } else if (matchObj.isMu) {
+        matchObj.priorityScore = matchObj.isLive ? 10 : 15;
+      } else if (matchObj.isVietnam) {
+        matchObj.priorityScore = matchObj.isLive ? 20 : 25;
+      } else if (matchObj.isPremierLeagueOrC1) {
+        matchObj.priorityScore = matchObj.isLive ? 30 : 35;
+      } else if (matchObj.isHot) {
+        matchObj.priorityScore = matchObj.isLive ? 40 : 45;
+      } else if (matchObj.isFamous) {
+        matchObj.priorityScore = matchObj.isLive ? 50 : 55;
+      } else if (matchObj.isLive) {
+        matchObj.priorityScore = 70;
+      } else {
+        matchObj.priorityScore = 80;
+      }
 
       matches.push(matchObj);
     });
 
-    // Helper functions for sorting
-    const isFinishedMatch = (m) => {
-      if (m.isFinished) return true;
-      if (m.statusText) {
-        const s = m.statusText.toLowerCase();
-        if (s.includes('hết giờ') || s.includes('kết thúc') || s.includes('ft') || s.includes('finished')) return true;
-      }
-      if (m.matchTimestamp && !m.isLive) {
-        const elapsedMin = (Date.now() - m.matchTimestamp) / (60 * 1000);
-        if (elapsedMin > 115) return true;
-      }
-      return false;
-    };
-
-    const isOngoingMatch = (m) => {
-      if (isFinishedMatch(m)) return false;
-      if (m.isLive) return true;
-      if (m.matchTimestamp) {
-        const elapsedMin = (Date.now() - m.matchTimestamp) / (60 * 1000);
-        if (elapsedMin >= 0 && elapsedMin <= 115) return true;
-      }
-      return false;
-    };
-
     // Sort:
-    // 1. Ongoing matches (trong 90') FIRST
-    // 2. Finished matches LAST
-    // 3. Level priority (MU & Việt Nam #1 -> Big Teams & Leagues #2 -> Others #3)
-    // 4. Live matches (isLive)
-    // 5. Chronological kickoff time
+    // 1. Priority Score (Tier 1 MU -> Tier 2 VN -> Tier 3 EPL/C1 -> Tier 4 Hot -> Tier 5 Major -> Tier 6 Grass Live -> Tier 7 Grass Upcoming -> Tier 8 Finished)
+    // 2. Chronological kickoff time
     matches.sort((a, b) => {
-      const aOngoing = isOngoingMatch(a);
-      const bOngoing = isOngoingMatch(b);
-      if (aOngoing && !bOngoing) return -1;
-      if (!aOngoing && bOngoing) return 1;
-
-      const aFinished = isFinishedMatch(a);
-      const bFinished = isFinishedMatch(b);
-      if (!aFinished && bFinished) return -1;
-      if (aFinished && !bFinished) return 1;
-
-      const pA = a.priority ? a.priority.level : 3;
-      const pB = b.priority ? b.priority.level : 3;
-      if (pA !== pB) return pA - pB;
-
-      // Ưu tiên giải Ngoại Hạng Anh & Cúp C1 lên đầu nhóm tâm điểm
-      const isPlOrC1A = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${a.league || ''} ${a.title || ''}`);
-      const isPlOrC1B = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${b.league || ''} ${b.title || ''}`);
-      if (isPlOrC1A && !isPlOrC1B) return -1;
-      if (!isPlOrC1A && isPlOrC1B) return 1;
-
-      if (a.isLive && !b.isLive) return -1;
-      if (!a.isLive && b.isLive) return 1;
+      const sA = a.priorityScore || 80;
+      const sB = b.priorityScore || 80;
+      if (sA !== sB) return sA - sB;
 
       if (a.matchTimestamp && b.matchTimestamp) {
         return a.matchTimestamp - b.matchTimestamp;
