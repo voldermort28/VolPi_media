@@ -113,11 +113,17 @@
             Đăng nhập để xem được các Thư Mục Riêng Tư (Private), My Drive và Shared Drive mà không cần chia sẻ link công khai.
           </p>
         </div>
-        <div id="oauth-status-badge">
-          <!-- Rendered via JS -->
-          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
-            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Đang kiểm tra...
-          </span>
+        <div class="flex items-center gap-2.5">
+          <button onclick="openOAuthGuideModal()" class="px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm">
+            <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+            <span>Hướng Dẫn Kết Nối</span>
+          </button>
+          <div id="oauth-status-badge">
+            <!-- Rendered via JS -->
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700">
+              <span class="w-2 h-2 rounded-full bg-slate-500"></span> Đang kiểm tra...
+            </span>
+          </div>
         </div>
       </div>
 
@@ -198,6 +204,130 @@
       </div>
       <div id="modal-preview-content" class="overflow-y-auto space-y-2 flex-1 pr-1">
         <!-- Files rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- OAuth Guide Modal -->
+  <div id="modal-oauth-guide" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel w-full max-w-3xl rounded-2xl border border-sky-500/40 p-6 space-y-5 max-h-[90vh] flex flex-col shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 text-white">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="font-bold text-base text-white">Hướng Dẫn Kết Nối Google OAuth2 (5 Bước)</h3>
+            <p class="text-xs text-sky-400">Khắc phục triệt để lỗi Quota Exceeded & xem phim 4K không giới hạn</p>
+          </div>
+        </div>
+        <button onclick="closeOAuthGuideModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="overflow-y-auto space-y-4 flex-1 pr-2 text-xs leading-relaxed text-slate-300">
+        <!-- Benefit Callout -->
+        <div class="p-4 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-200 space-y-1.5">
+          <p class="font-bold flex items-center gap-1.5 text-sky-400 text-sm">
+            <i data-lucide="sparkles" class="w-4 h-4"></i> Tại sao nên kết nối tài khoản Google?
+          </p>
+          <p class="text-xs text-slate-300">
+            Khi xem phim qua link công khai ẩn danh, Google Drive sẽ giới hạn lượt tải với các file nặng (> 1GB). Kết nối tài khoản Google sẽ cấp cho server hạn ngạch riêng của bạn (lên tới <b>10TB/ngày</b>), giúp mở bất kỳ bộ phim nào tức thì mà <b>không bao giờ bị lỗi Quota Exceeded</b> trên TV hay iPhone nữa.
+          </p>
+        </div>
+
+        <!-- Step 1 -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
+              <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">1</span>
+              Tạo Dự Án Trên Google Cloud Console
+            </span>
+            <a href="https://console.cloud.google.com/" target="_blank" class="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 font-semibold text-[11px] border border-sky-500/40 transition flex items-center gap-1 cursor-pointer">
+              <span>Mở Google Cloud</span>
+              <i data-lucide="external-link" class="w-3 h-3"></i>
+            </a>
+          </div>
+          <p class="text-slate-400">
+            Mở <b class="text-white">console.cloud.google.com</b> và đăng nhập tài khoản Google của bạn.<br>
+            Ở thanh menu trên cùng, bấm vào ô chọn dự án &rarr; Bấm <b>"New Project" (Dự án mới)</b> &rarr; Đặt tên (ví dụ: <code class="text-sky-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono">VolPi Media</code>) &rarr; Bấm <b>Create</b>.
+          </p>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
+            <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">2</span>
+            Bật Google Drive API
+          </span>
+          <p class="text-slate-400">
+            Ở thanh menu bên trái <b>☰</b> &rarr; Chọn <b>APIs & Services</b> &rarr; Chọn <b>Library (Thư viện)</b>.<br>
+            Tìm kiếm từ khóa: <b class="text-white">Google Drive API</b> &rarr; Bấm vào kết quả và nhấn nút <b class="text-emerald-400">Enable (Bật)</b>.
+          </p>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
+            <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">3</span>
+            Cấu Hình OAuth Consent Screen (Màn hình chấp thuận)
+          </span>
+          <p class="text-slate-400">
+            Vào <b>APIs & Services</b> &rarr; <b>OAuth consent screen</b> &rarr; Chọn <b>External (Bên ngoài)</b> &rarr; Bấm <b>Create</b>.<br>
+            - <b>App name</b>: Điền <code class="text-sky-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono">VolPi Media</code>.<br>
+            - <b>User support email</b> & <b>Developer contact email</b>: Chọn email Google của bạn.<br>
+            - Bấm <b>Save and continue</b> qua các bước tiếp theo.<br>
+            - <span class="text-amber-400 font-bold">⚠️ Bước quan trọng (Test Users)</span>: Tại bước <b>Test users</b>, bấm <b>+ ADD USERS</b>, nhập chính địa chỉ email Google của bạn vào &rarr; Bấm <b>Save and continue</b> (bắt buộc để tài khoản của bạn được phép đăng nhập).
+          </p>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+          <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
+            <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">4</span>
+            Tạo Client ID & Client Secret
+          </span>
+          <p class="text-slate-400">
+            Vào <b>APIs & Services</b> &rarr; <b>Credentials (Thông tin xác thực)</b> &rarr; Bấm <b>+ CREATE CREDENTIALS</b> &rarr; Chọn <b>OAuth client ID</b>.<br>
+            - <b>Application type</b>: Chọn <b>Web application</b>.<br>
+            - <b>Name</b>: Điền <code class="text-sky-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono">VolPi Media Web</code>.<br>
+            - <span class="text-emerald-400 font-bold">Authorized redirect URIs (Rất quan trọng)</span>: Cuộn xuống mục này, bấm <b>+ ADD URI</b> và dán chính xác đường link sau:
+          </p>
+          <div class="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-700">
+            <code id="guide-redirect-uri" class="text-xs text-sky-300 font-mono flex-1 select-all break-all">https://stremio.laboon.vn/api/gdrive/auth/callback</code>
+            <button onclick="copyRedirectUri()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs flex items-center gap-1 transition shrink-0 cursor-pointer shadow-md">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Sao Chép</span>
+            </button>
+          </div>
+          <p class="text-slate-400">
+            Bấm <b>Create</b> &rarr; Google sẽ hiển thị popup chứa <b>Client ID</b> và <b>Client Secret</b>.
+          </p>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+          <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
+            <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">5</span>
+            Dán Vào VolPi Media & Bấm Đăng Nhập
+          </span>
+          <p class="text-slate-400">
+            1. Copy <b>Client ID</b> và <b>Client Secret</b> dán vào 2 ô cấu hình trên trang này &rarr; Bấm <b>Lưu Thông Tin API</b>.<br>
+            2. Bấm nút màu trắng <b>"Đăng Nhập Google"</b> &rarr; Chọn tài khoản Google của bạn &rarr; Bấm <b>Tiếp tục (Continue / Advanced &rarr; Go to VolPi Media)</b> để xác nhận cấp quyền đọc Google Drive.<br>
+            3. Sau khi hoàn tất, huy hiệu chuyển sang màu xanh <b class="text-emerald-400 font-bold">"Đã Kết Nối"</b>! Mọi thiết bị TV và điện thoại đều có thể mở phim mượt mà.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between pt-3 border-t border-slate-800">
+        <button onclick="closeOAuthGuideModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
+          Đóng
+        </button>
+        <button onclick="closeOAuthGuideModal(true)" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition flex items-center gap-2 cursor-pointer shadow-lg shadow-sky-600/30">
+          <span>Tôi Đã Hiểu & Bắt Đầu Cấu Hình</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
       </div>
     </div>
   </div>
@@ -310,12 +440,25 @@
             </div>
 
             <!-- Credentials Accordion -->
-            <details class="text-xs text-slate-400 group">
-              <summary class="cursor-pointer hover:text-sky-300 flex items-center gap-1 font-semibold select-none">
-                <span>Cấu hình Client ID & Secret riêng (Google Cloud Console)</span>
+            <details id="oauth-credentials-details" class="text-xs text-slate-400 group">
+              <summary class="cursor-pointer hover:text-sky-300 flex items-center justify-between font-semibold select-none py-1">
+                <span class="flex items-center gap-1.5">
+                  <i data-lucide="key" class="w-3.5 h-3.5 text-sky-400"></i>
+                  <span>Cấu hình Google OAuth Client ID & Secret</span>
+                </span>
                 <i data-lucide="chevron-down" class="w-3.5 h-3.5 group-open:rotate-180 transition"></i>
               </summary>
-              <div class="mt-3 p-3 rounded-lg bg-slate-950/70 border border-slate-800 space-y-2">
+              <div class="mt-3 p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                <div class="flex items-center justify-between p-2 rounded-lg bg-sky-500/10 border border-sky-500/20 text-[11px] text-slate-300">
+                  <span class="flex items-center gap-1 text-sky-400 font-semibold">
+                    <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    Chưa có Client ID & Secret?
+                  </span>
+                  <button type="button" onclick="openOAuthGuideModal()" class="text-sky-300 hover:text-white font-bold underline flex items-center gap-1 cursor-pointer">
+                    <i data-lucide="book-open" class="w-3 h-3"></i>
+                    <span>Xem hướng dẫn 5 bước</span>
+                  </button>
+                </div>
                 <div>
                   <label class="block text-[11px] font-bold text-slate-400 mb-1">Google Client ID</label>
                   <input type="text" id="input-client-id" value="${oauthState.clientId || ''}" placeholder="xxx.apps.googleusercontent.com" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
@@ -324,9 +467,12 @@
                   <label class="block text-[11px] font-bold text-slate-400 mb-1">Google Client Secret</label>
                   <input type="password" id="input-client-secret" placeholder="GOCSPX-xxx" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white">
                 </div>
-                <button onclick="saveOAuthCredentials()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition">
-                  Lưu Thông Tin API
-                </button>
+                <div class="flex items-center gap-2 pt-1">
+                  <button onclick="saveOAuthCredentials()" class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition cursor-pointer flex items-center gap-1.5">
+                    <i data-lucide="save" class="w-3.5 h-3.5"></i>
+                    <span>Lưu Thông Tin API</span>
+                  </button>
+                </div>
               </div>
             </details>
           </div>
@@ -626,6 +772,42 @@
 
     function closePreviewModal() {
       document.getElementById('modal-preview').classList.add('hidden');
+    }
+
+    // 4. OAuth Guide Modal & Helpers
+    function openOAuthGuideModal() {
+      const modal = document.getElementById('modal-oauth-guide');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function closeOAuthGuideModal(openAccordion = false) {
+      const modal = document.getElementById('modal-oauth-guide');
+      if (modal) modal.classList.add('hidden');
+
+      if (openAccordion) {
+        const details = document.getElementById('oauth-credentials-details');
+        if (details) {
+          details.open = true;
+          details.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const idInput = document.getElementById('input-client-id');
+          if (idInput) idInput.focus();
+        }
+      }
+    }
+
+    function copyRedirectUri() {
+      const uri = 'https://stremio.laboon.vn/api/gdrive/auth/callback';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(uri).then(() => {
+          showToast('Đã sao chép', 'Đã copy Redirect URI vào bộ nhớ đệm!', true);
+        }).catch(() => {
+          prompt('Copy Redirect URI:', uri);
+        });
+      } else {
+        prompt('Copy Redirect URI:', uri);
+      }
     }
 
     window.addEventListener('DOMContentLoaded', init);

@@ -1,10 +1,10 @@
 {
-  "version": "2.2.28",
-  "build": 94,
-  "tag_name": "v2.2.28",
-  "changelog": "• VolPi Media v2.2.28:\n- Xử lý lỗi CoreMediaErrorDomain -12939 khi phát video Google Drive bị giới hạn hạn ngạch (Quota Exceeded).\n- Tự động nhận diện và chặn trang HTML lỗi từ Google Drive, hiển thị thông báo hướng dẫn kết nối tài khoản rõ ràng trên TV.",
+  "version": "2.2.29",
+  "build": 95,
+  "tag_name": "v2.2.29",
+  "changelog": "• VolPi Media v2.2.29:\n- Bổ sung modal hướng dẫn từng bước 5 bước chi tiết cấu hình Google OAuth2 trên trang quản lý (/gdrive).\n- Tích hợp nút sao chép Redirect URI một chạm và tự động mở form điền thông tin sau khi xem hướng dẫn.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T23:18:00Z"
+  "published_at": "2026-11-09T23:24:00Z"
 }
