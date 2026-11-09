@@ -28,6 +28,8 @@ const telegramService = require("./services/telegramService");
 const app = express();
 const PORT = process.env.PORT || 7000;
 
+app.set("trust proxy", true);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -583,7 +585,9 @@ app.post("/api/gdrive/auth/credentials", authService.requireAuth, (req, res) => 
 
 app.get("/api/gdrive/auth/url", authService.requireAuth, (req, res) => {
   try {
-    const redirectUri = `${req.protocol}://${req.get("host")}/api/gdrive/auth/callback`;
+    const host = req.get("host") || "stremio.laboon.vn";
+    const protocol = req.headers["x-forwarded-proto"] || (host.includes("localhost") ? "http" : "https");
+    const redirectUri = `${protocol}://${host}/api/gdrive/auth/callback`;
     const url = gdriveService.getOAuthUrl(redirectUri);
     res.json({ url });
   } catch (err) {
@@ -595,7 +599,9 @@ app.get("/api/gdrive/auth/callback", async (req, res) => {
   const code = req.query.code;
   if (!code) return res.redirect("/gdrive?error=no_code");
   try {
-    const redirectUri = `${req.protocol}://${req.get("host")}/api/gdrive/auth/callback`;
+    const host = req.get("host") || "stremio.laboon.vn";
+    const protocol = req.headers["x-forwarded-proto"] || (host.includes("localhost") ? "http" : "https");
+    const redirectUri = `${protocol}://${host}/api/gdrive/auth/callback`;
     await gdriveService.handleOAuthCallback(code, redirectUri);
     res.redirect("/gdrive?success=connected");
   } catch (err) {
