@@ -353,9 +353,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final errStr = e.toString();
+        String friendlyError = 'Không thể phát luồng này: $errStr';
+
+        if (errStr.contains('12939') ||
+            (errStr.contains('length') && errStr.contains('2040')) ||
+            errStr.contains('429') ||
+            errStr.contains('QUOTA_EXCEEDED') ||
+            errStr.contains('Quota exceeded')) {
+          friendlyError =
+              'File này đã bị Google Drive giới hạn lượt tải công khai trong 24 giờ (Quota Exceeded).\n\n'
+              '💡 Cách khắc phục: Vui lòng mở trang web quản trị https://stremio.laboon.vn/gdrive '
+              'và kết nối Tài Khoản Google của bạn để phát không giới hạn!';
+        }
+
         setState(() {
           _hasError = true;
-          _errorMessage = 'Không thể phát luồng này: ${e.toString()}';
+          _errorMessage = friendlyError;
         });
       }
     }

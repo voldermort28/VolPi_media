@@ -1,10 +1,10 @@
 {
-  "version": "2.2.27",
-  "build": 93,
-  "tag_name": "v2.2.27",
-  "changelog": "• VolPi Media v2.2.27:\n- Chuyển tab Google Drive và Telegram Phim vào khu vực Riêng tư (bảo vệ bằng mã PIN).\n- Tinh gọn thanh điều hướng TV với 5 tab công khai chính (Trang chủ, Xôi Lạc, Socolive, Anime & Phim, Truyền hình IPTV).",
+  "version": "2.2.28",
+  "build": 94,
+  "tag_name": "v2.2.28",
+  "changelog": "• VolPi Media v2.2.28:\n- Xử lý lỗi CoreMediaErrorDomain -12939 khi phát video Google Drive bị giới hạn hạn ngạch (Quota Exceeded).\n- Tự động nhận diện và chặn trang HTML lỗi từ Google Drive, hiển thị thông báo hướng dẫn kết nối tài khoản rõ ràng trên TV.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-07T20:10:09Z"
+  "published_at": "2026-11-09T23:18:00Z"
 }

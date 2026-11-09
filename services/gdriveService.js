@@ -702,6 +702,34 @@ async function streamVideo(fileId, req, res) {
       validateStatus: (status) => status >= 200 && status < 400,
     });
 
+    // Check if Google Drive returned an HTML page (e.g. Quota exceeded or Auth required)
+    const rawContentType = (driveRes.headers['content-type'] || '').toLowerCase();
+    if (rawContentType.includes('text/html')) {
+      let htmlBody = '';
+      for await (const chunk of driveRes.data) {
+        htmlBody += chunk.toString();
+        if (htmlBody.length > 5000) break;
+      }
+
+      const isQuota =
+        htmlBody.includes('Quota exceeded') ||
+        htmlBody.includes('Too many users') ||
+        htmlBody.includes('can\'t view or download') ||
+        htmlBody.includes('không thể xem hoặc tải xuống');
+
+      console.warn(`[GDriveStream] File ${fileId} failed: Google Drive returned HTML (Quota exceeded: ${isQuota})`);
+
+      if (!res.headersSent) {
+        res.status(isQuota ? 429 : 403).json({
+          error: isQuota
+            ? 'File này đã bị Google Drive giới hạn lượt tải trong 24h (Quota Exceeded). Vui lòng đăng nhập tài khoản Google tại https://stremio.laboon.vn/gdrive để phát không giới hạn.'
+            : 'Google Drive không cho phép phát file này hoặc yêu cầu đăng nhập tài khoản Google.',
+          code: isQuota ? 'QUOTA_EXCEEDED' : 'STREAM_ERROR',
+        });
+      }
+      return;
+    }
+
     const status = driveRes.status === 206 || (range && driveRes.headers['content-range']) ? 206 : 200;
 
     const responseHeaders = {
