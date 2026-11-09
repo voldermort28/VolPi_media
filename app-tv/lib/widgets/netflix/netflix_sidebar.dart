@@ -54,17 +54,21 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
       'icon': Icons.live_tv_rounded,
       'label': 'Truyền Hình (IPTV)',
     },
+    {
+      'icon': Icons.music_note_rounded,
+      'label': 'Nghe Nhạc',
+    },
   ];
 
   KeyEventResult _handleSidebarItemKey(int index, KeyEvent event) {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
-      if (index < 4) {
+      if (index < _menuItems.length - 1) {
         widget.focusNodes?[index + 1].requestFocus();
         return KeyEventResult.handled;
-      } else if (index == 4) {
-        // Move from IPTV (4) to Làm mới (7)
+      } else if (index == _menuItems.length - 1) {
+        // Move from last menu item to Làm mới (7)
         widget.focusNodes?[7].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 7) {
@@ -80,15 +84,15 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
-      if (index > 0 && index <= 4) {
+      if (index > 0 && index < _menuItems.length) {
         widget.focusNodes?[index - 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 0) {
         // Reached top of sidebar
         return KeyEventResult.handled;
       } else if (index == 7) {
-        // Move from Làm mới (7) up to IPTV (4)
-        widget.focusNodes?[4].requestFocus();
+        // Move from Làm mới (7) up to last menu item
+        widget.focusNodes?[_menuItems.length - 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 8) {
         // Move from Cập nhật (8) up to Làm mới (7)

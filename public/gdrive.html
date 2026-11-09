@@ -158,9 +158,9 @@
 
       <div class="flex items-center justify-between pt-2">
         <div class="flex items-center gap-2">
-          <input type="checkbox" id="check-is-private" class="w-4 h-4 rounded text-sky-600 bg-slate-800 border-slate-700 focus:ring-sky-500">
-          <label for="check-is-private" class="text-xs text-slate-300 cursor-pointer select-none">
-            Đây là thư mục riêng tư (Private) của tài khoản Owner đã kết nối
+          <input type="checkbox" id="check-is-public" class="w-4 h-4 rounded text-sky-600 bg-slate-800 border-slate-700 focus:ring-sky-500">
+          <label for="check-is-public" class="text-xs text-slate-300 cursor-pointer select-none">
+            Đây là nguồn công khai (Public - hiển thị ở Tab ngoài)
           </label>
         </div>
 
@@ -685,7 +685,8 @@
     async function handleAddSource() {
       const name = document.getElementById('input-source-name').value.trim();
       const url = document.getElementById('input-source-url').value.trim();
-      const isPrivate = document.getElementById('check-is-private').checked;
+      const isPublic = document.getElementById('check-is-public').checked;
+      const isPrivate = !isPublic; // Mặc định là Riêng tư nếu không tick
 
       if (!url) {
         showToast('Lỗi', 'Vui lòng nhập link hoặc ID thư mục Google Drive', false);
@@ -709,7 +710,7 @@
           showToast('Thành công', `Đã thêm thư mục! Tìm thấy ${data.count || 0} mục video & subfolder.`, true);
           document.getElementById('input-source-name').value = '';
           document.getElementById('input-source-url').value = '';
-          document.getElementById('check-is-private').checked = false;
+          document.getElementById('check-is-public').checked = false;
           await fetchSourcesData(true);
         } else {
           showToast('Lỗi', data.error || 'Không thể thêm nguồn', false);

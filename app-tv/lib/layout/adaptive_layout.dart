@@ -5,6 +5,7 @@ import '../screens/football_screen.dart';
 import '../screens/football_aggregate_screen.dart';
 import '../screens/anime_screen.dart';
 import '../screens/iptv_screen.dart';
+import '../screens/music_screen.dart';
 import '../screens/secret_movie_screen.dart';
 import '../services/player_settings_service.dart';
 import '../services/sync_service.dart';
@@ -31,6 +32,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
   final GlobalKey<FootballAggregateScreenState> _footballAggregateKey = GlobalKey<FootballAggregateScreenState>();
   final GlobalKey<AnimeScreenState> _animeKey = GlobalKey<AnimeScreenState>();
   final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
+  final GlobalKey<MusicScreenState> _musicKey = GlobalKey<MusicScreenState>();
 
   bool _isRefreshing = false;
 
@@ -100,6 +102,9 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           break;
         case 3:
           await _iptvKey.currentState?.refresh();
+          break;
+        case 4:
+          await _musicKey.currentState?.refresh();
           break;
       }
       if (mounted) {
@@ -217,6 +222,8 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                   _buildTvNavTab(index: 2, label: 'Anime & Phim', icon: Icons.auto_awesome_rounded),
                   const SizedBox(width: 12),
                   _buildTvNavTab(index: 3, label: 'Truyền Hình (IPTV)', icon: Icons.live_tv_rounded),
+                  const SizedBox(width: 12),
+                  _buildTvNavTab(index: 4, label: 'Nghe Nhạc', icon: Icons.music_note_rounded),
 
                   const Spacer(),
 
@@ -366,6 +373,14 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
                       isActive: _currentTabIndex == 3,
                     ),
                   ),
+                  ExcludeFocus(
+                    excluding: _currentTabIndex != 4,
+                    child: MusicScreen(
+                      key: _musicKey,
+                      apiService: widget.apiService,
+                      isActive: _currentTabIndex == 4,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -509,6 +524,14 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
               isActive: _currentTabIndex == 3,
             ),
           ),
+          ExcludeFocus(
+            excluding: _currentTabIndex != 4,
+            child: MusicScreen(
+              key: _musicKey,
+              apiService: widget.apiService,
+              isActive: _currentTabIndex == 4,
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -517,6 +540,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
         ),
         child: BottomNavigationBar(
           backgroundColor: const Color(0xFF0F172A),
+          type: BottomNavigationBarType.fixed,
           currentIndex: _currentTabIndex,
           selectedItemColor: const Color(0xFF38BDF8),
           unselectedItemColor: const Color(0xFF64748B),
@@ -543,6 +567,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
             BottomNavigationBarItem(
               icon: Icon(Icons.live_tv_rounded),
               label: 'Truyền Hình',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.music_note_rounded),
+              label: 'Nghe Nhạc',
             ),
           ],
         ),

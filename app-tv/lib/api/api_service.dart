@@ -461,10 +461,16 @@ class ApiService {
   // 5. GOOGLE DRIVE (PUBLIC & PRIVATE FOLDERS)
   // =========================================================================
 
-  /// Fetch all configured Google Drive sources from server
-  Future<List<GDriveSourceModel>> getGDriveSources({bool forceRefresh = false}) async {
+  /// Fetch configured Google Drive sources from server (optional filter by isPrivate)
+  Future<List<GDriveSourceModel>> getGDriveSources({bool? isPrivate, bool forceRefresh = false}) async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final url = forceRefresh ? '$baseUrl/api/gdrive/sources?_t=$timestamp' : '$baseUrl/api/gdrive/sources';
+    String url = '$baseUrl/api/gdrive/sources?_t=$timestamp';
+    if (isPrivate != null) {
+      url += '&isPrivate=$isPrivate';
+    }
+    if (forceRefresh) {
+      url += '&forceRefresh=true';
+    }
     try {
       final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {

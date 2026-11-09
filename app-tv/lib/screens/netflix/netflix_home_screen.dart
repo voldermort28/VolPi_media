@@ -12,6 +12,7 @@ import '../../services/favorites_service.dart';
 import '../../services/sync_service.dart';
 import '../../services/watch_history_service.dart';
 import '../../widgets/resume_playback_dialog.dart';
+import '../../widgets/movie_action_dialog.dart';
 import '../../widgets/tv_focusable_card.dart';
 import '../../widgets/netflix/netflix_scrollable_row.dart';
 import '../anime_detail_screen.dart';
@@ -67,7 +68,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   void _onHistoryChanged() {
     if (mounted) {
       setState(() {
-        _continueWatching = WatchHistoryService.instance.getContinueWatching(excludeCategory: 'secret');
+        _continueWatching = WatchHistoryService.instance
+            .getContinueWatching(excludeCategory: 'secret')
+            .where((item) => !item.category.contains('secret') && !item.category.contains('private'))
+            .toList();
       });
     }
   }
@@ -75,7 +79,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   void _onFavoritesChanged() {
     if (mounted) {
       setState(() {
-        _favorites = FavoritesService.instance.getFavorites().where((f) => f.category != 'secret').toList();
+        _favorites = FavoritesService.instance
+            .getFavorites()
+            .where((f) => f.category != 'secret' && !f.category.contains('private'))
+            .toList();
       });
     }
   }
@@ -152,8 +159,14 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         _vietnamMatches = vnMatches;
         _majorMatches = major;
         _liveMatches = live;
-        _continueWatching = WatchHistoryService.instance.getContinueWatching(excludeCategory: 'secret');
-        _favorites = FavoritesService.instance.getFavorites().where((f) => f.category != 'secret').toList();
+        _continueWatching = WatchHistoryService.instance
+            .getContinueWatching(excludeCategory: 'secret')
+            .where((item) => !item.category.contains('secret') && !item.category.contains('private'))
+            .toList();
+        _favorites = FavoritesService.instance
+            .getFavorites()
+            .where((f) => f.category != 'secret' && !f.category.contains('private'))
+            .toList();
         _isLoading = false;
       });
 
@@ -209,6 +222,86 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         ),
       ),
     );
+  }
+
+  void _openContinueWatchingMenu(WatchHistoryItem item) async {
+    final favId = item.id.startsWith('anime:') ? 'anime:${_cleanAnimeSlug(item.id)}' : item.id;
+    final isFav = FavoritesService.instance.isFavorite(favId) || FavoritesService.instance.isFavorite(item.id);
+
+    final action = await MovieActionDialog.show(
+      context,
+      title: item.title,
+      poster: item.poster,
+      isFavorite: isFav,
+      hasHistory: true,
+    );
+
+    if (action == null || action == MovieAction.cancel || !mounted) return;
+
+    if (action == MovieAction.toggleFavorite) {
+      final nowFav = FavoritesService.instance.toggleFavorite(
+        FavoriteItem(
+          id: favId,
+          title: item.title,
+          poster: item.poster,
+          category: item.category,
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(nowFav ? 'Đã thêm vào Danh Sách Của Tôi' : 'Đã xóa khỏi Danh Sách Của Tôi'),
+          backgroundColor: nowFav ? const Color(0xFF0284C7) : Colors.grey[800],
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else if (action == MovieAction.removeHistory) {
+      WatchHistoryService.instance.clearProgress(item.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa khỏi Tiếp tục xem'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (action == MovieAction.play) {
+      _onContinueWatchingTap(item);
+    }
+  }
+
+  void _openFavoritesMenu(FavoriteItem item) async {
+    final hasHist = WatchHistoryService.instance.getProgress(item.id) != null;
+
+    final action = await MovieActionDialog.show(
+      context,
+      title: item.title,
+      poster: item.poster,
+      isFavorite: true,
+      hasHistory: hasHist,
+    );
+
+    if (action == null || action == MovieAction.cancel || !mounted) return;
+
+    if (action == MovieAction.toggleFavorite) {
+      FavoritesService.instance.toggleFavorite(item);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa khỏi Danh Sách Của Tôi'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (action == MovieAction.removeHistory) {
+      WatchHistoryService.instance.clearProgress(item.id);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã xóa khỏi Tiếp tục xem'),
+          backgroundColor: Colors.grey,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } else if (action == MovieAction.play) {
+      _onFavoriteItemTap(item);
+    }
   }
 
   void _onContinueWatchingTap(WatchHistoryItem item) {
@@ -628,6 +721,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
             child: TvFocusableCard(
               focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
               onTap: () => _playContinueWatchingAtIndex(idx),
+              onLongPress: () => _openContinueWatchingMenu(item),
+              onSecondaryTap: () => _openContinueWatchingMenu(item),
               borderRadius: BorderRadius.circular(6),
               scale: 1.05,
               focusBorderColor: Colors.white,
@@ -750,6 +845,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           child: TvFocusableCard(
             focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
             onTap: () => _onFavoriteItemTap(item),
+            onLongPress: () => _openFavoritesMenu(item),
+            onSecondaryTap: () => _openFavoritesMenu(item),
             borderRadius: BorderRadius.circular(6),
             scale: 1.05,
             focusBorderColor: Colors.white,

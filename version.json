@@ -1,10 +1,10 @@
 {
-  "version": "2.2.35",
-  "build": 101,
-  "tag_name": "v2.2.35",
-  "changelog": "• VolPi Media v2.2.35:\n- Khắc phục triệt để lỗi biên dịch thuộc tính score trong MatchModel trên iOS/Android/macOS.\n- Ra mắt Tab Tổng Hợp Bóng Đá đa nguồn: Gà Vàng TV (gavang1.xyz), Về Bờ TV (vebozbn.cc) & Socolive.\n- Sắp xếp thông minh: Manchester United, ĐTQG & CLB Việt Nam, Ngoại Hạng Anh, Cúp C1 và Trận Hot; hạ giải cỏ xuống cuối.",
+  "version": "2.2.36",
+  "build": 102,
+  "tag_name": "v2.2.36",
+  "changelog": "• VolPi Media v2.2.36:\n- Ra mắt Tab Nghe Nhạc độc lập, công khai: hỗ trợ album/thư mục lossless FLAC, MP3 từ Google Drive.\n- Phát nhạc chạy ngầm khi tắt màn hình (Background Audio) & Media Control trên màn hình khóa (Lockscreen Player).\n- Sửa lỗi click chuột phải trên Desktop / Giữ thumbnail trên TV/Mobile để mở menu và xóa khỏi Tiếp tục xem (Recent).\n- Mặc định thêm nguồn Google Drive là Riêng tư (Private by default), bảo mật tuyệt đối không lọt vào Recent ở Home.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T19:02:00Z"
+  "published_at": "2026-11-09T19:45:00Z"
 }

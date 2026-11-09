@@ -183,6 +183,7 @@ class TelegramScreenState extends State<TelegramScreen> {
     final posterUrl = video.thumbnailUrl != null
         ? '${widget.apiService.baseUrl}${video.thumbnailUrl}'
         : '';
+    final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -191,8 +192,20 @@ class TelegramScreenState extends State<TelegramScreen> {
           title: video.title,
           subtitle: _selectedSource?.name ?? 'Telegram Phim',
           mediaId: 'telegram_${video.channelId}_${video.id}',
-          mediaCategory: 'telegram',
+          mediaCategory: 'secret',
           mediaPoster: posterUrl,
+          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex + 1]);
+                }
+              : null,
+          onPrevious: (currentIndex > 0)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex - 1]);
+                }
+              : null,
         ),
       ),
     );

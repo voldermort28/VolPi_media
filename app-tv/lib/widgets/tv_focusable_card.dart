@@ -253,7 +253,7 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
                     (widget.onSecondaryTap ?? widget.onLongPress)!();
                   }
                 : null,
-            onLongPress: (widget.onLongPress != null && !_isMacOS)
+            onLongPress: widget.onLongPress != null
                 ? () {
                     _focusNode.requestFocus();
                     widget.onLongPress!();

@@ -7,6 +7,7 @@ import 'services/favorites_service.dart';
 import 'services/player_settings_service.dart';
 import 'services/update_service.dart';
 import 'services/watch_history_service.dart';
+import 'services/audio_player_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +30,7 @@ void main() async {
     FavoritesService.instance.init(),
     PlayerSettingsService.instance.init(),
     UpdateService.cleanupStaleApk(),
+    VolPiAudioHandler.init(),
   ]);
 
   final apiService = ApiService();

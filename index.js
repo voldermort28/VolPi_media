@@ -659,7 +659,12 @@ app.post("/api/gdrive/auth/disconnect", authService.requireAuth, (req, res) => {
 
 app.get("/api/gdrive/sources", async (req, res) => {
   try {
-    const sources = await gdriveService.getSources();
+    const isPrivate = req.query.isPrivate;
+    const filter = {};
+    if (isPrivate !== undefined) {
+      filter.isPrivate = isPrivate === 'true' || isPrivate === true;
+    }
+    const sources = await gdriveService.getSources(filter);
     res.json(sources);
   } catch (err) {
     res.status(500).json({ error: err.message });

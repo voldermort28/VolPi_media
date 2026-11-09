@@ -37,6 +37,7 @@ class GDriveItemModel {
   final String id;
   final String name;
   final bool isFolder;
+  final bool isAudio;
   final int size;
   final String formattedSize;
   final String mimeType;
@@ -51,6 +52,7 @@ class GDriveItemModel {
     required this.id,
     required this.name,
     required this.isFolder,
+    this.isAudio = false,
     this.size = 0,
     this.formattedSize = '',
     this.mimeType = '',
@@ -63,13 +65,20 @@ class GDriveItemModel {
   });
 
   factory GDriveItemModel.fromJson(Map<String, dynamic> json) {
+    final mime = json['mimeType'] as String? ?? '';
+    final nameLower = (json['name'] as String? ?? '').toLowerCase();
+    final isAud = json['isAudio'] == true ||
+        mime.startsWith('audio/') ||
+        ['.mp3', '.flac', '.m4a', '.wav', '.aac', '.ogg', '.dsf', '.wma', '.alac'].any((ext) => nameLower.endsWith(ext));
+
     return GDriveItemModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       isFolder: json['isFolder'] as bool? ?? false,
+      isAudio: isAud,
       size: (json['size'] as num?)?.toInt() ?? 0,
       formattedSize: json['formattedSize'] as String? ?? '',
-      mimeType: json['mimeType'] as String? ?? '',
+      mimeType: mime,
       thumbnailUrl: json['thumbnailUrl'] as String?,
       subtitleFileId: json['subtitleFileId'] as String?,
       subtitleName: json['subtitleName'] as String?,
@@ -86,7 +95,10 @@ class GDriveFolderContentResult {
   final List<GDriveItemModel> allFolders;
   final List<GDriveItemModel> videos;
   final List<GDriveItemModel> allVideos;
+  final List<GDriveItemModel> audios;
+  final List<GDriveItemModel> allAudios;
   final int totalVideos;
+  final int totalAudios;
   final int totalFolders;
   final int totalItems;
 
@@ -96,7 +108,10 @@ class GDriveFolderContentResult {
     required this.allFolders,
     required this.videos,
     required this.allVideos,
+    this.audios = const [],
+    this.allAudios = const [],
     required this.totalVideos,
+    this.totalAudios = 0,
     required this.totalFolders,
     required this.totalItems,
   });
@@ -118,6 +133,14 @@ class GDriveFolderContentResult {
             ?.map((e) => GDriveItemModel.fromJson(e as Map<String, dynamic>))
             .toList() ??
         videoList;
+    final audioList = (json['audios'] as List?)
+            ?.map((e) => GDriveItemModel.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+    final allAudioList = (json['allAudios'] as List?)
+            ?.map((e) => GDriveItemModel.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        audioList;
 
     return GDriveFolderContentResult(
       folderId: json['folderId'] as String? ?? '',
@@ -125,9 +148,12 @@ class GDriveFolderContentResult {
       allFolders: allFolderList,
       videos: videoList,
       allVideos: allVideoList,
+      audios: audioList,
+      allAudios: allAudioList,
       totalVideos: (json['totalVideos'] as num?)?.toInt() ?? allVideoList.length,
+      totalAudios: (json['totalAudios'] as num?)?.toInt() ?? allAudioList.length,
       totalFolders: (json['totalFolders'] as num?)?.toInt() ?? allFolderList.length,
-      totalItems: (json['totalItems'] as num?)?.toInt() ?? (allVideoList.length + folderList.length),
+      totalItems: (json['totalItems'] as num?)?.toInt() ?? (allVideoList.length + allAudioList.length + folderList.length),
     );
   }
 }

@@ -123,7 +123,7 @@ class GDriveScreenState extends State<GDriveScreen> {
       if (result != null) {
         setState(() {
           _folders = result.folders;
-          _videos = result.allVideos.isNotEmpty ? result.allVideos : result.videos;
+          _videos = result.videos;
           _isLoading = false;
         });
       } else {
@@ -168,6 +168,8 @@ class GDriveScreenState extends State<GDriveScreen> {
 
   void _playVideo(GDriveItemModel video) {
     final streamUrl = widget.apiService.getGDriveStreamUrl(video.id);
+    final isPrivate = _selectedSource?.isPrivate ?? true;
+    final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -176,8 +178,20 @@ class GDriveScreenState extends State<GDriveScreen> {
           title: video.name,
           subtitle: _selectedSource?.name ?? 'Google Drive',
           mediaId: 'gdrive_${video.id}',
-          mediaCategory: 'gdrive',
+          mediaCategory: isPrivate ? 'secret' : 'gdrive',
           mediaPoster: video.thumbnailUrl ?? '',
+          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex + 1]);
+                }
+              : null,
+          onPrevious: (currentIndex > 0)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex - 1]);
+                }
+              : null,
         ),
       ),
     );

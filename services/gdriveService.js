@@ -97,6 +97,7 @@ function formatBytes(bytes) {
  * Check if file is a video by extension or mimeType
  */
 const VIDEO_EXTENSIONS = ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.ts', '.m4v', '.flv'];
+const AUDIO_EXTENSIONS = ['.flac', '.mp3', '.m4a', '.wav', '.aac', '.ogg', '.dsf', '.wma', '.alac', '.ape', '.opus'];
 const SUBTITLE_EXTENSIONS = ['.srt', '.vtt', '.ass'];
 
 function isVideoFile(name, mimeType = '') {
@@ -104,6 +105,13 @@ function isVideoFile(name, mimeType = '') {
   if (!name) return false;
   const lower = name.toLowerCase();
   return VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
+
+function isAudioFile(name, mimeType = '') {
+  if (mimeType && mimeType.startsWith('audio/')) return true;
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  return AUDIO_EXTENSIONS.some((ext) => lower.endsWith(ext));
 }
 
 function isSubtitleFile(name, mimeType = '') {
@@ -273,9 +281,15 @@ async function getValidAccessToken() {
 // SOURCES MANAGEMENT
 // =========================================================================
 
-async function getSources() {
+async function getSources(filter = {}) {
   const cfg = loadConfig();
-  const sources = cfg.sources || [];
+  let sources = cfg.sources || [];
+
+  if (filter.isPrivate === true || filter.isPrivate === 'true') {
+    sources = sources.filter((s) => s.isPrivate === true);
+  } else if (filter.isPrivate === false || filter.isPrivate === 'false') {
+    sources = sources.filter((s) => s.isPrivate === false);
+  }
 
   return sources.map((s) => ({
     id: s.id,
@@ -283,13 +297,13 @@ async function getSources() {
     folderId: s.folderId,
     url: s.url,
     enabled: s.enabled !== false,
-    isPrivate: !!s.isPrivate,
+    isPrivate: s.isPrivate !== false,
     count: s.lastCount || 0,
     createdAt: s.createdAt || null,
   }));
 }
 
-async function addSource({ name, url, isPrivate = false }) {
+async function addSource({ name, url, isPrivate = true }) {
   const cleanName = (name || '').trim();
   const cleanUrl = (url || '').trim();
 
@@ -315,9 +329,12 @@ async function addSource({ name, url, isPrivate = false }) {
   let count = 0;
   try {
     const contents = await getFolderContents(folderId, { forceRefresh: true });
-    count = contents.totalVideos > 0
-        ? contents.totalVideos
-        : ((contents.videos ? contents.videos.length : 0) + (contents.folders ? contents.folders.length : 0));
+    count = (contents.totalVideos || 0) + (contents.totalAudios || 0);
+    if (count === 0) {
+      count = (contents.videos ? contents.videos.length : 0) +
+              (contents.audios ? contents.audios.length : 0) +
+              (contents.folders ? contents.folders.length : 0);
+    }
   } catch (err) {
     console.warn(`[GDriveService] Warning during test scan of ${folderId}:`, err.message);
   }
@@ -327,7 +344,7 @@ async function addSource({ name, url, isPrivate = false }) {
     name: cleanName || 'Thư mục Google Drive',
     folderId,
     url: cleanUrl,
-    isPrivate: !!isPrivate,
+    isPrivate: isPrivate !== false,
     enabled: true,
     lastCount: count,
     createdAt: new Date().toISOString(),
@@ -547,8 +564,10 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
 
   const directFolders = [];
   const directVideos = [];
+  const directAudios = [];
   const allFolders = [];
   const allVideos = [];
+  const allAudios = [];
   const allSubtitles = [];
 
   while (queue.length > 0) {
@@ -617,6 +636,25 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
             directVideos.push(videoObj);
           }
           allVideos.push(videoObj);
+        } else if (isAudioFile(f.name, f.mimeType)) {
+          const audioObj = {
+            id: f.id,
+            name: f.name || 'Audio',
+            isFolder: false,
+            isAudio: true,
+            size: parseInt(f.size || 0, 10),
+            formattedSize: formatBytes(f.size),
+            mimeType: f.mimeType || 'audio/mpeg',
+            thumbnailUrl: f.thumbnailLink || null,
+            folderId: curr.id,
+            folderName: curr.name,
+            folderPath: curr.path || '',
+          };
+
+          if (isRoot) {
+            directAudios.push(audioObj);
+          }
+          allAudios.push(audioObj);
         } else if (isSubtitleFile(f.name, f.mimeType)) {
           allSubtitles.push({
             id: f.id,
@@ -653,7 +691,14 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
 
   directFolders.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
   directVideos.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
+  directAudios.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
   allVideos.sort((a, b) => {
+    if (a.folderPath && b.folderPath && a.folderPath !== b.folderPath) {
+      return a.folderPath.localeCompare(b.folderPath, 'vi', { numeric: true });
+    }
+    return a.name.localeCompare(b.name, 'vi', { numeric: true });
+  });
+  allAudios.sort((a, b) => {
     if (a.folderPath && b.folderPath && a.folderPath !== b.folderPath) {
       return a.folderPath.localeCompare(b.folderPath, 'vi', { numeric: true });
     }
@@ -666,9 +711,12 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
     allFolders,
     videos: directVideos,
     allVideos,
+    audios: directAudios,
+    allAudios,
     totalVideos: allVideos.length,
+    totalAudios: allAudios.length,
     totalFolders: allFolders.length,
-    totalItems: allVideos.length + directFolders.length,
+    totalItems: allVideos.length + allAudios.length + directFolders.length,
     timestamp: Date.now(),
   };
 

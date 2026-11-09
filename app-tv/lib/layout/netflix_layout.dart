@@ -6,6 +6,7 @@ import '../models/update_model.dart';
 import '../screens/football_screen.dart';
 import '../screens/football_aggregate_screen.dart';
 import '../screens/iptv_screen.dart';
+import '../screens/music_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
 import '../screens/secret_movie_screen.dart';
@@ -28,7 +29,7 @@ class NetflixLayout extends StatefulWidget {
 
 class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Tổng Hợp Bóng Đá, 3: Anime, 4: IPTV
+  int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Tổng Hợp Bóng Đá, 3: Anime, 4: IPTV, 5: Nghe Nhạc
 
   // Tab GlobalKeys to trigger reloads from Header bar
   final GlobalKey<NetflixHomeScreenState> _homeKey = GlobalKey<NetflixHomeScreenState>();
@@ -36,6 +37,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<FootballAggregateScreenState> _footballAggregateKey = GlobalKey<FootballAggregateScreenState>();
   final GlobalKey<NetflixAnimeScreenState> _animeKey = GlobalKey<NetflixAnimeScreenState>();
   final GlobalKey<IptvScreenState> _iptvKey = GlobalKey<IptvScreenState>();
+  final GlobalKey<MusicScreenState> _musicKey = GlobalKey<MusicScreenState>();
 
   bool _isRefreshingHeader = false;
 
@@ -207,6 +209,17 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           }
         }
         break;
+
+      case 5: // Nghe Nhạc: Thẻ đầu tiên của Music
+        final musicState = _musicKey.currentState;
+        if (musicState != null && musicState.mounted) {
+          final firstNode = musicState.firstCardFocusNode;
+          if (firstNode.canRequestFocus && isUsable(firstNode)) {
+            firstNode.requestFocus();
+            return;
+          }
+        }
+        break;
     }
 
     // 3. Fallback: Thẻ hiển thị trên cùng - bên trái nhất của vùng nội dung nhìn thấy
@@ -265,6 +278,9 @@ class _NetflixLayoutState extends State<NetflixLayout> {
           break;
         case 4:
           await _iptvKey.currentState?.refresh();
+          break;
+        case 5:
+          await _musicKey.currentState?.refresh();
           break;
       }
       if (mounted) {
@@ -476,6 +492,16 @@ class _NetflixLayoutState extends State<NetflixLayout> {
             isActive: _currentTabIndex == 4,
           ),
         ),
+
+        // Tab 5: Nghe Nhạc
+        ExcludeFocus(
+          excluding: _currentTabIndex != 5,
+          child: MusicScreen(
+            key: _musicKey,
+            apiService: widget.apiService,
+            isActive: _currentTabIndex == 5,
+          ),
+        ),
       ],
     );
   }
@@ -490,6 +516,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       'Tổng Hợp Bóng Đá',
       'Anime & Phim',
       'Truyền Hình (IPTV)',
+      'Nghe Nhạc',
     ];
     final currentTitle = _currentTabIndex < titles.length ? titles[_currentTabIndex] : 'VolPi Media';
 
@@ -590,6 +617,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       {'icon': Icons.sports_rounded, 'label': 'Tổng Hợp Bóng Đá'},
       {'icon': Icons.auto_awesome_rounded, 'label': 'Anime & Phim'},
       {'icon': Icons.live_tv_rounded, 'label': 'Truyền Hình (IPTV)'},
+      {'icon': Icons.music_note_rounded, 'label': 'Nghe Nhạc'},
     ];
 
     return Drawer(
