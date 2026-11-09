@@ -499,105 +499,39 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     ? const Color(0xFFEC4899)
                     : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E)))));
 
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       body: SafeArea(
         child: Column(
           children: [
-            // Header Bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  TvFocusableCard(
-                    autoFocus: !_isSearching,
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      color: const Color(0xFF1E293B),
-                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-
-                  // TAB SWITCHER: VLFilm vs Viet69 vs xNhau vs Google Drive vs Telegram Phim vs Yêu thích
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    padding: const EdgeInsets.all(3),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildSourceTab(
-                          index: 0,
-                          label: 'VLFilm',
-                          icon: Icons.movie_outlined,
-                          activeColor: const Color(0xFFF43F5E),
+            if (isMobile) ...[
+              // Action Bar (Row 1 on Mobile)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Row(
+                  children: [
+                    TvFocusableCard(
+                      autoFocus: !_isSearching,
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        const SizedBox(width: 4),
-                        _buildSourceTab(
-                          index: 1,
-                          label: 'Viet69',
-                          icon: Icons.local_fire_department_rounded,
-                          activeColor: const Color(0xFFEA580C),
-                        ),
-                        const SizedBox(width: 4),
-                        _buildSourceTab(
-                          index: 2,
-                          label: 'xNhau',
-                          icon: Icons.flash_on_rounded,
-                          activeColor: const Color(0xFFEC4899),
-                        ),
-                        const SizedBox(width: 4),
-                        _buildSourceTab(
-                          index: 3,
-                          label: 'Google Drive',
-                          icon: Icons.cloud_circle_rounded,
-                          activeColor: const Color(0xFF0284C7),
-                        ),
-                        const SizedBox(width: 4),
-                        _buildSourceTab(
-                          index: 4,
-                          label: 'Telegram Phim',
-                          icon: Icons.send_rounded,
-                          activeColor: const Color(0xFF0EA5E9),
-                        ),
-                        const SizedBox(width: 4),
-                        _buildSourceTab(
-                          index: 5,
-                          label: 'Yêu thích ${_secretFavorites.isNotEmpty ? "(${_secretFavorites.length})" : ""}',
-                          icon: Icons.favorite_rounded,
-                          activeColor: const Color(0xFFE11D48),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-                  if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3)
-                    Expanded(
-                      child: Text(
-                        'Tìm: "$_searchQuery"',
-                        style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
                       ),
-                    )
-                  else
-                    const Spacer(),
-
-                  // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2)
-                  if (_selectedSourceIndex < 3) ...[
-                    if (_isSearching)
+                    ),
+                    const SizedBox(width: 10),
+                    if (_isSearching && _selectedSourceIndex < 3) ...[
                       Expanded(
-                        flex: 3,
                         child: Container(
                           height: 38,
-                          margin: const EdgeInsets.symmetric(horizontal: 10),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFF1E293B),
                             borderRadius: BorderRadius.circular(10),
@@ -606,7 +540,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                           child: Row(
                             children: [
                               const Icon(Icons.search, color: Colors.white54, size: 18),
-                              const SizedBox(width: 8),
+                              const SizedBox(width: 6),
                               Expanded(
                                 child: TextField(
                                   controller: _searchController,
@@ -614,10 +548,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                   style: const TextStyle(color: Colors.white, fontSize: 13),
                                   decoration: InputDecoration(
                                     hintText: _selectedSourceIndex == 2
-                                        ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
+                                        ? 'Tìm clip xNhau...'
                                         : (_selectedSourceIndex == 1
-                                            ? 'Nhập từ khóa clip, sinh viên, teen...'
-                                            : 'Nhập từ khóa, mã phim...'),
+                                            ? 'Tìm clip Viet69...'
+                                            : 'Tìm phim VLFilm...'),
                                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                                     border: InputBorder.none,
                                     isDense: true,
@@ -626,61 +560,260 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                   onSubmitted: (_) => _submitSearch(),
                                 ),
                               ),
+                              if (_searchController.text.isNotEmpty)
+                                IconButton(
+                                  icon: const Icon(Icons.clear, color: Colors.white54, size: 16),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    _clearSearch();
+                                  },
+                                ),
                               IconButton(
-                                icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                                icon: const Icon(Icons.close, color: Colors.white70, size: 18),
                                 padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () {
+                                  setState(() {
+                                    _isSearching = false;
+                                  });
+                                  if (_searchQuery != null) _clearSearch();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3) ...[
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Tìm: "$_searchQuery"',
+                                  style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close, color: Colors.white54, size: 16),
+                                padding: const EdgeInsets.only(left: 4),
                                 constraints: const BoxConstraints(),
                                 onPressed: _clearSearch,
                               ),
                             ],
                           ),
                         ),
-                      )
-                    else
+                      ] else ...[
+                        const Expanded(
+                          child: Text(
+                            'Kho Phim',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(width: 6),
+                      // Search Toggle Button (Tabs 0, 1, 2)
+                      if (_selectedSourceIndex < 3) ...[
+                        TvFocusableCard(
+                          onTap: () {
+                            setState(() {
+                              _isSearching = true;
+                            });
+                            Future.delayed(const Duration(milliseconds: 100), () {
+                              _searchFocusNode.requestFocus();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.search, color: Colors.white70, size: 16),
+                                SizedBox(width: 4),
+                                Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      // Exit & Lock Button
                       TvFocusableCard(
-                        onTap: () {
-                          setState(() {
-                            _isSearching = true;
-                          });
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            _searchFocusNode.requestFocus();
-                          });
-                        },
+                        onTap: () => Navigator.of(context).pop(),
                         borderRadius: BorderRadius.circular(10),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          color: const Color(0xFF1E293B),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent.withOpacity(0.18),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                          ),
                           child: const Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.search, color: Colors.white70, size: 16),
-                              SizedBox(width: 6),
-                              Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                              Icon(Icons.lock_outline_rounded, color: Colors.redAccent, size: 16),
+                              SizedBox(width: 4),
+                              Text('Khóa', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
                       ),
-                    const SizedBox(width: 10),
+                    ],
                   ],
+                ),
+              ),
 
-                  // Exit & Lock button
-                  TvFocusableCard(
-                    onTap: () => Navigator.of(context).pop(),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      color: Colors.redAccent.withOpacity(0.2),
-                      child: const Row(
-                        children: [
-                          Icon(Icons.lock_outline_rounded, color: Colors.redAccent, size: 16),
-                          SizedBox(width: 6),
-                          Text('Khóa & Thoát', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
-                        ],
+              // Tab Switcher Row (Row 2 on Mobile - Horizontally scrollable)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  physics: const BouncingScrollPhysics(),
+                  child: _buildTabSwitcher(),
+                ),
+              ),
+            ] else ...[
+              // Desktop & TV (Row 1 contains Back, Tabs inside Flexible/Scrollable, Spacer, Search, Lock)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Row(
+                  children: [
+                    TvFocusableCard(
+                      autoFocus: !_isSearching,
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        color: const Color(0xFF1E293B),
+                        child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 12),
+
+                    // TAB SWITCHER: Wrapped in Flexible + SingleChildScrollView
+                    Flexible(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: _buildTabSwitcher(),
+                      ),
+                    ),
+
+                    const SizedBox(width: 12),
+                    if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3)
+                      Expanded(
+                        child: Text(
+                          'Tìm: "$_searchQuery"',
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )
+                    else
+                      const Spacer(),
+
+                    // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2)
+                    if (_selectedSourceIndex < 3) ...[
+                      if (_isSearching)
+                        Expanded(
+                          flex: 3,
+                          child: Container(
+                            height: 38,
+                            margin: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: themeColor, width: 1.5),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.search, color: Colors.white54, size: 18),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _searchFocusNode,
+                                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText: _selectedSourceIndex == 2
+                                          ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
+                                          : (_selectedSourceIndex == 1
+                                              ? 'Nhập từ khóa clip, sinh viên, teen...'
+                                              : 'Nhập từ khóa, mã phim...'),
+                                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
+                                      border: InputBorder.none,
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                    ),
+                                    onSubmitted: (_) => _submitSearch(),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close, color: Colors.white54, size: 18),
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  onPressed: _clearSearch,
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      else
+                        TvFocusableCard(
+                          onTap: () {
+                            setState(() {
+                              _isSearching = true;
+                            });
+                            Future.delayed(const Duration(milliseconds: 100), () {
+                              _searchFocusNode.requestFocus();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(10),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            color: const Color(0xFF1E293B),
+                            child: const Row(
+                              children: [
+                                Icon(Icons.search, color: Colors.white70, size: 16),
+                                SizedBox(width: 6),
+                                Text('Tìm kiếm', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 10),
+                    ],
+
+                    // Exit & Lock button
+                    TvFocusableCard(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        color: Colors.redAccent.withOpacity(0.2),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.lock_outline_rounded, color: Colors.redAccent, size: 16),
+                            SizedBox(width: 6),
+                            Text('Khóa & Thoát', style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
 
             // Category Bar (Visible when Viet69 or xNhau tab is active & not in search mode)
             if ((_selectedSourceIndex == 1 || _selectedSourceIndex == 2) && (_searchQuery == null || _searchQuery!.isEmpty))
@@ -1384,6 +1517,63 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTabSwitcher() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white10),
+      ),
+      padding: const EdgeInsets.all(3),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildSourceTab(
+            index: 0,
+            label: 'VLFilm',
+            icon: Icons.movie_outlined,
+            activeColor: const Color(0xFFF43F5E),
+          ),
+          const SizedBox(width: 4),
+          _buildSourceTab(
+            index: 1,
+            label: 'Viet69',
+            icon: Icons.local_fire_department_rounded,
+            activeColor: const Color(0xFFEA580C),
+          ),
+          const SizedBox(width: 4),
+          _buildSourceTab(
+            index: 2,
+            label: 'xNhau',
+            icon: Icons.flash_on_rounded,
+            activeColor: const Color(0xFFEC4899),
+          ),
+          const SizedBox(width: 4),
+          _buildSourceTab(
+            index: 3,
+            label: 'Google Drive',
+            icon: Icons.cloud_circle_rounded,
+            activeColor: const Color(0xFF0284C7),
+          ),
+          const SizedBox(width: 4),
+          _buildSourceTab(
+            index: 4,
+            label: 'Telegram Phim',
+            icon: Icons.send_rounded,
+            activeColor: const Color(0xFF0EA5E9),
+          ),
+          const SizedBox(width: 4),
+          _buildSourceTab(
+            index: 5,
+            label: 'Yêu thích ${_secretFavorites.isNotEmpty ? "(${_secretFavorites.length})" : ""}',
+            icon: Icons.favorite_rounded,
+            activeColor: const Color(0xFFE11D48),
+          ),
+        ],
       ),
     );
   }

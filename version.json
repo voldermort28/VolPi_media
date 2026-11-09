@@ -1,10 +1,10 @@
 {
-  "version": "2.2.30",
-  "build": 96,
-  "tag_name": "v2.2.30",
-  "changelog": "• VolPi Media v2.2.30:\n- Tự động kiểm tra và xác thực quyền Google Drive (drive.readonly) trong quá trình kết nối OAuth2.\n- Cảnh báo trực quan trên web quản lý khi người dùng chưa tích chọn ô quyền Drive và hỗ trợ nút cấp lại quyền một chạm.",
+  "version": "2.2.31",
+  "build": 97,
+  "tag_name": "v2.2.31",
+  "changelog": "• VolPi Media v2.2.31:\n- Tối ưu giao diện mobile / màn hình dọc cho trang Kho Phim Bí Mật: Tách riêng thanh hành động và thanh chọn nguồn (VLFilm, Viet69, xNhau, Google Drive, Telegram, Yêu thích) với khả năng cuộn ngang mượt mà, khắc phục triệt để hiện tượng tràn dòng và che khuất nội dung.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T17:12:00Z"
+  "published_at": "2026-11-10T00:45:00Z"
 }
