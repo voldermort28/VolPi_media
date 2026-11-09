@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
 class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
@@ -16,7 +17,7 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         androidNotificationChannelName: 'VolPi Media Audio Playback',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
-        notificationColor: 0xFF0284C7,
+        notificationColor: Color(0xFF0284C7),
       ),
     );
     _instance = handler;

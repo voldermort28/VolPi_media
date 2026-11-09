@@ -245,6 +245,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           title: item.title,
           poster: item.poster,
           category: item.category,
+          createdAt: DateTime.now().toIso8601String(),
         ),
       );
       ScaffoldMessenger.of(context).showSnackBar(
