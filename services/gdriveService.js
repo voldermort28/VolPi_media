@@ -120,8 +120,13 @@ function isSubtitleFile(name, mimeType = '') {
 function getOAuthStatus() {
   const cfg = loadConfig();
   const oauth = cfg.oauth || {};
+  const hasDriveScope = (oauth.scope || '').includes('drive');
+  const isFullyConnected = !!oauth.connected && !!oauth.refreshToken && hasDriveScope;
+  const needsDriveScope = !!oauth.connected && !hasDriveScope;
+
   return {
-    connected: !!oauth.connected && !!oauth.refreshToken,
+    connected: isFullyConnected,
+    needsDriveScope,
     email: oauth.email || null,
     hasCredentials: !!(oauth.clientId && oauth.clientSecret),
     clientId: oauth.clientId ? `${oauth.clientId.substring(0, 15)}...` : '',
@@ -183,7 +188,7 @@ async function handleOAuthCallback(code, redirectUri) {
     }
   );
 
-  const { access_token, refresh_token, expires_in } = tokenRes.data;
+  const { access_token, refresh_token, expires_in, scope } = tokenRes.data;
   let userEmail = null;
 
   try {
@@ -198,6 +203,7 @@ async function handleOAuthCallback(code, redirectUri) {
 
   cfg.oauth.connected = true;
   cfg.oauth.email = userEmail || 'Connected Account';
+  cfg.oauth.scope = scope || '';
   if (refresh_token) {
     cfg.oauth.refreshToken = refresh_token;
   }
@@ -205,13 +211,15 @@ async function handleOAuthCallback(code, redirectUri) {
   cfg.oauth.tokenExpiry = Date.now() + (expires_in ? (expires_in - 120) * 1000 : 3500 * 1000);
 
   saveConfig(cfg);
-  return { success: true, email: cfg.oauth.email };
+  const hasDriveScope = (scope || '').includes('drive');
+  return { success: true, email: cfg.oauth.email, needsDriveScope: !hasDriveScope };
 }
 
 function disconnectOAuth() {
   const cfg = loadConfig();
   cfg.oauth.connected = false;
   cfg.oauth.email = null;
+  cfg.oauth.scope = '';
   cfg.oauth.refreshToken = '';
   cfg.oauth.accessToken = '';
   cfg.oauth.tokenExpiry = 0;
@@ -223,7 +231,8 @@ async function getValidAccessToken() {
   const cfg = loadConfig();
   const oauth = cfg.oauth || {};
 
-  if (!oauth.connected || !oauth.refreshToken) {
+  const hasDriveScope = (oauth.scope || '').includes('drive');
+  if (!oauth.connected || !oauth.refreshToken || !hasDriveScope) {
     return null;
   }
 
@@ -248,8 +257,9 @@ async function getValidAccessToken() {
       }
     );
 
-    const { access_token, expires_in } = res.data;
+    const { access_token, expires_in, scope: newScope } = res.data;
     cfg.oauth.accessToken = access_token;
+    if (newScope) cfg.oauth.scope = newScope;
     cfg.oauth.tokenExpiry = Date.now() + (expires_in ? (expires_in - 120) * 1000 : 3500 * 1000);
     saveConfig(cfg);
     return access_token;

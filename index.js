@@ -602,7 +602,10 @@ app.get("/api/gdrive/auth/callback", async (req, res) => {
     const host = req.get("host") || "stremio.laboon.vn";
     const protocol = req.headers["x-forwarded-proto"] || (host.includes("localhost") ? "http" : "https");
     const redirectUri = `${protocol}://${host}/api/gdrive/auth/callback`;
-    await gdriveService.handleOAuthCallback(code, redirectUri);
+    const result = await gdriveService.handleOAuthCallback(code, redirectUri);
+    if (result && result.needsDriveScope) {
+      return res.redirect("/gdrive?warning=missing_drive_scope");
+    }
     res.redirect("/gdrive?success=connected");
   } catch (err) {
     console.error("OAuth callback error:", err.message);

@@ -268,18 +268,45 @@
         </div>
 
         <!-- Step 3 -->
-        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2">
+        <div class="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
           <span class="inline-flex items-center gap-2 font-bold text-white text-sm">
             <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">3</span>
             Cấu Hình OAuth Consent Screen (Màn hình chấp thuận)
           </span>
-          <p class="text-slate-400">
-            Vào <b>APIs & Services</b> &rarr; <b>OAuth consent screen</b> &rarr; Chọn <b>External (Bên ngoài)</b> &rarr; Bấm <b>Create</b>.<br>
-            - <b>App name</b>: Điền <code class="text-sky-300 bg-slate-950 px-1.5 py-0.5 rounded font-mono">VolPi Media</code>.<br>
-            - <b>User support email</b> & <b>Developer contact email</b>: Chọn email Google của bạn.<br>
-            - Bấm <b>Save and continue</b> qua các bước tiếp theo.<br>
-            - <span class="text-amber-400 font-bold">⚠️ Bước quan trọng (Test Users)</span>: Tại bước <b>Test users</b>, bấm <b>+ ADD USERS</b>, nhập chính địa chỉ email Google của bạn vào &rarr; Bấm <b>Save and continue</b> (bắt buộc để tài khoản của bạn được phép đăng nhập).
-          </p>
+          <div class="text-slate-400 space-y-2">
+            <p>Vào menu bên trái <b>☰</b> &rarr; <b>APIs & Services</b> &rarr; <b>OAuth consent screen</b> &rarr; Tích chọn <b>External (Bên ngoài)</b> &rarr; Bấm <b>Create</b>.</p>
+            
+            <div class="p-3 rounded-lg bg-slate-950/70 border border-slate-800 space-y-1.5 text-[11px]">
+              <p class="font-bold text-slate-200">Trang 1: App information (Thông tin ứng dụng)</p>
+              <ul class="list-disc list-inside space-y-1 pl-1 text-slate-400">
+                <li><b>App name</b>: Gõ <code class="text-sky-300 font-mono">VolPi Media</code>.</li>
+                <li><b>User support email</b>: Nhấp chọn chính địa chỉ email Gmail của bạn.</li>
+                <li>Logo & App domains: Bỏ trống hoàn toàn (không bắt buộc).</li>
+                <li><b>Developer contact information</b>: Ở cuối trang, nhập lại chính email Gmail của bạn.</li>
+              </ul>
+              <p class="pt-1 text-slate-300">&rarr; Cuộn xuống dưới cùng bấm nút màu xanh <b>SAVE AND CONTINUE</b>.</p>
+            </div>
+
+            <div class="p-3 rounded-lg bg-slate-950/70 border border-slate-800 space-y-1.5 text-[11px]">
+              <p class="font-bold text-slate-200">Trang 2: Scopes (Phạm vi quyền)</p>
+              <p class="text-slate-400">Không cần chọn gì ở trang này &rarr; Cuộn xuống dưới cùng bấm luôn <b>SAVE AND CONTINUE</b>.</p>
+            </div>
+
+            <div class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-1.5 text-[11px]">
+              <p class="font-bold text-amber-300 flex items-center gap-1.5">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+                Trang 3: Test users (Người dùng thử nghiệm - BẮT BUỘC)
+              </p>
+              <p class="text-slate-300">
+                1. Bấm nút <b>+ ADD USERS</b>.<br>
+                2. Nhập chính địa chỉ email Gmail của bạn vào ô &rarr; Bấm <b>ADD</b>.<br>
+                3. Email của bạn xuất hiện trong danh sách &rarr; Bấm <b>SAVE AND CONTINUE</b>.<br>
+                <i>(Nếu không thêm email vào đây, Google sẽ chặn không cho bạn đăng nhập ở Bước 5).</i>
+              </p>
+            </div>
+
+            <p class="text-[11px]">Trang 4 (Summary): Bấm <b>BACK TO DASHBOARD</b> là hoàn tất Bước 3!</p>
+          </div>
         </div>
 
         <!-- Step 4 -->
@@ -312,11 +339,16 @@
             <span class="w-6 h-6 rounded-full bg-sky-500/20 text-sky-400 border border-sky-500/30 flex items-center justify-center text-xs">5</span>
             Dán Vào VolPi Media & Bấm Đăng Nhập
           </span>
-          <p class="text-slate-400">
-            1. Copy <b>Client ID</b> và <b>Client Secret</b> dán vào 2 ô cấu hình trên trang này &rarr; Bấm <b>Lưu Thông Tin API</b>.<br>
-            2. Bấm nút màu trắng <b>"Đăng Nhập Google"</b> &rarr; Chọn tài khoản Google của bạn &rarr; Bấm <b>Tiếp tục (Continue / Advanced &rarr; Go to VolPi Media)</b> để xác nhận cấp quyền đọc Google Drive.<br>
-            3. Sau khi hoàn tất, huy hiệu chuyển sang màu xanh <b class="text-emerald-400 font-bold">"Đã Kết Nối"</b>! Mọi thiết bị TV và điện thoại đều có thể mở phim mượt mà.
-          </p>
+          <div class="text-slate-400 space-y-1.5 text-xs">
+            <p>1. Copy <b>Client ID</b> và <b>Client Secret</b> dán vào 2 ô cấu hình trên trang này &rarr; Bấm <b>Lưu Thông Tin API</b>.</p>
+            <p>2. Bấm nút <b>"Đăng Nhập Google"</b> &rarr; Chọn tài khoản Google của bạn &rarr; Nếu hiện cảnh báo chưa xác minh, bấm <i>Nâng cao (Advanced)</i> &rarr; <i>Đi tới ứng dụng (Go to app)</i>.</p>
+            <div class="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium">
+              ⚠️ <b>CỰC KỲ QUAN TRỌNG</b>: Tại màn hình cấp quyền, bạn <b>BẮT BUỘC PHẢI TÍCH CHỌN VÀO Ô VUÔNG</b>: <br>
+              <span class="font-bold underline text-white">☑️ Xem và tải xuống tất cả các tệp trên Google Drive của bạn</span>.<br>
+              <i>(Mặc định Google để trống ô này. Nếu không tích chọn, server sẽ không thể lấy luồng video để phát!)</i>
+            </div>
+            <p>3. Bấm <b>Tiếp tục (Continue)</b>. Sau khi hoàn tất, huy hiệu chuyển sang màu xanh <b class="text-emerald-400 font-bold">"Đã Kết Nối"</b>!</p>
+          </div>
         </div>
       </div>
 
@@ -372,8 +404,23 @@
 
     async function init() {
       if (window.lucide) lucide.createIcons();
+      handleUrlParams();
       await fetchOAuthStatus();
       await fetchSourcesData();
+    }
+
+    function handleUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('warning') === 'missing_drive_scope') {
+        showToast('Chưa cấp quyền Drive', 'Vui lòng bấm Cấp Lại Quyền Drive và TÍCH CHỌN ô vuông quyền Google Drive!', false);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (params.get('success') === 'connected') {
+        showToast('Thành công', 'Đã liên kết Google Drive thành công!', true);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (params.get('error')) {
+        showToast('Lỗi kết nối', decodeURIComponent(params.get('error')), false);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
     }
 
     // 1. Fetch OAuth Status
@@ -418,6 +465,37 @@
               <i data-lucide="unlink" class="w-3.5 h-3.5"></i>
               <span>Ngắt Kết Nối</span>
             </button>
+          </div>
+        `;
+      } else if (oauthState.needsDriveScope) {
+        badge.innerHTML = `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> Chưa Cấp Quyền Drive (${oauthState.email || 'Google Account'})
+          </span>
+        `;
+        area.innerHTML = `
+          <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
+                  <h4 class="font-bold text-sm text-amber-300">Đã đăng nhập (${oauthState.email}), nhưng chưa cấp quyền Google Drive</h4>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                  Khi đăng nhập Google, bạn cần <b>TÍCH CHỌN VÀO Ô VUÔNG</b>: <br>
+                  <span class="text-amber-200 font-bold bg-amber-500/20 px-2 py-0.5 rounded inline-block mt-1 border border-amber-500/30">☑️ Xem và tải xuống tất cả các tệp trên Google Drive của bạn</span>
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button onclick="startGoogleAuth()" class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-lg flex items-center gap-2 cursor-pointer">
+                  <i data-lucide="shield-alert" class="w-4 h-4"></i>
+                  <span>Cấp Lại Quyền Drive</span>
+                </button>
+                <button onclick="disconnectOAuth()" class="px-3 py-2.5 rounded-xl bg-slate-900/80 hover:bg-rose-500/20 text-rose-400 border border-slate-800 hover:border-rose-500/40 text-xs font-bold transition cursor-pointer" title="Hủy kết nối">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
           </div>
         `;
       } else {

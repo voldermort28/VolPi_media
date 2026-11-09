@@ -1,10 +1,10 @@
 {
-  "version": "2.2.29",
-  "build": 95,
-  "tag_name": "v2.2.29",
-  "changelog": "• VolPi Media v2.2.29:\n- Bổ sung modal hướng dẫn từng bước 5 bước chi tiết cấu hình Google OAuth2 trên trang quản lý (/gdrive).\n- Tích hợp nút sao chép Redirect URI một chạm và tự động mở form điền thông tin sau khi xem hướng dẫn.",
+  "version": "2.2.30",
+  "build": 96,
+  "tag_name": "v2.2.30",
+  "changelog": "• VolPi Media v2.2.30:\n- Tự động kiểm tra và xác thực quyền Google Drive (drive.readonly) trong quá trình kết nối OAuth2.\n- Cảnh báo trực quan trên web quản lý khi người dùng chưa tích chọn ô quyền Drive và hỗ trợ nút cấp lại quyền một chạm.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T23:24:00Z"
+  "published_at": "2026-11-09T17:12:00Z"
 }
