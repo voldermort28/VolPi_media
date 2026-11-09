@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
@@ -49,9 +51,24 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     return 3;
   }
 
+  final List<String> _vlxxGenres = const [
+    'Tất cả',
+    'JAV',
+    'Phim sex hay',
+    'Vietsub',
+    'Không che',
+    'Học sinh',
+    'Vụng trộm',
+    'Phim cấp 3',
+    'Châu Âu',
+    'XVIDEOS',
+    'XNXX',
+  ];
+
   final List<String> _viet69Genres = const [
     'Tất cả',
     'Phim sex Việt mới',
+    'Video thành viên',
     'Sinh viên',
     'Teen',
     'Check hàng',
@@ -77,6 +94,20 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     'Cặp đôi',
     'Máy bay',
   ];
+
+  List<String> _getCurrentGenres() {
+    if (_selectedSourceIndex == 0) return _vlxxGenres;
+    if (_selectedSourceIndex == 1) return _viet69Genres;
+    if (_selectedSourceIndex == 2) return _xnhauGenres;
+    return const [];
+  }
+
+  Color _getActiveGenreColor() {
+    if (_selectedSourceIndex == 0) return const Color(0xFFF43F5E);
+    if (_selectedSourceIndex == 1) return const Color(0xFFEA580C);
+    if (_selectedSourceIndex == 2) return const Color(0xFFEC4899);
+    return const Color(0xFF38BDF8);
+  }
 
   List<MovieModel> _movies = [];
   List<FavoriteItem> _secretFavorites = [];
@@ -155,7 +186,11 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     List<MovieModel> results = [];
     if (_selectedSourceIndex == 0) {
       // VLFilm
-      results = await widget.apiService.getVlxxCatalog(searchQuery: search, skip: 0);
+      results = await widget.apiService.getVlxxCatalog(
+        searchQuery: search,
+        skip: 0,
+        genre: _selectedGenre,
+      );
     } else if (_selectedSourceIndex == 1) {
       // Viet69
       results = await widget.apiService.getViet69Catalog(
@@ -199,6 +234,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       nextResults = await widget.apiService.getVlxxCatalog(
         searchQuery: _searchQuery,
         skip: currentSkip,
+        genre: _selectedGenre,
       );
     } else if (_selectedSourceIndex == 1) {
       nextResults = await widget.apiService.getViet69Catalog(
@@ -815,16 +851,103 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               ),
             ],
 
-            // Category Bar (Visible when Viet69 or xNhau tab is active & not in search mode)
-            if ((_selectedSourceIndex == 1 || _selectedSourceIndex == 2) && (_searchQuery == null || _searchQuery!.isEmpty))
-              Container(
-                height: 40,
-                margin: const EdgeInsets.only(bottom: 6),
-                child: Builder(
-                  builder: (context) {
-                    final genres = _selectedSourceIndex == 1 ? _viet69Genres : _xnhauGenres;
-                    final activeColor = _selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFEC4899);
-                    return ListView.separated(
+            // Category Bar / Dropdown (Visible when VLFilm, Viet69 or xNhau tab is active & not in search mode)
+            if (_selectedSourceIndex < 3 && (_searchQuery == null || _searchQuery!.isEmpty))
+              Builder(
+                builder: (context) {
+                  final genres = _getCurrentGenres();
+                  final activeColor = _getActiveGenreColor();
+                  final bool useDropdown = isMobile || (!kIsWeb && Platform.isIOS);
+
+                  if (useDropdown) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: activeColor.withOpacity(0.4), width: 1.2),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeColor.withOpacity(0.08),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: genres.contains(_selectedGenre) ? _selectedGenre : 'Tất cả',
+                                icon: Icon(Icons.arrow_drop_down_rounded, color: activeColor, size: 24),
+                                dropdownColor: const Color(0xFF1E293B),
+                                borderRadius: BorderRadius.circular(12),
+                                isDense: true,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                items: genres.map((genre) {
+                                  final isSel = genre == _selectedGenre;
+                                  return DropdownMenuItem<String>(
+                                    value: genre,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          isSel ? Icons.check_circle_rounded : Icons.circle_outlined,
+                                          color: isSel ? activeColor : Colors.white30,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          genre,
+                                          style: TextStyle(
+                                            color: isSel ? activeColor : Colors.white,
+                                            fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) _selectGenre(val);
+                                },
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: activeColor.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Đang lọc: $_selectedGenre',
+                              style: TextStyle(
+                                color: activeColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  // Android TV / Large Screen: Keep original horizontal scrollable chips
+                  return Container(
+                    height: 40,
+                    margin: const EdgeInsets.only(bottom: 6),
+                    child: ListView.separated(
                       controller: _genreScrollController,
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -857,9 +980,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                           ),
                         );
                       },
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
 
             // Content Stack (0: Adult Catalog, 1: Google Drive, 2: Telegram, 3: Yêu thích)

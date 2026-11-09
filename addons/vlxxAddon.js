@@ -3,7 +3,7 @@ const scraper = require('../scrapers/vlxx');
 
 const manifest = {
   id: 'community.vlxx',
-  version: '1.1.1',
+  version: '1.2.0',
   name: 'VLFilm Stream',
   description: 'Xem phim và video VLFilm trực tiếp trên Stremio không quảng cáo',
   resources: ['catalog', 'meta', 'stream'],
@@ -13,8 +13,25 @@ const manifest = {
     {
       type: 'movie',
       id: 'vlxx-catalog',
-      name: 'VLFilm Mới Cập Nhật',
+      name: 'VLFilm Cập Nhật',
       extra: [
+        {
+          name: 'genre',
+          options: [
+            'Tất cả',
+            'JAV',
+            'Phim sex hay',
+            'Vietsub',
+            'Không che',
+            'Học sinh',
+            'Vụng trộm',
+            'Phim cấp 3',
+            'Châu Âu',
+            'XVIDEOS',
+            'XNXX',
+          ],
+          isRequired: false,
+        },
         { name: 'search', isRequired: false },
         { name: 'skip', isRequired: false },
       ],
@@ -37,6 +54,8 @@ builder.defineCatalogHandler(async (args) => {
     let videos = [];
     if (extra && extra.search) {
       videos = await scraper.search(extra.search, page);
+    } else if (extra && extra.genre) {
+      videos = await scraper.getByCategory(extra.genre, page);
     } else {
       videos = await scraper.getLatest(page);
     }

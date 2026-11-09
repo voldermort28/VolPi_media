@@ -65,6 +65,41 @@ function removeAccents(str) {
 
 const videoInfoCache = new Map();
 
+const CATEGORY_MAP = {
+  'tat-ca': '',
+  'jav': 'jav',
+  'phim-sex-hay': 'phim-sex-hay',
+  'phim-hay': 'phim-sex-hay',
+  'vietsub': 'vietsub',
+  'phim-sex-vietsub': 'vietsub',
+  'khong-che': 'khong-che',
+  'phim-sex-khong-che': 'khong-che',
+  'hoc-sinh': 'hoc-sinh',
+  'sex-hoc-sinh': 'hoc-sinh',
+  'vung-trom': 'vung-trom',
+  'vung-trom-ngoai-tinh': 'vung-trom',
+  'cap-3': 'cap-3',
+  'phim-cap-3': 'cap-3',
+  'chau-au': 'chau-au',
+  'sex-my-chau-au': 'chau-au',
+  'xvideos': 'xvideos',
+  'xnxx': 'xnxx',
+};
+
+const GENRE_TO_CAT = {
+  'Tất cả': '',
+  'JAV': 'jav',
+  'Phim sex hay': 'phim-sex-hay',
+  'Vietsub': 'vietsub',
+  'Không che': 'khong-che',
+  'Học sinh': 'hoc-sinh',
+  'Vụng trộm': 'vung-trom',
+  'Phim cấp 3': 'cap-3',
+  'Châu Âu': 'chau-au',
+  'XVIDEOS': 'xvideos',
+  'XNXX': 'xnxx',
+};
+
 function parseVideoItem($, el) {
   const $el = $(el);
   const rawId = $el.attr('id') || '';
@@ -117,6 +152,39 @@ async function getLatest(page = 1) {
   });
 
   return videos;
+}
+
+async function getByCategory(category, page = 1) {
+  let catSlug = '';
+  if (category) {
+    if (GENRE_TO_CAT[category] !== undefined) {
+      catSlug = GENRE_TO_CAT[category];
+    } else if (CATEGORY_MAP[category] !== undefined) {
+      catSlug = CATEGORY_MAP[category];
+    } else {
+      catSlug = removeAccents(category);
+    }
+  }
+
+  const url = !catSlug
+    ? (page === 1 ? '/' : `/new/${page}/`)
+    : (page === 1 ? `/${catSlug}/` : `/${catSlug}/${page}/`);
+
+  try {
+    const res = await client.get(url);
+    const $ = cheerio.load(res.data);
+    const videos = [];
+
+    $('#video-list .video-item').each((_, el) => {
+      const item = parseVideoItem($, el);
+      if (item) videos.push(item);
+    });
+
+    return videos;
+  } catch (err) {
+    console.error(`Get VLXX category "${category}" page ${page} error:`, err.message);
+    return [];
+  }
 }
 
 async function search(query, page = 1) {
@@ -320,6 +388,7 @@ function clearCache() {
 
 module.exports = {
   getLatest,
+  getByCategory,
   search,
   getVideoDetails,
   getVideoInfo,
@@ -327,4 +396,6 @@ module.exports = {
   getBaseUrl,
   clearCache,
   USER_AGENT,
+  CATEGORY_MAP,
+  GENRE_TO_CAT,
 };
