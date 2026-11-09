@@ -21,6 +21,7 @@ class MatchModel {
   final bool isLive;
   final int matchTimestamp;
   final String source;
+  final String score;
 
   MatchModel({
     required this.id,
@@ -45,6 +46,7 @@ class MatchModel {
     this.isLive = false,
     this.matchTimestamp = 0,
     this.source = '',
+    this.score = '',
   });
 
   factory MatchModel.fromJson(Map<String, dynamic> json) {
@@ -428,6 +430,8 @@ class MatchModel {
         ? json['matchTimestamp']
         : (int.tryParse(json['matchTimestamp']?.toString() ?? '') ?? 0);
 
+    final String score = json['score'] ?? (json['scores'] != null && json['scores'] is Map ? '${json['scores']['home'] ?? 0} - ${json['scores']['away'] ?? 0}' : '');
+
     return MatchModel(
       id: id,
       slug: slug,
@@ -451,6 +455,7 @@ class MatchModel {
       isLive: live,
       matchTimestamp: ts,
       source: detectedSource,
+      score: score,
     );
   }
 

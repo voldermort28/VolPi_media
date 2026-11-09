@@ -1,10 +1,10 @@
 {
-  "version": "2.2.34",
-  "build": 100,
-  "tag_name": "v2.2.34",
-  "changelog": "• VolPi Media v2.2.34:\n- Khắc phục lỗi cú pháp ApiService trên App TV.\n- Ra mắt Tab Tổng Hợp Bóng Đá đa nguồn: Gà Vàng TV (gavang1.xyz), Về Bờ TV (vebozbn.cc) & Socolive.\n- Sắp xếp trận đấu thông minh theo thói quen: Ưu tiên Manchester United, ĐTQG & CLB Việt Nam, Ngoại Hạng Anh, Cúp C1 và Trận Hot; hạ giải cỏ xuống cuối.",
+  "version": "2.2.35",
+  "build": 101,
+  "tag_name": "v2.2.35",
+  "changelog": "• VolPi Media v2.2.35:\n- Khắc phục triệt để lỗi biên dịch thuộc tính score trong MatchModel trên iOS/Android/macOS.\n- Ra mắt Tab Tổng Hợp Bóng Đá đa nguồn: Gà Vàng TV (gavang1.xyz), Về Bờ TV (vebozbn.cc) & Socolive.\n- Sắp xếp thông minh: Manchester United, ĐTQG & CLB Việt Nam, Ngoại Hạng Anh, Cúp C1 và Trận Hot; hạ giải cỏ xuống cuối.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T18:58:00Z"
+  "published_at": "2026-11-09T19:02:00Z"
 }
