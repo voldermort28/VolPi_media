@@ -321,7 +321,7 @@ class MusicScreenState extends State<MusicScreen> {
                         child: Row(
                           children: [
                             Icon(
-                              isVideoMode ? Icons.folder_video : Icons.album_rounded,
+                              isVideoMode ? Icons.video_collection_rounded : Icons.album_rounded,
                               size: 20,
                               color: isSelected ? activeColor : Colors.white70,
                             ),
