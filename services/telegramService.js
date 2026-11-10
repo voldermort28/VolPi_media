@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const bigInt = require('big-integer');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
@@ -869,7 +870,7 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
     // Stream chunks via GramJS iterDownload
     for await (const chunk of client.iterDownload({
       file: media,
-      offset: BigInt(start),
+      offset: bigInt(start),
       limit: chunksCount,
       chunkSize: CHUNK_SIZE,
     })) {
@@ -897,6 +898,8 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
     console.error(`[TelegramStream] Error streaming msg ${msgId} in ${channelId}:`, err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: 'Lỗi phát video từ Telegram', details: err.message });
+    } else {
+      try { res.end(); } catch (_) {}
     }
   }
 }

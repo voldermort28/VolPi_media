@@ -1,8 +1,17 @@
 const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 const axios = require('axios');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'gdrive_config.json');
+const AUDIO_CACHE_DIR = path.join(__dirname, '..', 'cache', 'audio');
+if (!fs.existsSync(AUDIO_CACHE_DIR)) {
+  try {
+    fs.mkdirSync(AUDIO_CACHE_DIR, { recursive: true });
+  } catch (_) {}
+}
+
+const activeTranscodes = new Map(); // fileId -> Promise
 
 // Memory Cache with 10-minute TTL
 const folderCache = new Map();
@@ -764,7 +773,135 @@ function inferMimeType(filename, rawContentType = '') {
   return 'video/mp4';
 }
 
+function serveLocalFileRange(filePath, contentType, req, res) {
+  const stat = fs.statSync(filePath);
+  const totalSize = stat.size;
+  const range = req.headers.range;
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+    const chunksize = end - start + 1;
+
+    res.writeHead(206, {
+      'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': chunksize,
+      'Content-Type': contentType,
+      'Cache-Control': 'no-cache',
+    });
+    const fileStream = fs.createReadStream(filePath, { start, end });
+    fileStream.pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': totalSize,
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+      'Cache-Control': 'no-cache',
+    });
+    fs.createReadStream(filePath).pipe(res);
+  }
+}
+
 async function streamVideo(fileId, req, res) {
+  let filename = req.params?.filename || req.query?.name || '';
+  if (!filename) {
+    for (const entry of folderCache.values()) {
+      if (entry?.data?.allAudios) {
+        const found = entry.data.allAudios.find((a) => a.id === fileId);
+        if (found?.name) {
+          filename = found.name;
+          break;
+        }
+      }
+      if (entry?.data?.allVideos) {
+        const found = entry.data.allVideos.find((v) => v.id === fileId);
+        if (found?.name) {
+          filename = found.name;
+          break;
+        }
+      }
+    }
+  }
+
+  const isFlac = filename.toLowerCase().endsWith('.flac');
+  const cachedMp3Path = path.join(AUDIO_CACHE_DIR, `${fileId}.mp3`);
+
+  // 1. If cached MP3 exists, serve directly with Range support (lossless 320k, instant playback)
+  if (isFlac && fs.existsSync(cachedMp3Path) && fs.statSync(cachedMp3Path).size > 1000) {
+    return serveLocalFileRange(cachedMp3Path, 'audio/mpeg', req, res);
+  }
+
+  // 2. If it's a FLAC file and not yet cached, transcode on the fly
+  if (isFlac) {
+    try {
+      if (!activeTranscodes.has(fileId)) {
+        const transcodePromise = (async () => {
+          const accessToken = await getValidAccessToken();
+          let targetUrl = '';
+          const requestHeaders = {
+            'User-Agent': 'Mozilla/5.0 (SmartTV; VolPiMedia/2.2.20)',
+          };
+          if (accessToken) {
+            targetUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`;
+            requestHeaders['Authorization'] = `Bearer ${accessToken}`;
+          } else {
+            targetUrl = `https://drive.usercontent.google.com/download?id=${fileId}&export=download&authuser=0&confirm=t`;
+          }
+
+          const driveRes = await axios.get(targetUrl, {
+            headers: requestHeaders,
+            responseType: 'stream',
+            timeout: 30000,
+            maxRedirects: 5,
+            validateStatus: (status) => status >= 200 && status < 400,
+          });
+
+          const tmpPath = path.join(AUDIO_CACHE_DIR, `${fileId}.tmp.mp3`);
+          const fileStream = fs.createWriteStream(tmpPath);
+          const ff = spawn('ffmpeg', [
+            '-y',
+            '-f', 'flac',
+            '-i', 'pipe:0',
+            '-c:a', 'libmp3lame',
+            '-b:a', '320k',
+            '-f', 'mp3',
+            'pipe:1',
+          ]);
+
+          driveRes.data.pipe(ff.stdin);
+          ff.stdout.pipe(fileStream);
+
+          return new Promise((resolve, reject) => {
+            ff.on('close', (code) => {
+              if (code === 0 && fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 1000) {
+                fs.renameSync(tmpPath, cachedMp3Path);
+                resolve(true);
+              } else {
+                reject(new Error(`FFmpeg exited with code ${code}`));
+              }
+            });
+            ff.on('error', (err) => reject(err));
+            driveRes.data.on('error', (err) => reject(err));
+          });
+        })();
+
+        activeTranscodes.set(fileId, transcodePromise);
+        transcodePromise.finally(() => {
+          activeTranscodes.delete(fileId);
+        });
+      }
+
+      await activeTranscodes.get(fileId);
+      if (fs.existsSync(cachedMp3Path)) {
+        return serveLocalFileRange(cachedMp3Path, 'audio/mpeg', req, res);
+      }
+    } catch (transcodeErr) {
+      console.warn(`[GDriveStream] Transcode failed for ${fileId}, falling back to direct stream:`, transcodeErr.message);
+    }
+  }
+
   const range = req.headers.range;
   const accessToken = await getValidAccessToken();
 
