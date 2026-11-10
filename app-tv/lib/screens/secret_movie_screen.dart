@@ -736,26 +736,30 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     ),
                     const SizedBox(width: 12),
 
-                    // TAB SWITCHER: Wrapped in Flexible + SingleChildScrollView
-                    Flexible(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: _buildTabSwitcher(),
+                    // TAB SWITCHER: Takes all available space up to Search & Lock
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: _buildTabSwitcher(),
+                        ),
                       ),
                     ),
 
                     const SizedBox(width: 12),
-                    if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3)
-                      Expanded(
+                    if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 3) ...[
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
                         child: Text(
                           'Tìm: "$_searchQuery"',
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                          style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
-                      )
-                    else
-                      const Spacer(),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
 
                     // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2)
                     if (_selectedSourceIndex < 3) ...[
@@ -1714,7 +1718,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       borderRadius: BorderRadius.circular(9),
       focusBorderColor: activeColor,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
         decoration: BoxDecoration(
           color: isSelected ? activeColor : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
@@ -1722,13 +1726,13 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.white60, size: 16),
-            const SizedBox(width: 6),
+            Icon(icon, color: isSelected ? Colors.white : Colors.white60, size: 15),
+            const SizedBox(width: 5),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.white70,
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
               ),
             ),

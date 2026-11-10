@@ -75,6 +75,15 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       }
     });
 
+    // 2b. Broadcast live buffered position updates
+    _player.bufferedPositionStream.listen((buffered) {
+      playbackState.add(
+        playbackState.value.copyWith(
+          bufferedPosition: buffered,
+        ),
+      );
+    });
+
     // 3. Auto-play next track when track completes
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
@@ -95,6 +104,17 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (_currentIndex < 0 || _currentIndex >= queue.value.length) return;
     final item = queue.value[_currentIndex];
     mediaItem.add(item);
+
+    // Broadcast immediate loading state so UI updates instantly
+    playbackState.add(
+      playbackState.value.copyWith(
+        processingState: AudioProcessingState.loading,
+        playing: true,
+        updatePosition: Duration.zero,
+        bufferedPosition: Duration.zero,
+        queueIndex: _currentIndex,
+      ),
+    );
 
     try {
       await _player.stop();

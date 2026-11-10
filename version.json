@@ -1,10 +1,10 @@
 {
-  "version": "2.2.36",
-  "build": 102,
-  "tag_name": "v2.2.36",
-  "changelog": "• VolPi Media v2.2.36:\n- Ra mắt Tab Nghe Nhạc độc lập, công khai: hỗ trợ album/thư mục lossless FLAC, MP3 từ Google Drive.\n- Phát nhạc chạy ngầm khi tắt màn hình (Background Audio) & Media Control trên màn hình khóa (Lockscreen Player).\n- Sửa lỗi click chuột phải trên Desktop / Giữ thumbnail trên TV/Mobile để mở menu và xóa khỏi Tiếp tục xem (Recent).\n- Mặc định thêm nguồn Google Drive là Riêng tư (Private by default), bảo mật tuyệt đối không lọt vào Recent ở Home.",
+  "version": "2.2.37",
+  "build": 103,
+  "tag_name": "v2.2.37",
+  "changelog": "• VolPi Media v2.2.37:\n- Tách riêng 2 phân hệ 'Nghe Nhạc' và 'Video & Phim' trong cùng 1 tab: Khắc phục triệt để lỗi video công khai chỉ phát tiếng, mở đầy đủ hình ảnh trên VideoPlayerScreen.\n- Sửa lỗi click bài hát không tự động phát: Bổ sung trạng thái nạp bài tức thì, viền sáng highlight, loading spinner và equalizer động.\n- Bổ sung thanh hiển thị Buffer (Bộ đệm nạp trước) 2 lớp cùng nhãn % buffer cho cả Trình phát Video và Trình phát Nhạc.\n- Sửa lỗi layout thanh Tab bị cắt cụt trên macOS trong trang Kho Phim Bí Mật.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-09T19:45:00Z"
+  "published_at": "2026-11-10T18:02:00Z"
 }

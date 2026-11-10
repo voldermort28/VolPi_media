@@ -6,6 +6,7 @@ import '../models/gdrive_model.dart';
 import '../services/audio_player_handler.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../widgets/music_player_bottom_sheet.dart';
+import '../player/video_player_screen.dart';
 
 class MusicScreen extends StatefulWidget {
   final ApiService apiService;
@@ -22,6 +23,9 @@ class MusicScreen extends StatefulWidget {
 }
 
 class MusicScreenState extends State<MusicScreen> {
+  // 0: Nghe Nhạc, 1: Video & Phim
+  int _mediaSubTab = 0;
+
   List<GDriveSourceModel> _sources = [];
   GDriveSourceModel? _selectedSource;
   bool _isLoading = true;
@@ -32,6 +36,7 @@ class MusicScreenState extends State<MusicScreen> {
 
   List<GDriveItemModel> _folders = [];
   List<GDriveItemModel> _tracks = [];
+  List<GDriveItemModel> _videos = [];
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
@@ -73,17 +78,13 @@ class MusicScreenState extends State<MusicScreen> {
       });
 
       if (allSources.isNotEmpty) {
-        // Ưu tiên chọn nguồn có chữ 'music' hoặc 'nhạc', nếu không thì chọn nguồn đầu tiên
-        final musicSource = allSources.firstWhere(
-          (s) => s.name.toLowerCase().contains('music') || s.name.toLowerCase().contains('nhạc'),
-          orElse: () => allSources.first,
-        );
-        _selectSource(musicSource, forceRefresh: forceRefresh);
+        _autoSelectSourceForSubTab(forceRefresh: forceRefresh);
       } else {
         setState(() {
           _selectedSource = null;
           _folders = [];
           _tracks = [];
+          _videos = [];
           _breadcrumbs.clear();
         });
       }
@@ -91,9 +92,42 @@ class MusicScreenState extends State<MusicScreen> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Không thể tải nguồn nhạc: $e';
+        _errorMessage = 'Không thể tải nguồn media: $e';
       });
     }
+  }
+
+  void _autoSelectSourceForSubTab({bool forceRefresh = false}) {
+    if (_sources.isEmpty) return;
+
+    if (_mediaSubTab == 0) {
+      // Nhạc: Ưu tiên chọn nguồn có chữ 'music' hoặc 'nhạc'
+      final musicSource = _sources.firstWhere(
+        (s) => s.name.toLowerCase().contains('music') || s.name.toLowerCase().contains('nhạc'),
+        orElse: () => _sources.first,
+      );
+      _selectSource(musicSource, forceRefresh: forceRefresh);
+    } else {
+      // Video: Ưu tiên chọn nguồn có chữ 'phim' hoặc 'video' hoặc 'movie'
+      final videoSource = _sources.firstWhere(
+        (s) => s.name.toLowerCase().contains('phim') || s.name.toLowerCase().contains('video') || s.name.toLowerCase().contains('movie'),
+        orElse: () => _sources.firstWhere(
+          (s) => !s.name.toLowerCase().contains('music') && !s.name.toLowerCase().contains('nhạc'),
+          orElse: () => _sources.first,
+        ),
+      );
+      _selectSource(videoSource, forceRefresh: forceRefresh);
+    }
+  }
+
+  void _setSubTab(int tab) {
+    if (_mediaSubTab == tab) return;
+    setState(() {
+      _mediaSubTab = tab;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+    _autoSelectSourceForSubTab();
   }
 
   void _selectSource(GDriveSourceModel source, {bool forceRefresh = false}) {
@@ -119,25 +153,17 @@ class MusicScreenState extends State<MusicScreen> {
       if (!mounted) return;
 
       if (result != null) {
-        // Lấy các bài hát trực tiếp (audios) hoặc video MV trực tiếp
-        final mediaTracks = <GDriveItemModel>[];
-        if (result.audios.isNotEmpty) {
-          mediaTracks.addAll(result.audios);
-        }
-        if (result.videos.isNotEmpty) {
-          // Bổ sung video nếu trong folder này có MV
-          mediaTracks.addAll(result.videos);
-        }
-
         setState(() {
           _folders = result.folders;
-          _tracks = mediaTracks;
+          _tracks = result.audios;
+          _videos = result.videos;
           _isLoading = false;
         });
       } else {
         setState(() {
           _folders = [];
           _tracks = [];
+          _videos = [];
           _isLoading = false;
           _errorMessage = 'Thư mục trống hoặc không thể tải dữ liệu.';
         });
@@ -174,12 +200,14 @@ class MusicScreenState extends State<MusicScreen> {
     return false;
   }
 
-  void _playTrack(int index) {
-    if (index < 0 || index >= _tracks.length) return;
+  void _playTrack(GDriveItemModel track, List<GDriveItemModel> trackList) {
+    final targetIndex = trackList.indexWhere((t) => t.id == track.id);
+    if (targetIndex == -1) return;
+
     final currentAlbum = _breadcrumbs.isNotEmpty ? _breadcrumbs.last['name'] ?? 'Album' : 'Album';
 
-    // Tạo danh sách MediaItem cho toàn bộ Album này
-    final mediaItems = _tracks.map((t) {
+    // Tạo danh sách MediaItem cho toàn bộ trackList này
+    final mediaItems = trackList.map((t) {
       final streamUrl = widget.apiService.getGDriveStreamUrl(t.id);
       return MediaItem(
         id: streamUrl,
@@ -190,16 +218,48 @@ class MusicScreenState extends State<MusicScreen> {
       );
     }).toList();
 
-    VolPiAudioHandler.instance.setPlaylist(mediaItems, initialIndex: index);
+    VolPiAudioHandler.instance.setPlaylist(mediaItems, initialIndex: targetIndex);
   }
 
   void _playAll() {
     if (_tracks.isNotEmpty) {
-      _playTrack(0);
+      _playTrack(_tracks[0], _tracks);
     }
   }
 
+  void _playVideo(GDriveItemModel video) {
+    final streamUrl = widget.apiService.getGDriveStreamUrl(video.id);
+    final currentIndex = _videos.indexWhere((v) => v.id == video.id);
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          streamUrl: streamUrl,
+          title: video.name,
+          subtitle: _selectedSource?.name ?? 'Google Drive Video',
+          mediaId: 'gdrive_${video.id}',
+          mediaCategory: 'gdrive',
+          mediaPoster: video.thumbnailUrl ?? '',
+          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex + 1]);
+                }
+              : null,
+          onPrevious: (currentIndex > 0)
+              ? () {
+                  Navigator.of(context).pop();
+                  _playVideo(_videos[currentIndex - 1]);
+                }
+              : null,
+        ),
+      ),
+    );
+  }
+
   void _showSourceSelectionDialog() {
+    final bool isVideoMode = _mediaSubTab == 1;
+
     showDialog(
       context: context,
       builder: (dialogCtx) => AlertDialog(
@@ -208,13 +268,17 @@ class MusicScreenState extends State<MusicScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: Color(0xFF262626)),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.library_music_rounded, color: Color(0xFF38BDF8), size: 24),
-            SizedBox(width: 10),
+            Icon(
+              isVideoMode ? Icons.video_collection_rounded : Icons.library_music_rounded,
+              color: isVideoMode ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8),
+              size: 24,
+            ),
+            const SizedBox(width: 10),
             Text(
-              'Chọn Nguồn Nhạc Google Drive',
-              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              isVideoMode ? 'Chọn Nguồn Video Google Drive' : 'Chọn Nguồn Nhạc Google Drive',
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ],
         ),
@@ -224,7 +288,7 @@ class MusicScreenState extends State<MusicScreen> {
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 20),
                   child: Text(
-                    'Chưa có nguồn nhạc công khai nào.\nVui lòng vào website quản trị https://stremio.laboon.vn/gdrive để tick chọn "Đây là nguồn công khai".',
+                    'Chưa có nguồn công khai nào.\nVui lòng vào website quản trị https://stremio.laboon.vn/gdrive để tick chọn "Đây là nguồn công khai".',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.white70, fontSize: 13),
                   ),
@@ -236,6 +300,7 @@ class MusicScreenState extends State<MusicScreen> {
                   itemBuilder: (ctx, index) {
                     final source = _sources[index];
                     final isSelected = source.id == _selectedSource?.id;
+                    final activeColor = isVideoMode ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8);
 
                     return InkWell(
                       onTap: () {
@@ -246,28 +311,42 @@ class MusicScreenState extends State<MusicScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isSelected ? const Color(0xFF0284C7).withOpacity(0.25) : const Color(0xFF1F1F1F),
+                          color: isSelected ? activeColor.withOpacity(0.2) : const Color(0xFF1F1F1F),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF38BDF8) : Colors.transparent,
+                            color: isSelected ? activeColor : Colors.transparent,
                             width: 1.5,
                           ),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.album_rounded, size: 20, color: isSelected ? const Color(0xFF38BDF8) : Colors.white70),
+                            Icon(
+                              isVideoMode ? Icons.folder_video : Icons.album_rounded,
+                              size: 20,
+                              color: isSelected ? activeColor : Colors.white70,
+                            ),
                             const SizedBox(width: 12),
                             Expanded(
-                              child: Text(
-                                source.name,
-                                style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white70,
-                                  fontSize: 13,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    source.name,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.white : Colors.white70,
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                    ),
+                                  ),
+                                  if (source.count > 0)
+                                    Text(
+                                      '${source.count} tập tin',
+                                      style: const TextStyle(color: Colors.white38, fontSize: 10),
+                                    ),
+                                ],
                               ),
                             ),
-                            if (isSelected) const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 18),
+                            if (isSelected) Icon(Icons.check_circle_rounded, color: activeColor, size: 18),
                           ],
                         ),
                       ),
@@ -304,49 +383,85 @@ class MusicScreenState extends State<MusicScreen> {
   }
 
   Widget _buildTopBar() {
+    final activeThemeColor = _mediaSubTab == 0 ? const Color(0xFF38BDF8) : const Color(0xFFF59E0B);
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: const BoxDecoration(
         color: Color(0xFF0F172A),
         border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
       ),
       child: Row(
         children: [
-          // Nguồn Music Dropdown Button
-          TvFocusableCard(
-            onTap: _showSourceSelectionDialog,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.5), width: 1.2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.library_music_rounded, size: 20, color: Color(0xFF38BDF8)),
-                  const SizedBox(width: 8),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 220),
-                    child: Text(
-                      _selectedSource?.name ?? 'Chọn Nguồn Nhạc',
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 22),
-                ],
-              ),
+          // 1. Segmented Switcher: [ 🎵 Nghe Nhạc | 🎬 Video & Phim ]
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            padding: const EdgeInsets.all(2.5),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSegmentButton(
+                  index: 0,
+                  label: 'Nghe Nhạc',
+                  icon: Icons.music_note_rounded,
+                  activeColor: const Color(0xFF0284C7),
+                ),
+                const SizedBox(width: 3),
+                _buildSegmentButton(
+                  index: 1,
+                  label: 'Video & Phim',
+                  icon: Icons.video_library_rounded,
+                  activeColor: const Color(0xFFD97706),
+                ),
+              ],
             ),
           ),
 
           const SizedBox(width: 12),
 
-          // Search Field
+          // 2. Nguồn Dropdown Button
+          TvFocusableCard(
+            onTap: _showSourceSelectionDialog,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: activeThemeColor.withOpacity(0.5), width: 1.2),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _mediaSubTab == 0 ? Icons.library_music_rounded : Icons.video_collection_rounded,
+                    size: 18,
+                    color: activeThemeColor,
+                  ),
+                  const SizedBox(width: 6),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 160),
+                    child: Text(
+                      _selectedSource?.name ?? 'Chọn Nguồn',
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 20),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 10),
+
+          // 3. Search Field
           Expanded(
             child: Container(
               height: 38,
@@ -364,9 +479,9 @@ class MusicScreenState extends State<MusicScreen> {
                     child: TextField(
                       controller: _searchController,
                       style: const TextStyle(color: Colors.white, fontSize: 12),
-                      decoration: const InputDecoration(
-                        hintText: 'Tìm bài hát hoặc album...',
-                        hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: _mediaSubTab == 0 ? 'Tìm bài hát hoặc album...' : 'Tìm video hoặc phim...',
+                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
                         border: InputBorder.none,
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
@@ -393,11 +508,11 @@ class MusicScreenState extends State<MusicScreen> {
             ),
           ),
 
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
 
-          // Refresh Button
+          // 4. Refresh Button
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF38BDF8), size: 20),
+            icon: Icon(Icons.refresh_rounded, color: activeThemeColor, size: 20),
             tooltip: 'Làm mới',
             onPressed: () {
               if (_breadcrumbs.isNotEmpty) {
@@ -412,8 +527,46 @@ class MusicScreenState extends State<MusicScreen> {
     );
   }
 
+  Widget _buildSegmentButton({
+    required int index,
+    required String label,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final bool isSelected = _mediaSubTab == index;
+
+    return TvFocusableCard(
+      onTap: () => _setSubTab(index),
+      borderRadius: BorderRadius.circular(8),
+      focusBorderColor: activeColor,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? activeColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: isSelected ? Colors.white : Colors.white60),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white70,
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBreadcrumbBar() {
     if (_breadcrumbs.isEmpty) return const SizedBox.shrink();
+    final activeThemeColor = _mediaSubTab == 0 ? const Color(0xFF38BDF8) : const Color(0xFFF59E0B);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -432,11 +585,11 @@ class MusicScreenState extends State<MusicScreen> {
                   borderRadius: BorderRadius.circular(6),
                   border: Border.all(color: const Color(0xFF334155)),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.arrow_back_rounded, size: 14, color: Color(0xFF38BDF8)),
-                    SizedBox(width: 4),
-                    Text('Lùi lại', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 11, fontWeight: FontWeight.bold)),
+                    Icon(Icons.arrow_back_rounded, size: 14, color: activeThemeColor),
+                    const SizedBox(width: 4),
+                    Text('Lùi lại', style: TextStyle(color: activeThemeColor, fontSize: 11, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
@@ -469,7 +622,7 @@ class MusicScreenState extends State<MusicScreen> {
                         child: Text(
                           crumb['name']!,
                           style: TextStyle(
-                            color: isLast ? Colors.white : const Color(0xFF38BDF8),
+                            color: isLast ? Colors.white : activeThemeColor,
                             fontSize: 11,
                             fontWeight: isLast ? FontWeight.bold : FontWeight.w500,
                           ),
@@ -482,7 +635,7 @@ class MusicScreenState extends State<MusicScreen> {
             ),
           ),
 
-          if (_tracks.isNotEmpty)
+          if (_mediaSubTab == 0 && _tracks.isNotEmpty)
             ElevatedButton.icon(
               onPressed: _playAll,
               icon: const Icon(Icons.play_circle_fill_rounded, size: 16),
@@ -501,13 +654,19 @@ class MusicScreenState extends State<MusicScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF38BDF8)),
-            SizedBox(height: 12),
-            Text('Đang nạp danh sách nhạc...', style: TextStyle(color: Colors.white70, fontSize: 13)),
+            CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: _mediaSubTab == 0 ? const Color(0xFF38BDF8) : const Color(0xFFF59E0B),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _mediaSubTab == 0 ? 'Đang nạp danh sách nhạc...' : 'Đang nạp danh sách video...',
+              style: const TextStyle(color: Colors.white70, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -520,7 +679,7 @@ class MusicScreenState extends State<MusicScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.album_rounded, color: Colors.amber, size: 48),
+              const Icon(Icons.error_outline_rounded, color: Colors.amber, size: 48),
               const SizedBox(height: 12),
               Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
               const SizedBox(height: 16),
@@ -546,82 +705,214 @@ class MusicScreenState extends State<MusicScreen> {
       return t.name.toLowerCase().contains(_searchQuery);
     }).toList();
 
-    if (filteredFolders.isEmpty && filteredTracks.isEmpty) {
-      return const Center(
-        child: Text('Thư mục này không có tập tin nhạc nào.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+    final filteredVideos = _videos.where((v) {
+      if (_searchQuery.isEmpty) return true;
+      return v.name.toLowerCase().contains(_searchQuery);
+    }).toList();
+
+    if (_mediaSubTab == 0) {
+      // -------------------------------------------------------------
+      // SUB-TAB 0: NGHE NHẠC (ALBUM, BÀI HÁT & VIDEO MV)
+      // -------------------------------------------------------------
+      if (filteredFolders.isEmpty && filteredTracks.isEmpty && filteredVideos.isEmpty) {
+        return const Center(
+          child: Text('Thư mục này không có tập tin nhạc nào.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+        );
+      }
+
+      return CustomScrollView(
+        slivers: [
+          // 1. Folders / Albums Section
+          if (filteredFolders.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_special_rounded, color: Color(0xFFF59E0B), size: 18),
+                    SizedBox(width: 8),
+                    Text('ALBUM & THƯ MỤC NHẠC', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 170,
+                  childAspectRatio: 0.88,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final folder = filteredFolders[idx];
+                    return _buildFolderCard(folder, isFirst: idx == 0);
+                  },
+                  childCount: filteredFolders.length,
+                ),
+              ),
+            ),
+          ],
+
+          // 2. Audio Tracks Section
+          if (filteredTracks.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 18),
+                    SizedBox(width: 8),
+                    Text('DANH SÁCH BÀI HÁT', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final track = filteredTracks[idx];
+                    return _buildTrackListItem(track, idx, filteredTracks);
+                  },
+                  childCount: filteredTracks.length,
+                ),
+              ),
+            ),
+          ],
+
+          // 3. Video MV Section in Music Folder (if any)
+          if (filteredVideos.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 24, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.video_collection_rounded, color: Color(0xFFF59E0B), size: 18),
+                    SizedBox(width: 8),
+                    Text('VIDEO & MV TRONG THƯ MỤC NÀY', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 220,
+                  childAspectRatio: 1.15,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final video = filteredVideos[idx];
+                    return _buildVideoCard(video);
+                  },
+                  childCount: filteredVideos.length,
+                ),
+              ),
+            ),
+          ],
+
+          const SliverToBoxAdapter(child: SizedBox(height: 85)),
+        ],
+      );
+    } else {
+      // -------------------------------------------------------------
+      // SUB-TAB 1: KHO VIDEO & PHIM (DUYỆT FOLDER PHIM, DANH SÁCH VIDEO)
+      // -------------------------------------------------------------
+      if (filteredFolders.isEmpty && filteredVideos.isEmpty) {
+        return const Center(
+          child: Text('Thư mục này không có tập tin video nào.', style: TextStyle(color: Colors.white54, fontSize: 13)),
+        );
+      }
+
+      return CustomScrollView(
+        slivers: [
+          // 1. Video Folders Section
+          if (filteredFolders.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_special_rounded, color: Color(0xFFF59E0B), size: 18),
+                    SizedBox(width: 8),
+                    Text('THƯ MỤC PHIM & VIDEO', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 170,
+                  childAspectRatio: 0.88,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final folder = filteredFolders[idx];
+                    return _buildFolderCard(folder, isFirst: idx == 0);
+                  },
+                  childCount: filteredFolders.length,
+                ),
+              ),
+            ),
+          ],
+
+          // 2. Video Grid Section
+          if (filteredVideos.isNotEmpty) ...[
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.movie_rounded, color: Color(0xFFF59E0B), size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      'DANH SÁCH VIDEO & PHIM (${filteredVideos.length})',
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 240,
+                  childAspectRatio: 1.15,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, idx) {
+                    final video = filteredVideos[idx];
+                    return _buildVideoCard(video);
+                  },
+                  childCount: filteredVideos.length,
+                ),
+              ),
+            ),
+          ],
+
+          const SliverToBoxAdapter(child: SizedBox(height: 85)),
+        ],
       );
     }
-
-    return CustomScrollView(
-      slivers: [
-        // 1. Folders / Albums Section
-        if (filteredFolders.isNotEmpty) ...[
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Row(
-                children: [
-                  Icon(Icons.folder_special_rounded, color: Color(0xFFF59E0B), size: 18),
-                  SizedBox(width: 8),
-                  Text('ALBUM & THƯ MỤC NHẠC', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 170,
-                childAspectRatio: 0.88,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (context, idx) {
-                  final folder = filteredFolders[idx];
-                  return _buildFolderCard(folder, isFirst: idx == 0);
-                },
-                childCount: filteredFolders.length,
-              ),
-            ),
-          ),
-        ],
-
-        // 2. Audio Tracks Section
-        if (filteredTracks.isNotEmpty) ...[
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 20, 16, 8),
-              child: Row(
-                children: [
-                  Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 18),
-                  SizedBox(width: 8),
-                  Text('DANH SÁCH BÀI HÁT', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, idx) {
-                  final track = filteredTracks[idx];
-                  return _buildTrackListItem(track, idx);
-                },
-                childCount: filteredTracks.length,
-              ),
-            ),
-          ),
-        ],
-
-        const SliverToBoxAdapter(child: SizedBox(height: 80)),
-      ],
-    );
   }
 
   Widget _buildFolderCard(GDriveItemModel folder, {bool isFirst = false}) {
+    final activeThemeColor = _mediaSubTab == 0 ? const Color(0xFFF59E0B) : const Color(0xFF38BDF8);
+
     return TvFocusableCard(
       focusNode: isFirst ? _firstCardFocusNode : null,
       onTap: () => _navigateToSubfolder(folder),
@@ -630,7 +921,7 @@ class MusicScreenState extends State<MusicScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFF1E293B).withOpacity(0.6),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.35)),
+          border: Border.all(color: activeThemeColor.withOpacity(0.35)),
         ),
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -640,10 +931,10 @@ class MusicScreenState extends State<MusicScreen> {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: const Color(0xFFF59E0B).withOpacity(0.18),
+                color: activeThemeColor.withOpacity(0.18),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.album_rounded, color: Color(0xFFF59E0B), size: 28),
+              child: Icon(Icons.folder_rounded, color: activeThemeColor, size: 28),
             ),
             const SizedBox(height: 8),
             Text(
@@ -657,7 +948,7 @@ class MusicScreenState extends State<MusicScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
               decoration: BoxDecoration(color: const Color(0xFF0F172A), borderRadius: BorderRadius.circular(4)),
-              child: const Text('Album', style: TextStyle(color: Color(0xFFF59E0B), fontSize: 9, fontWeight: FontWeight.bold)),
+              child: Text('Thư mục', style: TextStyle(color: activeThemeColor, fontSize: 9, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -665,87 +956,234 @@ class MusicScreenState extends State<MusicScreen> {
     );
   }
 
-  Widget _buildTrackListItem(GDriveItemModel track, int index) {
+  Widget _buildVideoCard(GDriveItemModel video) {
+    return TvFocusableCard(
+      onTap: () => _playVideo(video),
+      borderRadius: BorderRadius.circular(12),
+      focusBorderColor: const Color(0xFFF59E0B),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B).withOpacity(0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Thumbnail / Poster with play overlay
+            Expanded(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: video.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(color: const Color(0xFF0F172A)),
+                          errorWidget: (_, __, ___) => Container(
+                            color: const Color(0xFF0F172A),
+                            child: const Center(
+                              child: Icon(Icons.movie_rounded, color: Colors.white30, size: 36),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFF0F172A),
+                          child: const Center(
+                            child: Icon(Icons.movie_rounded, color: Colors.white30, size: 36),
+                          ),
+                        ),
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white24),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.black87,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        video.formattedSize,
+                        style: const TextStyle(color: Colors.white70, fontSize: 9, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Video title
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Text(
+                video.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackListItem(GDriveItemModel track, int index, List<GDriveItemModel> currentList) {
     final name = track.name;
     final ext = name.contains('.') ? name.split('.').last.toUpperCase() : 'AUDIO';
+    final streamUrl = widget.apiService.getGDriveStreamUrl(track.id);
+    final handler = VolPiAudioHandler.instance;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      child: TvFocusableCard(
-        onTap: () => _playTrack(index),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B).withOpacity(0.4),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
-          ),
-          child: Row(
-            children: [
-              // Track Number Badge
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(color: Color(0xFF38BDF8), fontWeight: FontWeight.bold, fontSize: 12),
+    return StreamBuilder<MediaItem?>(
+      stream: handler.mediaItem,
+      builder: (context, mediaSnap) {
+        final currentMedia = mediaSnap.data;
+        final bool isCurrent = currentMedia != null && currentMedia.id == streamUrl;
+
+        return StreamBuilder<PlaybackState>(
+          stream: handler.playbackState,
+          builder: (context, stateSnap) {
+            final state = stateSnap.data;
+            final isPlaying = isCurrent && (state?.playing ?? false);
+            final isBuffering = isCurrent &&
+                (state?.processingState == AudioProcessingState.buffering ||
+                    state?.processingState == AudioProcessingState.loading);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              child: TvFocusableCard(
+                onTap: () {
+                  if (isCurrent) {
+                    if (isPlaying) {
+                      handler.pause();
+                    } else {
+                      handler.play();
+                    }
+                  } else {
+                    _playTrack(track, currentList);
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                focusBorderColor: const Color(0xFF38BDF8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isCurrent ? const Color(0xFF0284C7).withOpacity(0.22) : const Color(0xFF1E293B).withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isCurrent ? const Color(0xFF38BDF8).withOpacity(0.8) : Colors.white.withOpacity(0.06),
+                      width: isCurrent ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Track Number Badge / Equalizer / Loading Spinner
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: isCurrent ? const Color(0xFF0284C7) : const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Center(
+                          child: isBuffering
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : (isPlaying
+                                  ? const Icon(Icons.equalizer_rounded, color: Colors.white, size: 18)
+                                  : Text(
+                                      '${index + 1}',
+                                      style: TextStyle(
+                                        color: isCurrent ? Colors.white : const Color(0xFF38BDF8),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    )),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12),
+
+                      // Title and Size
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: TextStyle(
+                                color: isCurrent ? const Color(0xFF38BDF8) : Colors.white,
+                                fontSize: 13,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Text(
+                                  track.formattedSize,
+                                  style: const TextStyle(color: Colors.white54, fontSize: 10),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: ext == 'FLAC' ? const Color(0xFF0284C7).withOpacity(0.2) : Colors.white10,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text(
+                                    ext,
+                                    style: TextStyle(
+                                      color: ext == 'FLAC' ? const Color(0xFF38BDF8) : Colors.white60,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Action Status Icon
+                      Icon(
+                        isBuffering
+                            ? Icons.hourglass_top_rounded
+                            : (isPlaying
+                                ? Icons.pause_circle_filled_rounded
+                                : (isCurrent ? Icons.play_circle_filled_rounded : Icons.play_circle_outline_rounded)),
+                        color: const Color(0xFF38BDF8),
+                        size: 26,
+                      ),
+                    ],
                   ),
                 ),
               ),
-
-              const SizedBox(width: 12),
-
-              // Title and Size
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        Text(
-                          track.formattedSize,
-                          style: const TextStyle(color: Colors.white54, fontSize: 10),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: ext == 'FLAC' ? const Color(0xFF0284C7).withOpacity(0.2) : Colors.white10,
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            ext,
-                            style: TextStyle(
-                              color: ext == 'FLAC' ? const Color(0xFF38BDF8) : Colors.white60,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const Icon(Icons.play_circle_outline_rounded, color: Color(0xFF38BDF8), size: 26),
-            ],
-          ),
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -761,12 +1199,17 @@ class MusicScreenState extends State<MusicScreen> {
         return StreamBuilder<PlaybackState>(
           stream: handler.playbackState,
           builder: (context, stateSnapshot) {
-            final playing = stateSnapshot.data?.playing ?? false;
+            final state = stateSnapshot.data;
+            final playing = state?.playing ?? false;
+            final pos = state?.position ?? Duration.zero;
+            final buffered = state?.bufferedPosition ?? Duration.zero;
+            final dur = item.duration ?? Duration.zero;
+            final isBuffering = state?.processingState == AudioProcessingState.buffering ||
+                state?.processingState == AudioProcessingState.loading;
 
             return GestureDetector(
               onTap: () => MusicPlayerBottomSheet.show(context),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: const BoxDecoration(
                   color: Color(0xFF0F172A),
                   border: Border(top: BorderSide(color: Color(0xFF0284C7), width: 1.5)),
@@ -774,58 +1217,118 @@ class MusicScreenState extends State<MusicScreen> {
                     BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, -2)),
                   ],
                 ),
-                child: Row(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Mini Thumbnail
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1E293B),
-                        borderRadius: BorderRadius.circular(8),
+                    // Dual-Layer Thin Buffer & Progress Bar at Top
+                    if (dur.inMilliseconds > 0)
+                      SizedBox(
+                        height: 2.5,
+                        width: double.infinity,
+                        child: Stack(
+                          children: [
+                            Container(color: const Color(0xFF1E293B)),
+                            // Buffer Bar
+                            FractionallySizedBox(
+                              widthFactor: (buffered.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
+                              child: Container(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                            ),
+                            // Position Bar
+                            FractionallySizedBox(
+                              widthFactor: (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
+                              child: Container(color: const Color(0xFF38BDF8)),
+                            ),
+                          ],
+                        ),
                       ),
-                      clipBehavior: Clip.antiAlias,
-                      child: item.artUri != null
-                          ? CachedNetworkImage(imageUrl: item.artUri.toString(), fit: BoxFit.cover)
-                          : const Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 24),
-                    ),
 
-                    const SizedBox(width: 12),
-
-                    // Title & Artist
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
                         children: [
-                          Text(
-                            item.title,
-                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          // Mini Thumbnail
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1E293B),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            child: item.artUri != null
+                                ? CachedNetworkImage(imageUrl: item.artUri.toString(), fit: BoxFit.cover)
+                                : const Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 24),
                           ),
-                          Text(
-                            item.artist ?? item.album ?? 'VolPi Music',
-                            style: const TextStyle(color: Colors.white60, fontSize: 11),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+
+                          const SizedBox(width: 12),
+
+                          // Title & Artist
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  item.title,
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        item.artist ?? item.album ?? 'VolPi Music',
+                                        style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (dur.inMilliseconds > 0 && buffered.inMilliseconds > 0) ...[
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Buffer: ${((buffered.inMilliseconds / dur.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
+                                        style: TextStyle(
+                                          color: const Color(0xFF38BDF8).withOpacity(0.75),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Mini Controls
+                          IconButton(
+                            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white70, size: 24),
+                            onPressed: () => handler.skipToPrevious(),
+                          ),
+                          IconButton(
+                            icon: isBuffering
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                                    ),
+                                  )
+                                : Icon(
+                                    playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded,
+                                    color: const Color(0xFF38BDF8),
+                                    size: 32,
+                                  ),
+                            onPressed: () => playing ? handler.pause() : handler.play(),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
+                            onPressed: () => handler.skipToNext(),
                           ),
                         ],
                       ),
-                    ),
-
-                    // Mini Controls
-                    IconButton(
-                      icon: const Icon(Icons.skip_previous_rounded, color: Colors.white70, size: 24),
-                      onPressed: () => handler.skipToPrevious(),
-                    ),
-                    IconButton(
-                      icon: Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded, color: const Color(0xFF38BDF8), size: 32),
-                      onPressed: () => playing ? handler.pause() : handler.play(),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
-                      onPressed: () => handler.skipToNext(),
                     ),
                   ],
                 ),

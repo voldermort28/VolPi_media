@@ -125,7 +125,7 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
                   Expanded(
                     child: _showQueue
                         ? _buildQueueList(handler)
-                        : _buildPlayerContent(title, artist, artUri, ext, pos, dur, playing, handler, isMobile),
+                        : _buildPlayerContent(title, artist, artUri, ext, pos, dur, state, handler, isMobile),
                   ),
                 ],
               ),
@@ -143,10 +143,14 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
     String ext,
     Duration pos,
     Duration dur,
-    bool playing,
+    PlaybackState? state,
     VolPiAudioHandler handler,
     bool isMobile,
   ) {
+    final playing = state?.playing ?? false;
+    final bufferedPos = state?.bufferedPosition ?? Duration.zero;
+    final isBuffering = state?.processingState == AudioProcessingState.buffering ||
+        state?.processingState == AudioProcessingState.loading;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
       child: Column(
@@ -232,33 +236,59 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
 
           const SizedBox(height: 18),
 
-          // Seek Slider Bar
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 3.5,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              activeTrackColor: const Color(0xFF38BDF8),
-              inactiveTrackColor: const Color(0xFF1E293B),
-              thumbColor: Colors.white,
-            ),
-            child: Slider(
-              min: 0,
-              max: dur.inMilliseconds.toDouble() > 0 ? dur.inMilliseconds.toDouble() : 1.0,
-              value: pos.inMilliseconds.toDouble().clamp(0.0, dur.inMilliseconds.toDouble() > 0 ? dur.inMilliseconds.toDouble() : 1.0),
-              onChanged: (val) {
-                handler.seek(Duration(milliseconds: val.toInt()));
-              },
-            ),
+          // Dual-Layer Seek Bar with Live Buffer
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // 1. Buffered Track Bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: dur.inMilliseconds > 0
+                        ? (bufferedPos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+                        : 0.0,
+                    minHeight: 4.0,
+                    backgroundColor: const Color(0xFF1E293B),
+                    valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF38BDF8).withOpacity(0.35)),
+                  ),
+                ),
+              ),
+              // 2. Interactive Position Slider
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 4.0,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                  activeTrackColor: const Color(0xFF38BDF8),
+                  inactiveTrackColor: Colors.transparent, // Let buffered track shine through
+                  thumbColor: Colors.white,
+                ),
+                child: Slider(
+                  min: 0,
+                  max: dur.inMilliseconds.toDouble() > 0 ? dur.inMilliseconds.toDouble() : 1.0,
+                  value: pos.inMilliseconds.toDouble().clamp(0.0, dur.inMilliseconds.toDouble() > 0 ? dur.inMilliseconds.toDouble() : 1.0),
+                  onChanged: (val) {
+                    handler.seek(Duration(milliseconds: val.toInt()));
+                  },
+                ),
+              ),
+            ],
           ),
 
-          // Position / Duration labels
+          // Position / Buffer / Duration labels
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(_formatDuration(pos), style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                if (dur.inMilliseconds > 0 && bufferedPos.inMilliseconds > 0)
+                  Text(
+                    'Đã nạp: ${_formatDuration(bufferedPos)} (${((bufferedPos.inMilliseconds / dur.inMilliseconds) * 100).clamp(0, 100).toInt()}%)',
+                    style: TextStyle(color: const Color(0xFF38BDF8).withOpacity(0.75), fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
                 Text(_formatDuration(dur), style: const TextStyle(color: Colors.white54, fontSize: 11)),
               ],
             ),
@@ -295,11 +325,20 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
                     ],
                   ),
                   child: Center(
-                    child: Icon(
-                      playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: Colors.white,
-                      size: 34,
-                    ),
+                    child: isBuffering
+                        ? const SizedBox(
+                            width: 26,
+                            height: 26,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Icon(
+                            playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 34,
+                          ),
                   ),
                 ),
               ),

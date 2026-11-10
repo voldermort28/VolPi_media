@@ -819,6 +819,19 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
+  Duration get _videoBufferedPosition {
+    if (!_isInitialized) return Duration.zero;
+    final buffered = _controller.value.buffered;
+    if (buffered.isEmpty) return Duration.zero;
+    final pos = _controller.value.position;
+    for (final range in buffered) {
+      if (pos >= range.start && pos <= range.end) {
+        return range.end;
+      }
+    }
+    return buffered.last.end;
+  }
+
   String _formatDelta(Duration d, int direction) {
     final int totalSec = d.inSeconds.abs();
     final String sign = direction >= 0 ? '+' : '-';
@@ -1868,6 +1881,58 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
+              // 3b. BUFFERING HUD INDICATOR (Khi video đang load bộ đệm giữa chừng)
+              if (_isInitialized && _controller.value.isBuffering)
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF38BDF8).withOpacity(0.15),
+                          blurRadius: 20,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Đang nạp bộ đệm...',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (_controller.value.duration.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Buffer: ${((_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
+                            style: TextStyle(
+                              color: const Color(0xFF38BDF8).withOpacity(0.85),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+
               // 4. OSD OVERLAY CONTROLS (Top Bar, Bottom Timeline & Controls Below Progress Bar)
               ExcludeFocus(
                 excluding: !_showControls || _isScreenLocked,
@@ -2254,48 +2319,69 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         Expanded(
                                           child: MouseRegion(
                                             cursor: SystemMouseCursors.click,
-                                            child: SliderTheme(
-                                              data: SliderTheme.of(context).copyWith(
-                                                activeTrackColor: const Color(0xFF38BDF8),
-                                                inactiveTrackColor: Colors.white24,
-                                                thumbColor: const Color(0xFF38BDF8),
-                                                overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                                thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isIOS ? 8.5 : 6.5),
-                                                trackHeight: _isIOS ? 5.0 : 4.0,
-                                              ),
-                                              child: Slider(
-                                                focusNode: FocusNode(canRequestFocus: false),
-                                                value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
-                                                      0.0,
-                                                      _controller.value.duration.inSeconds.toDouble(),
+                                            child: Stack(
+                                              alignment: Alignment.center,
+                                              children: [
+                                                // 1. Buffered Track Bar
+                                                Padding(
+                                                  padding: EdgeInsets.symmetric(horizontal: _isIOS ? 8.5 : 6.5),
+                                                  child: ClipRRect(
+                                                    borderRadius: BorderRadius.circular(4),
+                                                    child: LinearProgressIndicator(
+                                                      value: _controller.value.duration.inMilliseconds > 0
+                                                          ? (_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds).clamp(0.0, 1.0)
+                                                          : 0.0,
+                                                      minHeight: _isIOS ? 5.0 : 4.0,
+                                                      backgroundColor: Colors.white24,
+                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.4)),
                                                     ),
-                                                max: _controller.value.duration.inSeconds.toDouble() > 0
-                                                    ? _controller.value.duration.inSeconds.toDouble()
-                                                    : 1.0,
-                                                onChangeStart: (val) {
-                                                  _hideControlsTimer?.cancel();
-                                                  setState(() {
-                                                    _isHoldingSeek = true;
-                                                    _pendingSeekPosition = Duration(seconds: val.toInt());
-                                                  });
-                                                },
-                                                onChanged: (val) {
-                                                  setState(() {
-                                                    _pendingSeekPosition = Duration(seconds: val.toInt());
-                                                  });
-                                                },
-                                                onChangeEnd: (val) {
-                                                  final target = Duration(seconds: val.toInt());
-                                                  _controller.seekTo(target).then((_) {
-                                                    if (mounted) {
+                                                  ),
+                                                ),
+                                                // 2. Active Slider
+                                                SliderTheme(
+                                                  data: SliderTheme.of(context).copyWith(
+                                                    activeTrackColor: const Color(0xFF38BDF8),
+                                                    inactiveTrackColor: Colors.transparent, // Let buffer bar show through
+                                                    thumbColor: const Color(0xFF38BDF8),
+                                                    overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isIOS ? 8.5 : 6.5),
+                                                    trackHeight: _isIOS ? 5.0 : 4.0,
+                                                  ),
+                                                  child: Slider(
+                                                    focusNode: FocusNode(canRequestFocus: false),
+                                                    value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
+                                                          0.0,
+                                                          _controller.value.duration.inSeconds.toDouble(),
+                                                        ),
+                                                    max: _controller.value.duration.inSeconds.toDouble() > 0
+                                                      ? _controller.value.duration.inSeconds.toDouble()
+                                                      : 1.0,
+                                                    onChangeStart: (val) {
+                                                      _hideControlsTimer?.cancel();
                                                       setState(() {
-                                                        _isHoldingSeek = false;
+                                                        _isHoldingSeek = true;
+                                                        _pendingSeekPosition = Duration(seconds: val.toInt());
                                                       });
-                                                      _startHideControlsTimer();
-                                                    }
-                                                  });
-                                                },
-                                              ),
+                                                    },
+                                                    onChanged: (val) {
+                                                      setState(() {
+                                                        _pendingSeekPosition = Duration(seconds: val.toInt());
+                                                      });
+                                                    },
+                                                    onChangeEnd: (val) {
+                                                      final target = Duration(seconds: val.toInt());
+                                                      _controller.seekTo(target).then((_) {
+                                                        if (mounted) {
+                                                          setState(() {
+                                                            _isHoldingSeek = false;
+                                                          });
+                                                          _startHideControlsTimer();
+                                                        }
+                                                      });
+                                                    },
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -2309,6 +2395,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
                                           ),
                                         ),
+                                        if (!widget.isLive && _controller.value.duration.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '• Đã nạp: ${_formatDuration(_videoBufferedPosition)} (${((_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds) * 100).round()}%)',
+                                            style: TextStyle(
+                                              color: const Color(0xFF38BDF8).withOpacity(0.85),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              shadows: const [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
