@@ -29,6 +29,9 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   AudioPlayer get player => _player;
   int get currentIndex => _currentIndex;
+  Stream<double> get volumeStream => _player.volumeStream;
+  double get volume => _player.volume;
+  Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0.0, 1.0));
 
   VolPiAudioHandler._internal() {
     _initStreams();
@@ -118,7 +121,12 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
     try {
       await _player.stop();
-      await _player.setUrl(item.id);
+      await _player.setAudioSource(
+        AudioSource.uri(
+          Uri.parse(item.id),
+          tag: item,
+        ),
+      );
       await _player.play();
     } catch (e) {
       debugPrint('[VolPiAudioHandler] Error loading track: $e');

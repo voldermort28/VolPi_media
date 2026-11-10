@@ -730,6 +730,40 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
 // STREAMING PROXY (HTTP 206 Partial Content Range Support)
 // =========================================================================
 
+const MIME_BY_EXT = {
+  '.flac': 'audio/flac',
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.wav': 'audio/wav',
+  '.aac': 'audio/aac',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/opus',
+  '.wma': 'audio/x-ms-wma',
+  '.alac': 'audio/mp4',
+  '.mp4': 'video/mp4',
+  '.mkv': 'video/x-matroska',
+  '.webm': 'video/webm',
+  '.avi': 'video/x-msvideo',
+  '.mov': 'video/quicktime',
+  '.ts': 'video/mp2t',
+  '.m4v': 'video/mp4',
+};
+
+function inferMimeType(filename, rawContentType = '') {
+  if (filename) {
+    const lower = filename.toLowerCase();
+    for (const [ext, mime] of Object.entries(MIME_BY_EXT)) {
+      if (lower.endsWith(ext)) {
+        return mime;
+      }
+    }
+  }
+  if (rawContentType && !rawContentType.includes('octet-stream') && !rawContentType.includes('text/html')) {
+    return rawContentType;
+  }
+  return 'video/mp4';
+}
+
 async function streamVideo(fileId, req, res) {
   const range = req.headers.range;
   const accessToken = await getValidAccessToken();
@@ -790,9 +824,31 @@ async function streamVideo(fileId, req, res) {
 
     const status = driveRes.status === 206 || (range && driveRes.headers['content-range']) ? 206 : 200;
 
+    let filename = req.params?.filename || req.query?.name || '';
+    if (!filename) {
+      for (const entry of folderCache.values()) {
+        if (entry?.data?.allAudios) {
+          const found = entry.data.allAudios.find((a) => a.id === fileId);
+          if (found?.name) {
+            filename = found.name;
+            break;
+          }
+        }
+        if (entry?.data?.allVideos) {
+          const found = entry.data.allVideos.find((v) => v.id === fileId);
+          if (found?.name) {
+            filename = found.name;
+            break;
+          }
+        }
+      }
+    }
+
+    const contentType = inferMimeType(filename, driveRes.headers['content-type']);
+
     const responseHeaders = {
       'Accept-Ranges': 'bytes',
-      'Content-Type': driveRes.headers['content-type'] || 'video/mp4',
+      'Content-Type': contentType,
     };
 
     if (driveRes.headers['content-range']) {

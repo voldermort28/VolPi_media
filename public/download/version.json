@@ -1,10 +1,10 @@
 {
-  "version": "2.2.38",
-  "build": 104,
-  "tag_name": "v2.2.38",
-  "changelog": "• VolPi Media v2.2.38:\n- Sửa lỗi icon biên dịch trên Flutter (chuẩn hóa Icons.video_collection_rounded).\n- Tách riêng 2 phân hệ 'Nghe Nhạc' và 'Video & Phim' trong cùng 1 tab: Khắc phục triệt để lỗi video công khai chỉ phát tiếng, mở đầy đủ hình ảnh trên VideoPlayerScreen.\n- Sửa lỗi click bài hát không tự động phát: Bổ sung trạng thái nạp bài tức thì, viền sáng highlight, loading spinner và equalizer động.\n- Bổ sung thanh hiển thị Buffer (Bộ đệm nạp trước) 2 lớp cùng nhãn % buffer cho cả Trình phát Video và Trình phát Nhạc.\n- Sửa lỗi layout thanh Tab bị cắt cụt trên macOS trong trang Kho Phim Bí Mật.",
+  "version": "2.2.39",
+  "build": 105,
+  "tag_name": "v2.2.39",
+  "changelog": "• VolPi Media v2.2.39:\n- Hỗ trợ phát nhạc lossless định dạng FLAC: Chuẩn hóa MIME audio/flac và định danh luồng âm thanh tương thích AVPlayer (iOS/macOS) & ExoPlayer (Android).\n- Bổ sung thanh điều chỉnh âm lượng (Volume Slider) trong tab Nghe Nhạc: Tích hợp trực tiếp trên Bottom Sheet và thanh Mini Player góc đáy Desktop.\n- Khắc phục triệt để lỗi HTTP 504 Gateway Timeout khi phát video Telegram: Tối ưu hóa số lượng chunk iterDownload của GramJS, cắt dữ liệu chính xác theo byte Range và lưu cache metadata tin nhắn.\n- Tối ưu hóa kích thước thanh tab Kho Phim Bí Mật: Rút gọn nhãn tab, điều chỉnh độ rộng hiển thị ngăn chặn tình trạng tràn dòng hoặc bị cắt trên macOS / màn hình nhỏ.\n- Cải thiện hiển thị nút 'Tập tiếp theo' trong hộp thoại Tiếp tục xem cho các bộ phim series / anime.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-10T18:11:00Z"
+  "published_at": "2026-11-10T18:36:00Z"
 }

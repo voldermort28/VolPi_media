@@ -167,7 +167,7 @@ class GDriveScreenState extends State<GDriveScreen> {
   }
 
   void _playVideo(GDriveItemModel video) {
-    final streamUrl = widget.apiService.getGDriveStreamUrl(video.id);
+    final streamUrl = widget.apiService.getGDriveStreamUrl(video.id, fileName: video.name);
     final isPrivate = _selectedSource?.isPrivate ?? true;
     final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 

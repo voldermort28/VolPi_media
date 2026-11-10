@@ -1665,38 +1665,38 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
             icon: Icons.movie_outlined,
             activeColor: const Color(0xFFF43F5E),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           _buildSourceTab(
             index: 1,
             label: 'Viet69',
             icon: Icons.local_fire_department_rounded,
             activeColor: const Color(0xFFEA580C),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           _buildSourceTab(
             index: 2,
             label: 'xNhau',
             icon: Icons.flash_on_rounded,
             activeColor: const Color(0xFFEC4899),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           _buildSourceTab(
             index: 3,
-            label: 'Google Drive',
+            label: 'GDrive',
             icon: Icons.cloud_circle_rounded,
             activeColor: const Color(0xFF0284C7),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           _buildSourceTab(
             index: 4,
-            label: 'Telegram Phim',
+            label: 'Telegram',
             icon: Icons.send_rounded,
             activeColor: const Color(0xFF0EA5E9),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 3),
           _buildSourceTab(
             index: 5,
-            label: 'Yêu thích ${_secretFavorites.isNotEmpty ? "(${_secretFavorites.length})" : ""}',
+            label: _secretFavorites.isNotEmpty ? 'Yêu thích (${_secretFavorites.length})' : 'Yêu thích',
             icon: Icons.favorite_rounded,
             activeColor: const Color(0xFFE11D48),
           ),
@@ -1718,7 +1718,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       borderRadius: BorderRadius.circular(9),
       focusBorderColor: activeColor,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6.5),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5.5),
         decoration: BoxDecoration(
           color: isSelected ? activeColor : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
@@ -1726,13 +1726,13 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.white60, size: 15),
-            const SizedBox(width: 5),
+            Icon(icon, color: isSelected ? Colors.white : Colors.white60, size: 14),
+            const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 color: isSelected ? Colors.white : Colors.white70,
-                fontSize: 12.5,
+                fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
               ),
             ),

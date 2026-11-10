@@ -710,7 +710,7 @@ app.get("/api/gdrive/folders/:folderId", async (req, res) => {
   }
 });
 
-app.get("/api/gdrive/stream/:fileId", (req, res) => {
+app.get(["/api/gdrive/stream/:fileId", "/api/gdrive/stream/:fileId/:filename"], (req, res) => {
   gdriveService.streamVideo(req.params.fileId, req, res);
 });
 

@@ -506,7 +506,11 @@ class ApiService {
   }
 
   /// Get direct stream URL with Range (HTTP 206) proxy support
-  String getGDriveStreamUrl(String fileId) {
+  String getGDriveStreamUrl(String fileId, {String? fileName}) {
+    if (fileName != null && fileName.trim().isNotEmpty) {
+      final safeName = Uri.encodeComponent(fileName.trim());
+      return '$baseUrl/api/gdrive/stream/$fileId/$safeName';
+    }
     return '$baseUrl/api/gdrive/stream/$fileId';
   }
 

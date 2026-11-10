@@ -208,7 +208,7 @@ class MusicScreenState extends State<MusicScreen> {
 
     // Tạo danh sách MediaItem cho toàn bộ trackList này
     final mediaItems = trackList.map((t) {
-      final streamUrl = widget.apiService.getGDriveStreamUrl(t.id);
+      final streamUrl = widget.apiService.getGDriveStreamUrl(t.id, fileName: t.name);
       return MediaItem(
         id: streamUrl,
         title: t.name,
@@ -228,7 +228,7 @@ class MusicScreenState extends State<MusicScreen> {
   }
 
   void _playVideo(GDriveItemModel video) {
-    final streamUrl = widget.apiService.getGDriveStreamUrl(video.id);
+    final streamUrl = widget.apiService.getGDriveStreamUrl(video.id, fileName: video.name);
     final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 
     Navigator.of(context).push(
@@ -1043,7 +1043,7 @@ class MusicScreenState extends State<MusicScreen> {
   Widget _buildTrackListItem(GDriveItemModel track, int index, List<GDriveItemModel> currentList) {
     final name = track.name;
     final ext = name.contains('.') ? name.split('.').last.toUpperCase() : 'AUDIO';
-    final streamUrl = widget.apiService.getGDriveStreamUrl(track.id);
+    final streamUrl = widget.apiService.getGDriveStreamUrl(track.id, fileName: track.name);
     final handler = VolPiAudioHandler.instance;
 
     return StreamBuilder<MediaItem?>(
@@ -1327,6 +1327,53 @@ class MusicScreenState extends State<MusicScreen> {
                             icon: const Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
                             onPressed: () => handler.skipToNext(),
                           ),
+
+                          // Volume Slider on Desktop / Wide screens
+                          if (MediaQuery.of(context).size.width >= 700) ...[
+                            const SizedBox(width: 8),
+                            StreamBuilder<double>(
+                              stream: handler.volumeStream,
+                              initialData: handler.volume,
+                              builder: (context, volSnap) {
+                                final vol = volSnap.data ?? 1.0;
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        vol == 0
+                                            ? Icons.volume_off_rounded
+                                            : (vol < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      splashRadius: 18,
+                                      onPressed: () => handler.setVolume(vol == 0 ? 1.0 : 0.0),
+                                    ),
+                                    SizedBox(
+                                      width: 85,
+                                      child: SliderTheme(
+                                        data: SliderTheme.of(context).copyWith(
+                                          trackHeight: 3,
+                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                                          activeTrackColor: const Color(0xFF38BDF8),
+                                          inactiveTrackColor: Colors.white12,
+                                          thumbColor: Colors.white,
+                                        ),
+                                        child: Slider(
+                                          value: vol.clamp(0.0, 1.0),
+                                          min: 0.0,
+                                          max: 1.0,
+                                          onChanged: (newVol) => handler.setVolume(newVol),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ],
                         ],
                       ),
                     ),

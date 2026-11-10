@@ -40,6 +40,12 @@ let pendingPhoneAuth = null;
 // Global singleton Telegram Client instance
 let telegramClientInstance = null;
 
+// In-memory cache for channel entities to avoid repeated getEntity network roundtrips
+const entityCache = new Map();
+
+// In-memory cache for message documents to avoid getMessages network roundtrips on every range chunk
+const messageDocCache = new Map();
+
 function isDefaultOrInvalidApiId(apiId) {
   if (!apiId) return true;
   const num = parseInt(apiId, 10);
@@ -572,23 +578,32 @@ function toggleSource(id, enabled) {
  */
 async function resolveChannelEntity(client, channelIdentifier) {
   const idStr = channelIdentifier.toString().trim();
+  if (entityCache.has(idStr)) {
+    return entityCache.get(idStr);
+  }
 
+  let resolved = null;
   // If starts with -100
   if (idStr.startsWith('-100')) {
     const rawId = idStr.substring(4);
     try {
-      return await client.getEntity(new Api.PeerChannel({ channelId: BigInt(rawId) }));
+      resolved = await client.getEntity(new Api.PeerChannel({ channelId: BigInt(rawId) }));
     } catch (_) {
       try {
-        return await client.getInputEntity(BigInt(idStr));
+        resolved = await client.getInputEntity(BigInt(idStr));
       } catch (__) {
-        return await client.getEntity(BigInt(idStr));
+        resolved = await client.getEntity(BigInt(idStr));
       }
     }
+  } else {
+    // If username @...
+    resolved = await client.getEntity(idStr);
   }
 
-  // If username @...
-  return await client.getEntity(idStr);
+  if (resolved) {
+    entityCache.set(idStr, resolved);
+  }
+  return resolved;
 }
 
 /**
@@ -782,19 +797,31 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 async function streamMedia(channelIdentifier, messageId, req, res) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
   const msgId = parseInt(messageId, 10);
+  const cacheKey = `${channelId}_${msgId}`;
 
   try {
     const client = await getClient();
-    const entity = await resolveChannelEntity(client, channelId);
 
-    const [msg] = await client.getMessages(entity, { ids: [msgId] });
-    if (!msg || !msg.media || !msg.media.document) {
-      return res.status(404).json({ error: 'Không tìm thấy video trong tin nhắn' });
+    let mediaInfo = messageDocCache.get(cacheKey);
+    if (!mediaInfo || Date.now() > mediaInfo.expires) {
+      const entity = await resolveChannelEntity(client, channelId);
+      const [msg] = await client.getMessages(entity, { ids: [msgId] });
+      if (!msg || !msg.media || !msg.media.document) {
+        return res.status(404).json({ error: 'Không tìm thấy video trong tin nhắn' });
+      }
+
+      const document = msg.media.document;
+      mediaInfo = {
+        media: msg.media,
+        document,
+        totalSize: parseInt(document.size, 10),
+        mimeType: document.mimeType || 'video/mp4',
+        expires: Date.now() + 3600000, // 1 hour cache
+      };
+      messageDocCache.set(cacheKey, mediaInfo);
     }
 
-    const document = msg.media.document;
-    const totalSize = parseInt(document.size, 10);
-    const mimeType = document.mimeType || 'video/mp4';
+    const { totalSize, mimeType, media } = mediaInfo;
 
     const rangeHeader = req.headers.range;
     let start = 0;
@@ -834,18 +861,36 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
       isAborted = true;
     });
 
+    const CHUNK_SIZE = 512 * 1024;
+    // CRITICAL: GramJS limit parameter is the number of chunks to download, NOT bytes!
+    const chunksCount = Math.ceil(contentLength / CHUNK_SIZE);
+
+    let bytesSent = 0;
     // Stream chunks via GramJS iterDownload
     for await (const chunk of client.iterDownload({
-      file: msg.media,
+      file: media,
       offset: BigInt(start),
-      limit: contentLength,
-      chunkSize: 512 * 1024,
+      limit: chunksCount,
+      chunkSize: CHUNK_SIZE,
     })) {
       if (isAborted) break;
-      res.write(chunk);
+
+      const remaining = contentLength - bytesSent;
+      if (remaining <= 0) break;
+
+      if (chunk.length > remaining) {
+        res.write(chunk.slice(0, remaining));
+        bytesSent += remaining;
+        break;
+      } else {
+        res.write(chunk);
+        bytesSent += chunk.length;
+      }
+
+      if (bytesSent >= contentLength) break;
     }
 
-    if (!isAborted) {
+    if (!isAborted && !res.writableEnded) {
       res.end();
     }
   } catch (err) {

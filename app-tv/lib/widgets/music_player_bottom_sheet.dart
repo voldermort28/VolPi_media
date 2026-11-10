@@ -351,6 +351,75 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
             ],
           ),
 
+          const SizedBox(height: 14),
+
+          // Volume Control Row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: StreamBuilder<double>(
+              stream: handler.volumeStream,
+              initialData: handler.volume,
+              builder: (context, volSnap) {
+                final vol = volSnap.data ?? 1.0;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E293B).withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          vol == 0
+                              ? Icons.volume_off_rounded
+                              : (vol < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                          color: const Color(0xFF38BDF8),
+                          size: 20,
+                        ),
+                        splashRadius: 18,
+                        onPressed: () {
+                          handler.setVolume(vol == 0 ? 1.0 : 0.0);
+                        },
+                      ),
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 3.5,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                            activeTrackColor: const Color(0xFF38BDF8),
+                            inactiveTrackColor: Colors.white12,
+                            thumbColor: Colors.white,
+                          ),
+                          child: Slider(
+                            value: vol.clamp(0.0, 1.0),
+                            min: 0.0,
+                            max: 1.0,
+                            onChanged: (newVol) => handler.setVolume(newVol),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 38,
+                        child: Text(
+                          '${(vol * 100).round()}%',
+                          textAlign: TextAlign.end,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+
           const Spacer(flex: 1),
         ],
       ),

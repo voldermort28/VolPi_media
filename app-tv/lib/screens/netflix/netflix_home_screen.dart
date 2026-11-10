@@ -340,7 +340,11 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
 
     final cleanId = _cleanAnimeSlug(item.mediaId.isNotEmpty ? item.mediaId : item.id);
     final epNum = _extractEpisodeNumber(item);
-    final isAnimeSeries = (item.category == 'anime' || item.id.startsWith('anime:') || item.id.startsWith('yumei:')) && cleanId.isNotEmpty;
+    final isAnimeSeries = (item.category == 'anime' ||
+        item.id.startsWith('anime:') ||
+        item.id.startsWith('yumei:') ||
+        item.subtitle.toLowerCase().contains('tập') ||
+        item.episode > 0) && cleanId.isNotEmpty;
 
     Duration startPos = Duration(milliseconds: item.positionMs);
     if (replaceContext == null) {
