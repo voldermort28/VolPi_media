@@ -702,7 +702,7 @@ app.post("/api/gdrive/sources/toggle", authService.requireAuth, (req, res) => {
 
 app.get("/api/gdrive/folders/:folderId", async (req, res) => {
   try {
-    const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
+    const forceRefresh = req.query.forceRefresh === "true";
     const data = await gdriveService.getFolderContents(req.params.folderId, { forceRefresh });
     res.json(data);
   } catch (err) {

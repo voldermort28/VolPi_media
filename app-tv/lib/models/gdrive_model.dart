@@ -87,6 +87,24 @@ class GDriveItemModel {
       folderPath: json['folderPath'] as String?,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'isFolder': isFolder,
+      'isAudio': isAudio,
+      'size': size,
+      'formattedSize': formattedSize,
+      'mimeType': mimeType,
+      'thumbnailUrl': thumbnailUrl,
+      'subtitleFileId': subtitleFileId,
+      'subtitleName': subtitleName,
+      'folderId': folderId,
+      'folderName': folderName,
+      'folderPath': folderPath,
+    };
+  }
 }
 
 class GDriveFolderContentResult {
@@ -155,5 +173,21 @@ class GDriveFolderContentResult {
       totalFolders: (json['totalFolders'] as num?)?.toInt() ?? allFolderList.length,
       totalItems: (json['totalItems'] as num?)?.toInt() ?? (allVideoList.length + allAudioList.length + folderList.length),
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'folderId': folderId,
+      'folders': folders.map((e) => e.toJson()).toList(),
+      'allFolders': allFolders.map((e) => e.toJson()).toList(),
+      'videos': videos.map((e) => e.toJson()).toList(),
+      'allVideos': allVideos.map((e) => e.toJson()).toList(),
+      'audios': audios.map((e) => e.toJson()).toList(),
+      'allAudios': allAudios.map((e) => e.toJson()).toList(),
+      'totalVideos': totalVideos,
+      'totalAudios': totalAudios,
+      'totalFolders': totalFolders,
+      'totalItems': totalItems,
+    };
   }
 }

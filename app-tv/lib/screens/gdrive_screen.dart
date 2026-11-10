@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/gdrive_model.dart';
+import '../services/gdrive_cache_manager.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -24,6 +25,7 @@ class GDriveScreenState extends State<GDriveScreen> {
   List<GDriveSourceModel> _sources = [];
   GDriveSourceModel? _selectedSource;
   bool _isLoading = true;
+  bool _isSyncing = false;
   String? _errorMessage;
 
   // Breadcrumb navigation stack: each entry is {'id': folderId, 'name': folderName}
@@ -111,34 +113,61 @@ class GDriveScreenState extends State<GDriveScreen> {
 
   Future<void> _loadFolder(String folderId, {bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+
+    // 1. Check local cache (memory / disk) for 0ms instant display
+    final cached = GDriveCacheManager().get(folderId) ?? await GDriveCacheManager().loadFromDisk(folderId);
+
+    if (cached != null && !forceRefresh) {
+      if (mounted) {
+        setState(() {
+          _folders = cached.folders;
+          _videos = cached.videos;
+          _isLoading = false;
+          _isSyncing = true;
+          _errorMessage = null;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final result = await widget.apiService.getGDriveFolderContents(folderId, forceRefresh: forceRefresh);
       if (!mounted) return;
 
       if (result != null) {
+        await GDriveCacheManager().set(folderId, result);
         setState(() {
           _folders = result.folders;
           _videos = result.videos;
           _isLoading = false;
+          _isSyncing = false;
+          _errorMessage = null;
         });
-      } else {
+      } else if (cached == null) {
         setState(() {
           _folders = [];
           _videos = [];
           _isLoading = false;
+          _isSyncing = false;
           _errorMessage = 'Không có tập tin nào trong thư mục này hoặc link không thể truy cập.';
+        });
+      } else {
+        setState(() {
+          _isSyncing = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Lỗi truy cập thư mục: $e';
+        _isSyncing = false;
+        if (cached == null) {
+          _errorMessage = 'Lỗi truy cập thư mục: $e';
+        }
       });
     }
   }
@@ -519,6 +548,16 @@ class GDriveScreenState extends State<GDriveScreen> {
                 style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.bold),
               ),
             ),
+          ],
+          if (_isSyncing) ...[
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white54),
+            ),
+            const SizedBox(width: 4),
+            const Text('Đang đồng bộ...', style: TextStyle(color: Colors.white54, fontSize: 10)),
           ],
         ],
       ),

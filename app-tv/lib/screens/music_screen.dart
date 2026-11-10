@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/gdrive_model.dart';
 import '../services/audio_player_handler.dart';
+import '../services/gdrive_cache_manager.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../widgets/music_player_bottom_sheet.dart';
 import '../player/video_player_screen.dart';
@@ -29,6 +30,7 @@ class MusicScreenState extends State<MusicScreen> {
   List<GDriveSourceModel> _sources = [];
   GDriveSourceModel? _selectedSource;
   bool _isLoading = true;
+  bool _isSyncing = false;
   String? _errorMessage;
 
   // Breadcrumbs: each item is {'id': folderId, 'name': folderName}
@@ -143,36 +145,64 @@ class MusicScreenState extends State<MusicScreen> {
 
   Future<void> _loadFolder(String folderId, {bool forceRefresh = false}) async {
     if (!mounted) return;
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+
+    // 1. Check local cache (memory / disk) for 0ms instant display
+    final cached = GDriveCacheManager().get(folderId) ?? await GDriveCacheManager().loadFromDisk(folderId);
+
+    if (cached != null && !forceRefresh) {
+      if (mounted) {
+        setState(() {
+          _folders = cached.folders;
+          _tracks = cached.audios;
+          _videos = cached.videos;
+          _isLoading = false;
+          _isSyncing = true;
+          _errorMessage = null;
+        });
+      }
+    } else {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final result = await widget.apiService.getGDriveFolderContents(folderId, forceRefresh: forceRefresh);
       if (!mounted) return;
 
       if (result != null) {
+        await GDriveCacheManager().set(folderId, result);
         setState(() {
           _folders = result.folders;
           _tracks = result.audios;
           _videos = result.videos;
           _isLoading = false;
+          _isSyncing = false;
+          _errorMessage = null;
         });
-      } else {
+      } else if (cached == null) {
         setState(() {
           _folders = [];
           _tracks = [];
           _videos = [];
           _isLoading = false;
+          _isSyncing = false;
           _errorMessage = 'Thư mục trống hoặc không thể tải dữ liệu.';
+        });
+      } else {
+        setState(() {
+          _isSyncing = false;
         });
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Lỗi truy cập thư mục: $e';
+        _isSyncing = false;
+        if (cached == null) {
+          _errorMessage = 'Lỗi truy cập thư mục: $e';
+        }
       });
     }
   }
@@ -634,6 +664,18 @@ class MusicScreenState extends State<MusicScreen> {
               ),
             ),
           ),
+
+          if (_isSyncing) ...[
+            const SizedBox(width: 8),
+            const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white54),
+            ),
+            const SizedBox(width: 4),
+            const Text('Đang đồng bộ...', style: TextStyle(color: Colors.white54, fontSize: 10)),
+            const SizedBox(width: 8),
+          ],
 
           if (_mediaSubTab == 0 && _tracks.isNotEmpty)
             ElevatedButton.icon(

@@ -1,10 +1,10 @@
 {
-  "version": "2.2.40",
-  "build": 106,
-  "tag_name": "v2.2.40",
-  "changelog": "• VolPi Media v2.2.40:\n- Sửa triệt để lỗi phát video Telegram bị HTTP 504 Gateway Timeout: Chuẩn hóa thư viện big-integer cho GramJS, chia đúng số lượng chunk và lưu cache metadata.\n- Tích hợp bộ giải mã chuyển đổi FLAC Lossless sang MP3 320kbps trên server kèm bộ nhớ đệm: Khắc phục lỗi AVPlayer trên iOS/macOS từ chối phát luồng FLAC qua HTTP, hỗ trợ tua nhanh 206 Partial Content mượt mà.\n- Đã cập nhật và khởi động lại tiến trình PM2 trên VPS server stremio.laboon.vn.",
+  "version": "2.2.41",
+  "build": 107,
+  "tag_name": "v2.2.41",
+  "changelog": "• VolPi Media v2.2.41:\n- Tối ưu tải tức thì 0ms cho Tab Video và Music: Tích hợp GDriveCacheManager lưu cache cục bộ trên thiết bị, hiển thị danh mục ngay khi mở tab mà không phải chờ đợi spinner.\n- Cơ chế quét tăng dần (Incremental Indexing) và Stale-While-Revalidate trên Server: Lưu index vĩnh viễn trên đĩa, tự động so sánh modifiedTime của từng thư mục con để bỏ qua các album/thư mục không đổi, chỉ quét các mục có file mới hoặc thay đổi.\n- Thêm chỉ báo đồng bộ ngầm (Syncing Indicator) tinh tế trên giao diện, giữ nguyên trải nghiệm nghe nhạc và xem video không bị gián đoạn.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-10T19:00:00Z"
+  "published_at": "2026-11-10T20:35:00Z"
 }

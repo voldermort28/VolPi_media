@@ -12,6 +12,14 @@ if (!fs.existsSync(AUDIO_CACHE_DIR)) {
 }
 
 const activeTranscodes = new Map(); // fileId -> Promise
+const activeRevalidations = new Map(); // folderId -> Promise
+
+const INDEX_CACHE_DIR = path.join(__dirname, '..', 'cache', 'gdrive_index');
+if (!fs.existsSync(INDEX_CACHE_DIR)) {
+  try {
+    fs.mkdirSync(INDEX_CACHE_DIR, { recursive: true });
+  } catch (_) {}
+}
 
 // Memory Cache with 10-minute TTL
 const folderCache = new Map();
@@ -550,135 +558,256 @@ async function fetchFolderItems(folderId, accessToken) {
   return rawFiles;
 }
 
-/**
- * Get folder contents (recursively scans subfolders up to maxDepth)
- */
-async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 } = {}) {
-  const cleanId = extractFolderId(folderId) || folderId;
-  const cacheKey = `folder_rec_${cleanId}`;
+// =========================================================================
+// DISK-BACKED INCREMENTAL INDEXING & STALE-WHILE-REVALIDATE
+// =========================================================================
 
-  // Check cache
-  if (!forceRefresh && folderCache.has(cacheKey)) {
-    const entry = folderCache.get(cacheKey);
-    if (Date.now() - entry.time < CACHE_TTL_MS) {
-      return entry.data;
+function loadDiskIndex(cleanId) {
+  try {
+    const filePath = path.join(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      return JSON.parse(raw);
     }
+  } catch (e) {
+    console.warn(`[GDriveService] Error loading disk index for ${cleanId}:`, e.message);
+  }
+  return null;
+}
+
+function saveDiskIndex(cleanId, data) {
+  try {
+    const filePath = path.join(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
+    fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8');
+  } catch (e) {
+    console.warn(`[GDriveService] Error saving disk index for ${cleanId}:`, e.message);
+  }
+}
+
+/**
+ * Perform incremental crawl on Google Drive:
+ * Compares subfolder modifiedTime with stored subfolderMeta.
+ * Only fetches newly modified or added subfolders, avoiding full crawls.
+ */
+async function scanFolderIncremental(cleanId, previousIndex = null, accessToken = null) {
+  if (!accessToken) {
+    accessToken = await getValidAccessToken();
   }
 
-  const accessToken = await getValidAccessToken();
-
-  // BFS Queue to crawl folders
-  const queue = [{ id: cleanId, name: 'Thư mục gốc', path: '', depth: 0 }];
-  const visited = new Set();
+  // 1. Fetch direct root items
+  const rawRootFiles = await fetchFolderItems(cleanId, accessToken);
 
   const directFolders = [];
   const directVideos = [];
   const directAudios = [];
-  const allFolders = [];
-  const allVideos = [];
-  const allAudios = [];
-  const allSubtitles = [];
+  const directSubtitles = [];
 
-  while (queue.length > 0) {
-    // Process up to 10 folders in parallel
-    const batch = queue.splice(0, 10);
-    const batchResults = await Promise.all(
-      batch.map(async (curr) => {
-        if (visited.has(curr.id)) return null;
-        visited.add(curr.id);
+  for (const f of rawRootFiles) {
+    const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+    if (isFolder) {
+      directFolders.push({
+        id: f.id,
+        name: f.name || 'Thư mục con',
+        isFolder: true,
+        mimeType: f.mimeType,
+        modifiedTime: f.modifiedTime || '',
+        parentId: cleanId,
+        parentName: 'Thư mục gốc',
+        folderPath: f.name || '',
+      });
+    } else if (isVideoFile(f.name, f.mimeType)) {
+      directVideos.push({
+        id: f.id,
+        name: f.name || 'Video',
+        isFolder: false,
+        size: parseInt(f.size || 0, 10),
+        formattedSize: formatBytes(f.size),
+        mimeType: f.mimeType || 'video/mp4',
+        thumbnailUrl: f.thumbnailLink || null,
+        folderId: cleanId,
+        folderName: 'Thư mục gốc',
+        folderPath: '',
+        subtitleFileId: null,
+        subtitleName: null,
+      });
+    } else if (isAudioFile(f.name, f.mimeType)) {
+      directAudios.push({
+        id: f.id,
+        name: f.name || 'Audio',
+        isFolder: false,
+        isAudio: true,
+        size: parseInt(f.size || 0, 10),
+        formattedSize: formatBytes(f.size),
+        mimeType: f.mimeType || 'audio/mpeg',
+        thumbnailUrl: f.thumbnailLink || null,
+        folderId: cleanId,
+        folderName: 'Thư mục gốc',
+        folderPath: '',
+      });
+    } else if (isSubtitleFile(f.name, f.mimeType)) {
+      directSubtitles.push({
+        id: f.id,
+        name: f.name,
+        folderId: cleanId,
+      });
+    }
+  }
 
-        const rawFiles = await fetchFolderItems(curr.id, accessToken);
-        return { curr, rawFiles };
-      })
-    );
+  // 2. Identify subfolders needing crawl
+  const subfolderMeta = (previousIndex && previousIndex.subfolderMeta) ? { ...previousIndex.subfolderMeta } : {};
+  const subfolderItems = (previousIndex && previousIndex.subfolderItems) ? { ...previousIndex.subfolderItems } : {};
 
-    for (const res of batchResults) {
-      if (!res) continue;
-      const { curr, rawFiles } = res;
-      const isRoot = curr.id === cleanId;
+  const currentSubfolderIds = new Set(directFolders.map((df) => df.id));
 
-      for (const f of rawFiles) {
-        const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
-        const folderPath = curr.path ? `${curr.path} / ${f.name}` : (f.name || '');
+  // Prune deleted subfolders
+  for (const fId of Object.keys(subfolderMeta)) {
+    if (!currentSubfolderIds.has(fId)) {
+      delete subfolderMeta[fId];
+      delete subfolderItems[fId];
+    }
+  }
 
-        if (isFolder) {
-          const folderObj = {
-            id: f.id,
-            name: f.name || 'Thư mục con',
-            isFolder: true,
-            mimeType: f.mimeType,
-            parentId: curr.id,
-            parentName: curr.name,
-            folderPath,
-          };
+  const subfoldersToCrawl = [];
+  for (const df of directFolders) {
+    const existingMeta = subfolderMeta[df.id];
+    if (!existingMeta || !subfolderItems[df.id] || (df.modifiedTime && df.modifiedTime !== existingMeta.modifiedTime)) {
+      subfoldersToCrawl.push(df);
+    }
+  }
 
-          if (isRoot) {
-            directFolders.push(folderObj);
-          }
-          allFolders.push(folderObj);
+  console.log(`[GDriveService] Incremental scan for ${cleanId}: ${directFolders.length} folders, ${subfoldersToCrawl.length} changed (${directFolders.length - subfoldersToCrawl.length} unchanged - skipped).`);
 
-          if (curr.depth < maxDepth && visited.size < 100) {
-            queue.push({
+  // 3. Crawl only changed/new subfolders
+  if (subfoldersToCrawl.length > 0) {
+    const crawlQueue = subfoldersToCrawl.map((df) => ({
+      id: df.id,
+      name: df.name,
+      path: df.folderPath,
+      rootFolderId: df.id,
+      depth: 1,
+    }));
+
+    const newlyScanned = new Map();
+    for (const df of subfoldersToCrawl) {
+      newlyScanned.set(df.id, {
+        videos: [],
+        audios: [],
+        subtitles: [],
+        folders: [],
+      });
+    }
+
+    const visited = new Set();
+    while (crawlQueue.length > 0) {
+      const batch = crawlQueue.splice(0, 10);
+      const batchResults = await Promise.all(
+        batch.map(async (curr) => {
+          if (visited.has(curr.id)) return null;
+          visited.add(curr.id);
+          const rawFiles = await fetchFolderItems(curr.id, accessToken);
+          return { curr, rawFiles };
+        })
+      );
+
+      for (const res of batchResults) {
+        if (!res) continue;
+        const { curr, rawFiles } = res;
+        const target = newlyScanned.get(curr.rootFolderId);
+        if (!target) continue;
+
+        for (const f of rawFiles) {
+          const isFolder = f.mimeType === 'application/vnd.google-apps.folder';
+          const folderPath = curr.path ? `${curr.path} / ${f.name}` : (f.name || '');
+
+          if (isFolder) {
+            target.folders.push({
               id: f.id,
               name: f.name || 'Thư mục con',
-              path: folderPath,
-              depth: curr.depth + 1,
+              isFolder: true,
+              mimeType: f.mimeType,
+              parentId: curr.id,
+              parentName: curr.name,
+              folderPath,
+            });
+
+            if (curr.depth < 3 && visited.size < 100) {
+              crawlQueue.push({
+                id: f.id,
+                name: f.name || 'Thư mục con',
+                path: folderPath,
+                rootFolderId: curr.rootFolderId,
+                depth: curr.depth + 1,
+              });
+            }
+          } else if (isVideoFile(f.name, f.mimeType)) {
+            target.videos.push({
+              id: f.id,
+              name: f.name || 'Video',
+              isFolder: false,
+              size: parseInt(f.size || 0, 10),
+              formattedSize: formatBytes(f.size),
+              mimeType: f.mimeType || 'video/mp4',
+              thumbnailUrl: f.thumbnailLink || null,
+              folderId: curr.id,
+              folderName: curr.name,
+              folderPath: curr.path || '',
+              subtitleFileId: null,
+              subtitleName: null,
+            });
+          } else if (isAudioFile(f.name, f.mimeType)) {
+            target.audios.push({
+              id: f.id,
+              name: f.name || 'Audio',
+              isFolder: false,
+              isAudio: true,
+              size: parseInt(f.size || 0, 10),
+              formattedSize: formatBytes(f.size),
+              mimeType: f.mimeType || 'audio/mpeg',
+              thumbnailUrl: f.thumbnailLink || null,
+              folderId: curr.id,
+              folderName: curr.name,
+              folderPath: curr.path || '',
+            });
+          } else if (isSubtitleFile(f.name, f.mimeType)) {
+            target.subtitles.push({
+              id: f.id,
+              name: f.name,
+              folderId: curr.id,
             });
           }
-        } else if (isVideoFile(f.name, f.mimeType)) {
-          const videoObj = {
-            id: f.id,
-            name: f.name || 'Video',
-            isFolder: false,
-            size: parseInt(f.size || 0, 10),
-            formattedSize: formatBytes(f.size),
-            mimeType: f.mimeType || 'video/mp4',
-            thumbnailUrl: f.thumbnailLink || null,
-            folderId: curr.id,
-            folderName: curr.name,
-            folderPath: curr.path || '',
-            subtitleFileId: null,
-            subtitleName: null,
-          };
-
-          if (isRoot) {
-            directVideos.push(videoObj);
-          }
-          allVideos.push(videoObj);
-        } else if (isAudioFile(f.name, f.mimeType)) {
-          const audioObj = {
-            id: f.id,
-            name: f.name || 'Audio',
-            isFolder: false,
-            isAudio: true,
-            size: parseInt(f.size || 0, 10),
-            formattedSize: formatBytes(f.size),
-            mimeType: f.mimeType || 'audio/mpeg',
-            thumbnailUrl: f.thumbnailLink || null,
-            folderId: curr.id,
-            folderName: curr.name,
-            folderPath: curr.path || '',
-          };
-
-          if (isRoot) {
-            directAudios.push(audioObj);
-          }
-          allAudios.push(audioObj);
-        } else if (isSubtitleFile(f.name, f.mimeType)) {
-          allSubtitles.push({
-            id: f.id,
-            name: f.name,
-            folderId: curr.id,
-          });
         }
       }
+    }
+
+    for (const df of subfoldersToCrawl) {
+      const items = newlyScanned.get(df.id) || { videos: [], audios: [], subtitles: [], folders: [] };
+      subfolderItems[df.id] = items;
+      subfolderMeta[df.id] = {
+        name: df.name,
+        modifiedTime: df.modifiedTime || '',
+      };
+    }
+  }
+
+  // 4. Assemble final aggregated lists
+  const allFolders = [...directFolders];
+  const allVideos = [...directVideos];
+  const allAudios = [...directAudios];
+  const allSubtitles = [...directSubtitles];
+
+  for (const df of directFolders) {
+    const items = subfolderItems[df.id];
+    if (items) {
+      if (items.folders) allFolders.push(...items.folders);
+      if (items.videos) allVideos.push(...items.videos);
+      if (items.audios) allAudios.push(...items.audios);
+      if (items.subtitles) allSubtitles.push(...items.subtitles);
     }
   }
 
   // Match subtitles with videos
   for (const video of allVideos) {
     const vBase = video.name.substring(0, video.name.lastIndexOf('.')).toLowerCase();
-    // Prefer subtitle in the same subfolder
     let matchingSub = allSubtitles.find((s) => {
       if (s.folderId !== video.folderId) return false;
       const sBase = s.name.substring(0, s.name.lastIndexOf('.')).toLowerCase();
@@ -701,20 +830,10 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
   directFolders.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
   directVideos.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
   directAudios.sort((a, b) => a.name.localeCompare(b.name, 'vi', { numeric: true }));
-  allVideos.sort((a, b) => {
-    if (a.folderPath && b.folderPath && a.folderPath !== b.folderPath) {
-      return a.folderPath.localeCompare(b.folderPath, 'vi', { numeric: true });
-    }
-    return a.name.localeCompare(b.name, 'vi', { numeric: true });
-  });
-  allAudios.sort((a, b) => {
-    if (a.folderPath && b.folderPath && a.folderPath !== b.folderPath) {
-      return a.folderPath.localeCompare(b.folderPath, 'vi', { numeric: true });
-    }
-    return a.name.localeCompare(b.name, 'vi', { numeric: true });
-  });
+  allVideos.sort((a, b) => (a.folderPath || a.name).localeCompare(b.folderPath || b.name, 'vi', { numeric: true }));
+  allAudios.sort((a, b) => (a.folderPath || a.name).localeCompare(b.folderPath || b.name, 'vi', { numeric: true }));
 
-  const result = {
+  return {
     folderId: cleanId,
     folders: directFolders,
     allFolders,
@@ -727,12 +846,58 @@ async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 
     totalFolders: allFolders.length,
     totalItems: allVideos.length + allAudios.length + directFolders.length,
     timestamp: Date.now(),
+    subfolderMeta,
+    subfolderItems,
   };
+}
 
-  // Cache result
-  folderCache.set(cacheKey, { time: Date.now(), data: result });
+/**
+ * Get folder contents (Optimistic Stale-While-Revalidate + Incremental Indexing)
+ */
+async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 } = {}) {
+  const cleanId = extractFolderId(folderId) || folderId;
+  const cacheKey = `folder_rec_${cleanId}`;
 
-  return result;
+  // 1. Check in-memory cache (< 3 minutes is completely fresh)
+  if (!forceRefresh && folderCache.has(cacheKey)) {
+    const entry = folderCache.get(cacheKey);
+    if (Date.now() - entry.time < 3 * 60 * 1000) {
+      return entry.data;
+    }
+  }
+
+  // 2. Check disk index
+  const diskIndex = loadDiskIndex(cleanId);
+  if (diskIndex) {
+    folderCache.set(cacheKey, { time: diskIndex.timestamp || Date.now(), data: diskIndex });
+
+    if (!forceRefresh) {
+      // Revalidate in background if older than 3 minutes
+      const isStale = Date.now() - (diskIndex.timestamp || 0) > 3 * 60 * 1000;
+      if (isStale && !activeRevalidations.has(cleanId)) {
+        const revalPromise = (async () => {
+          try {
+            const updated = await scanFolderIncremental(cleanId, diskIndex);
+            saveDiskIndex(cleanId, updated);
+            folderCache.set(cacheKey, { time: Date.now(), data: updated });
+          } catch (err) {
+            console.warn(`[GDriveService] Background revalidation error for ${cleanId}:`, err.message);
+          } finally {
+            activeRevalidations.delete(cleanId);
+          }
+        })();
+        activeRevalidations.set(cleanId, revalPromise);
+      }
+      return diskIndex;
+    }
+  }
+
+  // 3. Force refresh or first-time load: execute incremental scan
+  const existing = diskIndex || (folderCache.has(cacheKey) ? folderCache.get(cacheKey).data : null);
+  const updated = await scanFolderIncremental(cleanId, existing);
+  saveDiskIndex(cleanId, updated);
+  folderCache.set(cacheKey, { time: Date.now(), data: updated });
+  return updated;
 }
 
 // =========================================================================
