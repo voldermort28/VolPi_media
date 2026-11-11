@@ -385,7 +385,7 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                             // 1. GÀ VÀNG TV ROW
                             _buildSourceCategorySection(
                               title: 'Gà Vàng TV',
-                              badgeText: 'gavang1.xyz',
+                              badgeText: 'Trực tiếp HD',
                               iconEmoji: '🐓',
                               accentColor: const Color(0xFFF59E0B),
                               matches: _gavangMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList(),
@@ -397,7 +397,7 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                             // 2. VỀ BỜ TV ROW
                             _buildSourceCategorySection(
                               title: 'Về Bờ TV',
-                              badgeText: 'vebozbn.cc',
+                              badgeText: 'Bình luận TV',
                               iconEmoji: '⛵',
                               accentColor: const Color(0xFF0284C7),
                               matches: _veboMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList(),
@@ -409,7 +409,7 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                             // 3. SOCOLIVE TV ROW
                             _buildSourceCategorySection(
                               title: 'Socolive TV',
-                              badgeText: 'socolive2.top',
+                              badgeText: 'Đa luồng BLV',
                               iconEmoji: '⚡',
                               accentColor: const Color(0xFF10B981),
                               matches: _socoliveMatches.where((m) => _matchPassesFilter(m, _selectedFilterId)).toList(),

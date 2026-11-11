@@ -40,3 +40,4 @@ public/download/*.ipa
 public/download/*.zip
 public/download/*.tmp
 public/download/*.part
+audit_report.html

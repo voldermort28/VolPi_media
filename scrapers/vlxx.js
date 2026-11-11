@@ -136,6 +136,9 @@ function parseVideoItem($, el) {
     ribbon,
   };
 
+  if (videoInfoCache.size >= 1000 && !videoInfoCache.has(String(id))) {
+    videoInfoCache.delete(videoInfoCache.keys().next().value);
+  }
   videoInfoCache.set(String(id), item);
   return item;
 }
@@ -342,6 +345,9 @@ async function getRawManifestUrl(rawId, serverNum = 1) {
         }
         const hlsUrl = await extractHlsFromEmbed(iframeSrc);
         if (hlsUrl) {
+          if (manifestUrlCache.size >= 500 && !manifestUrlCache.has(cacheKey)) {
+            manifestUrlCache.delete(manifestUrlCache.keys().next().value);
+          }
           manifestUrlCache.set(cacheKey, { url: hlsUrl, time: Date.now() });
           return hlsUrl;
         }

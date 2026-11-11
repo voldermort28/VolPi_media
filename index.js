@@ -359,6 +359,14 @@ const logoCache = new Map();
 const vlxxPosterCache = new Map();
 const yumeiPosterCache = new Map();
 
+function setBoundedCache(map, key, val, maxEntries = 500) {
+  if (map.size >= maxEntries && !map.has(key)) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey !== undefined) map.delete(oldestKey);
+  }
+  map.set(key, val);
+}
+
 async function getLogoBase64(url) {
   if (!url) return null;
   if (logoCache.has(url)) return logoCache.get(url);
@@ -372,7 +380,7 @@ async function getLogoBase64(url) {
       timeout: 3000,
     });
     const b64 = "data:image/png;base64," + Buffer.from(res.data).toString("base64");
-    logoCache.set(url, b64);
+    setBoundedCache(logoCache, url, b64, 500);
     return b64;
   } catch (e) {
     return null;
@@ -392,7 +400,7 @@ async function getVlxxPosterBase64(rawId) {
       timeout: 5000,
     });
     const b64 = "data:image/jpeg;base64," + Buffer.from(res.data).toString("base64");
-    vlxxPosterCache.set(url, b64);
+    setBoundedCache(vlxxPosterCache, url, b64, 500);
     return b64;
   } catch (e) {
     return null;
@@ -413,7 +421,7 @@ async function getYumeiPosterBase64(url) {
     });
     const mime = url.endsWith(".png") ? "image/png" : (url.endsWith(".webp") ? "image/webp" : "image/jpeg");
     const b64 = `data:${mime};base64,` + Buffer.from(res.data).toString("base64");
-    yumeiPosterCache.set(url, b64);
+    setBoundedCache(yumeiPosterCache, url, b64, 500);
     return b64;
   } catch (e) {
     return null;

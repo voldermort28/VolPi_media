@@ -113,6 +113,9 @@ function parseVideoItem($, el) {
     ribbon,
   };
 
+  if (videoInfoCache.size >= 1000 && !videoInfoCache.has(String(rawId))) {
+    videoInfoCache.delete(videoInfoCache.keys().next().value);
+  }
   videoInfoCache.set(String(rawId), item);
   return item;
 }
@@ -255,6 +258,9 @@ async function getVideoDetails(rawId) {
       type: 'movie',
     };
 
+    if (videoDetailsCache.size >= 500 && !videoDetailsCache.has(String(rawId))) {
+      videoDetailsCache.delete(videoDetailsCache.keys().next().value);
+    }
     videoDetailsCache.set(String(rawId), { data: details, time: Date.now() });
     return details;
   } catch (err) {

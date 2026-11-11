@@ -194,6 +194,19 @@ function loadConfig() {
       saveConfig(cfg);
     }
 
+    // Auto-disable dead tinhlagi.pro playlist if still enabled
+    let disabledDeadSource = false;
+    for (const pl of (cfg.playlists || [])) {
+      if (pl.enabled !== false && pl.url && pl.url.includes('tinhlagi.pro')) {
+        console.log(`[IPTV Service] Auto-disabling dead IPTV source: ${pl.url}`);
+        pl.enabled = false;
+        disabledDeadSource = true;
+      }
+    }
+    if (disabledDeadSource) {
+      saveConfig(cfg);
+    }
+
     return cfg;
   } catch (err) {
     console.error('[IPTV Service] Error reading iptv_config.json:', err.message);
