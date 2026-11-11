@@ -33,6 +33,7 @@ class FootballScreenState extends State<FootballScreen> {
   List<MatchModel> _upcomingOtherMatches = [];
   List<MatchModel> _finishedMatches = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _errorMessage;
   final FocusNode _firstMatchFocusNode = FocusNode();
   FocusNode get firstMatchFocusNode => _firstMatchFocusNode;
@@ -209,8 +210,14 @@ class FootballScreenState extends State<FootballScreen> {
   }
 
   Future<void> _loadMatches({bool forceRefresh = true}) async {
+    if (!mounted) return;
+    final hasCachedMatches = _matches.isNotEmpty;
     setState(() {
-      _isLoading = true;
+      if (hasCachedMatches) {
+        _isRefreshing = true;
+      } else {
+        _isLoading = true;
+      }
       _errorMessage = null;
     });
 
@@ -224,20 +231,26 @@ class FootballScreenState extends State<FootballScreen> {
           _matches = results.where((m) => !m.isEsports).toList();
           _computeCategorizedMatches();
           _isLoading = false;
+          _isRefreshing = false;
         });
 
-        // Tự động nhảy tới ngay trận đấu đang diễn ra đầu tiên khi danh sách load xong
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _matches.isNotEmpty) {
-            _firstMatchFocusNode.requestFocus();
-          }
-        });
+        // Tự động nhảy tới ngay trận đấu đang diễn ra đầu tiên khi danh sách load lần đầu
+        if (!hasCachedMatches && widget.isActive) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _matches.isNotEmpty) {
+              _firstMatchFocusNode.requestFocus();
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Không thể tải lịch thi đấu: ${e.toString()}';
+          _isRefreshing = false;
+          if (!hasCachedMatches) {
+            _errorMessage = 'Không thể tải lịch thi đấu: ${e.toString()}';
+          }
         });
       }
     }
@@ -409,13 +422,26 @@ class FootballScreenState extends State<FootballScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
                   ),
-                  child: Text(
-                    '${_matches.length} trận',
-                    style: TextStyle(
-                      color: const Color(0xFF38BDF8),
-                      fontSize: isMobile ? 10 : 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isRefreshing) ...[
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF38BDF8)),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        '${_matches.length} trận',
+                        style: TextStyle(
+                          color: const Color(0xFF38BDF8),
+                          fontSize: isMobile ? 10 : 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

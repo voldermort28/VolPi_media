@@ -33,6 +33,6 @@ MỖI KHI thực hiện chỉnh sửa code, thêm tính năng, sửa bug liên q
 3. **Triển khai VPS (`stremio.laboon.vn`)**:
    - Địa chỉ VPS: `116.118.48.68`, Port SSH: `288`, User: `root`.
    - Thư mục backend: `/www/wwwroot/stremio.laboon.vn`.
-   - Sử dụng `scp -P 288` để chép các file backend (`index.js`, `scrapers/`, `addons/`, `config.js`, `public/`, `version.json`, `public/download/version.json`).
+   - Sử dụng `scp -P 288` để chép các file backend (`index.js`, `services/`, `scrapers/`, `addons/`, `config.js`, `public/`, `version.json`, `public/download/version.json`).
    - Khởi động lại tiến trình PM2: `pm2 restart stremio-vlxx && pm2 save`.
    - Kiểm tra live: `https://stremio.laboon.vn/api/version`.

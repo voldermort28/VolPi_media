@@ -238,6 +238,7 @@ jobs:
             RELEASE_TAG="v${CLEAN_VERSION}"
           fi
           echo "RELEASE_TAG=$RELEASE_TAG" >> $GITHUB_ENV
+          echo "CLEAN_VERSION=$CLEAN_VERSION" >> $GITHUB_ENV
 
       - name: Create Unsigned IPA Package
         working-directory: app-tv
@@ -274,7 +275,7 @@ jobs:
           echo "Deploying IPA to VPS OTA server..."
           curl -f --retry 3 --max-time 180 -X POST -H "Content-Type: application/octet-stream" \
             --data-binary "@app-tv/VolPi-Media-iOS.ipa" \
-            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.RELEASE_TAG }}&token=volpi_ota_deploy_secret_9988" || true
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.CLEAN_VERSION }}&token=volpi_ota_deploy_secret_9988" || true
 
   build-macos:
     name: Build macOS Desktop App (.app / .zip)

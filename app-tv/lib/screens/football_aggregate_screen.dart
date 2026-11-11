@@ -30,6 +30,7 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
   List<MatchModel> _veboMatches = [];
   List<MatchModel> _socoliveMatches = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String? _errorMessage;
 
   final FocusNode _firstCardFocusNode = FocusNode();
@@ -95,8 +96,13 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
 
   Future<void> _loadAllMatches({bool forceRefresh = true}) async {
     if (!mounted) return;
+    final hasCachedMatches = _gavangMatches.isNotEmpty || _veboMatches.isNotEmpty || _socoliveMatches.isNotEmpty;
     setState(() {
-      _isLoading = true;
+      if (hasCachedMatches) {
+        _isRefreshing = true;
+      } else {
+        _isLoading = true;
+      }
       _errorMessage = null;
     });
 
@@ -122,19 +128,25 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
         _veboMatches = vb;
         _socoliveMatches = sc;
         _isLoading = false;
+        _isRefreshing = false;
       });
 
-      // Tự động focus vào thẻ trận đầu tiên cho Remote TV
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && (_gavangMatches.isNotEmpty || _veboMatches.isNotEmpty || _socoliveMatches.isNotEmpty)) {
-          _firstCardFocusNode.requestFocus();
-        }
-      });
+      // Tự động focus vào thẻ trận đầu tiên cho Remote TV nếu mới tải lần đầu và đang ở tab này
+      if (!hasCachedMatches && widget.isActive) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && (_gavangMatches.isNotEmpty || _veboMatches.isNotEmpty || _socoliveMatches.isNotEmpty)) {
+            _firstCardFocusNode.requestFocus();
+          }
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Không thể tải lịch thi đấu tổng hợp: ${e.toString()}';
+          _isRefreshing = false;
+          if (!hasCachedMatches) {
+            _errorMessage = 'Không thể tải lịch thi đấu tổng hợp: ${e.toString()}';
+          }
         });
       }
     }
@@ -227,13 +239,26 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF38BDF8), width: 0.8),
                   ),
-                  child: Text(
-                    '$totalCount trận',
-                    style: TextStyle(
-                      color: const Color(0xFF38BDF8),
-                      fontSize: isMobile ? 10 : 11,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_isRefreshing) ...[
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(strokeWidth: 1.5, color: Color(0xFF38BDF8)),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      Text(
+                        '$totalCount trận',
+                        style: TextStyle(
+                          color: const Color(0xFF38BDF8),
+                          fontSize: isMobile ? 10 : 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
 

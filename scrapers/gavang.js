@@ -135,44 +135,63 @@ function isMajorLeague(league, home, away, title, isVn = false) {
   return false;
 }
 
+function isGrassLeague(m) {
+  if (m.isVietnam) return false;
+  if (m.isMu || m.isMuFavorite) return false;
+  if (m.isPremierLeagueOrC1) return false;
+  if (m.isMajor) return false;
+  if (m.isHot) return false;
+  if (m.isFamous) return false;
+  return true;
+}
+
+function getGroupRank(m) {
+  if (m.isFinished) return 3;
+  if (isGrassLeague(m)) return 2;
+  return 1;
+}
+
+function getImportanceScore(m) {
+  if (m.isMu || m.isMuFavorite) return 10;
+  if (m.isVietnam) return 20;
+  if (m.isPremierLeagueOrC1) return 30;
+  if (m.isHot) return 40;
+  if (m.isMajor || m.isFamous) return 50;
+  return 70;
+}
+
 function calculateMatchScore(m) {
-  // Priority score calculation: Lower score = Higher display rank!
-  if (m.isFinished) return 1000;
+  return getGroupRank(m) * 100 + getImportanceScore(m);
+}
 
-  const isOngoing = m.isLive;
+function sortMatches(matches) {
+  matches.sort((a, b) => {
+    // 1. Group Rank: Main matches (1) -> Grass leagues (2) -> Finished (3)
+    const gA = getGroupRank(a);
+    const gB = getGroupRank(b);
+    if (gA !== gB) return gA - gB;
 
-  // Tier 1: Manchester United (Number 1 absolute priority)
-  if (m.isMu) {
-    return isOngoing ? 10 : 15;
-  }
+    // 2. Ongoing/Live matches first
+    const ongoingA = a.isLive ? 0 : 1;
+    const ongoingB = b.isLive ? 0 : 1;
+    if (ongoingA !== ongoingB) return ongoingA - ongoingB;
 
-  // Tier 2: Vietnam (Never treated as grass league)
-  if (m.isVietnam) {
-    return isOngoing ? 20 : 25;
-  }
+    // 3. Chronological schedule from nearest to furthest (từ gần nhất đến xa nhất)
+    const tA = a.matchTimestamp || 0;
+    const tB = b.matchTimestamp || 0;
+    if (tA > 0 && tB > 0 && tA !== tB) {
+      return tA - tB;
+    }
+    if (tA > 0 && tB <= 0) return -1;
+    if (tA <= 0 && tB > 0) return 1;
 
-  // Tier 3: Premier League & Champions League
-  if (m.isPremierLeagueOrC1) {
-    return isOngoing ? 30 : 35;
-  }
+    // 4. Same time: More important matches first
+    const impA = getImportanceScore(a);
+    const impB = getImportanceScore(b);
+    if (impA !== impB) return impA - impB;
 
-  // Tier 4: Hot matches from website
-  if (m.isHot) {
-    return isOngoing ? 40 : 45;
-  }
-
-  // Tier 5: Other Major Leagues (La Liga, Serie A, Bundesliga, C2, etc.)
-  if (m.isMajor) {
-    return isOngoing ? 50 : 55;
-  }
-
-  // Tier 6: Grass leagues ongoing (Lower than all major leagues!)
-  if (isOngoing) {
-    return 70;
-  }
-
-  // Tier 7: Grass leagues upcoming (Lowest rank before finished)
-  return 80;
+    return 0;
+  });
 }
 
 async function getLiveMatches() {
@@ -371,17 +390,8 @@ async function getLiveMatches() {
     }
   }
 
-  // 3. Sort matches according to priority score
-  matches.sort((a, b) => {
-    if (a.priorityScore !== b.priorityScore) {
-      return a.priorityScore - b.priorityScore;
-    }
-    // Within same priority tier: sort by kickoff time
-    if (a.matchTimestamp && b.matchTimestamp) {
-      return a.matchTimestamp - b.matchTimestamp;
-    }
-    return 0;
-  });
+  // 3. Sort matches: Main matches (nearest to furthest) -> Grass leagues (nearest to furthest) -> Finished
+  sortMatches(matches);
 
   if (matches.length > 0) {
     cachedMatches = matches;

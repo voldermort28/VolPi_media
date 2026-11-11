@@ -26,9 +26,17 @@ Thumbs.db
 # Logs
 *.log
 
-# IPTV runtime files
+# IPTV & Runtime State files
 iptv_config.json
 auth_config.json
 gdrive_config.json
 telegram_config.json
+telegram_cache.json
 uploads/
+cache/
+user_data/
+public/download/*.apk
+public/download/*.ipa
+public/download/*.zip
+public/download/*.tmp
+public/download/*.part

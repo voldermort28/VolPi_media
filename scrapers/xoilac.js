@@ -537,39 +537,57 @@ async function getLiveMatches() {
       return elapsed > (m.isLive ? 115 : 100);
     };
 
+    // Helper functions for ranking
+    const isGrassLeague = (m) => {
+      if (m.isVietnam) return false;
+      if (m.priority && (m.priority.level === 1 || m.priority.level === 2)) return false;
+      if (m.isFamous || m.isHot) return false;
+      return true;
+    };
+
+    const getGroupRank = (m) => {
+      if (isFinishedMatch(m)) return 3;
+      if (isGrassLeague(m)) return 2;
+      return 1;
+    };
+
+    const getImportanceScore = (m) => {
+      if (m.priority && m.priority.level === 1) return 10;
+      if (m.isVietnam) return 20;
+      const isPlOrC1 = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${m.league || ''} ${m.title || ''}`);
+      if (isPlOrC1) return 30;
+      if (m.isHot) return 40;
+      if (m.isFamous) return 50;
+      return 70;
+    };
+
     // Sort:
-    // 1. Ongoing matches (trong 90') FIRST
-    // 2. Finished matches LAST
-    // 3. Level priority (MU #1 -> Big Teams #2 -> Others #3)
-    // 4. Live matches (isLive)
-    // 5. Chronological kickoff time
+    // 1. Group Rank: Main matches (1) -> Grass leagues (2) -> Finished matches (3)
+    // 2. Ongoing/Live matches first
+    // 3. Chronological schedule from nearest to furthest (từ gần nhất đến xa nhất)
+    // 4. Same kickoff time: More important matches first
     matches.sort((a, b) => {
-      const aOngoing = isOngoingMatch(a);
-      const bOngoing = isOngoingMatch(b);
+      const gA = getGroupRank(a);
+      const gB = getGroupRank(b);
+      if (gA !== gB) return gA - gB;
+
+      const aOngoing = isOngoingMatch(a) || a.isLive;
+      const bOngoing = isOngoingMatch(b) || b.isLive;
       if (aOngoing && !bOngoing) return -1;
       if (!aOngoing && bOngoing) return 1;
 
-      const aFinished = isFinishedMatch(a);
-      const bFinished = isFinishedMatch(b);
-      if (!aFinished && bFinished) return -1;
-      if (aFinished && !bFinished) return 1;
-
-      const pA = a.priority ? a.priority.level : 3;
-      const pB = b.priority ? b.priority.level : 3;
-      if (pA !== pB) return pA - pB;
-
-      // Ưu tiên giải Ngoại Hạng Anh & Cúp C1 lên đầu nhóm tâm điểm
-      const isPlOrC1A = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${a.league || ''} ${a.title || ''}`);
-      const isPlOrC1B = /premier league|ngoại hạng anh|\bepl\b|champions league|cúp c1|uefa champions|\bucl\b/i.test(`${b.league || ''} ${b.title || ''}`);
-      if (isPlOrC1A && !isPlOrC1B) return -1;
-      if (!isPlOrC1A && isPlOrC1B) return 1;
-
-      if (a.isLive && !b.isLive) return -1;
-      if (!a.isLive && b.isLive) return 1;
-
-      if (a.matchTimestamp && b.matchTimestamp) {
-        return a.matchTimestamp - b.matchTimestamp;
+      const tA = a.matchTimestamp || 0;
+      const tB = b.matchTimestamp || 0;
+      if (tA > 0 && tB > 0 && tA !== tB) {
+        return tA - tB;
       }
+      if (tA > 0 && tB <= 0) return -1;
+      if (tA <= 0 && tB > 0) return 1;
+
+      const impA = getImportanceScore(a);
+      const impB = getImportanceScore(b);
+      if (impA !== impB) return impA - impB;
+
       return 0;
     });
 

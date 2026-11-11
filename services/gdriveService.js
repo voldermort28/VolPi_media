@@ -1125,27 +1125,6 @@ async function streamVideo(fileId, req, res) {
     }
 
     const status = driveRes.status === 206 || (range && driveRes.headers['content-range']) ? 206 : 200;
-
-    let filename = req.params?.filename || req.query?.name || '';
-    if (!filename) {
-      for (const entry of folderCache.values()) {
-        if (entry?.data?.allAudios) {
-          const found = entry.data.allAudios.find((a) => a.id === fileId);
-          if (found?.name) {
-            filename = found.name;
-            break;
-          }
-        }
-        if (entry?.data?.allVideos) {
-          const found = entry.data.allVideos.find((v) => v.id === fileId);
-          if (found?.name) {
-            filename = found.name;
-            break;
-          }
-        }
-      }
-    }
-
     const contentType = inferMimeType(filename, driveRes.headers['content-type']);
 
     const responseHeaders = {

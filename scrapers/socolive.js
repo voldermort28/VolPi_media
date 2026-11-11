@@ -307,24 +307,59 @@ async function getLiveMatches() {
   }
 
   try {
-    const baseUrl = getBaseUrl();
-    const res = await axios.get(baseUrl, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-      },
-      timeout: 10000,
-      maxRedirects: 5,
-    });
+    const primaryUrl = getBaseUrl();
+    const fetchDomain = async (domain, timeoutMs = 5000) => {
+      const r = await axios.get(domain, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+        },
+        timeout: timeoutMs,
+        maxRedirects: 5,
+      });
+      if (!r || r.status !== 200 || !r.data) {
+        throw new Error(`Invalid status from ${domain}`);
+      }
+      return { res: r, domain };
+    };
+
+    let res = null;
+    let workingDomain = primaryUrl;
+
+    try {
+      const primaryResult = await fetchDomain(primaryUrl, 4500);
+      res = primaryResult.res;
+      workingDomain = primaryResult.domain;
+    } catch (primaryErr) {
+      const backupUrls = CANDIDATE_DOMAINS.filter((d) => d !== primaryUrl);
+      if (backupUrls.length > 0) {
+        try {
+          const winner = await Promise.any(backupUrls.map((d) => fetchDomain(d, 5000)));
+          res = winner.res;
+          workingDomain = winner.domain;
+        } catch (aggErr) {
+          res = null;
+        }
+      }
+    }
+
+    if (!res || !res.data) {
+      lastCacheTime = Date.now() - 45000; // Cooldown 15s khi toàn bộ domain đều lỗi để không treo request tiếp theo
+      throw new Error(`Không thể kết nối tới bất kỳ domain SocoLive nào (${primaryUrl})`);
+    }
 
     if (res.request && res.request.res && res.request.res.responseUrl) {
       try {
         const u = new URL(res.request.res.responseUrl);
         resolvedBaseUrl = u.origin;
-      } catch (e) {}
+      } catch (e) {
+        resolvedBaseUrl = workingDomain;
+      }
+    } else {
+      resolvedBaseUrl = workingDomain;
     }
 
-    const currentBaseUrl = resolvedBaseUrl || baseUrl;
+    const currentBaseUrl = resolvedBaseUrl || workingDomain;
     const $ = cheerio.load(res.data);
     const matches = [];
 
@@ -458,40 +493,59 @@ async function getLiveMatches() {
       ) && !nonEnglish.some((c) => t.includes(c));
 
       matchObj.isPremierLeagueOrC1 = isC1 || isEpl;
-
-      // Compute 8-tier priority score
-      if (matchObj.isFinished) {
-        matchObj.priorityScore = 1000;
-      } else if (matchObj.isMu) {
-        matchObj.priorityScore = matchObj.isLive ? 10 : 15;
-      } else if (matchObj.isVietnam) {
-        matchObj.priorityScore = matchObj.isLive ? 20 : 25;
-      } else if (matchObj.isPremierLeagueOrC1) {
-        matchObj.priorityScore = matchObj.isLive ? 30 : 35;
-      } else if (matchObj.isHot) {
-        matchObj.priorityScore = matchObj.isLive ? 40 : 45;
-      } else if (matchObj.isFamous) {
-        matchObj.priorityScore = matchObj.isLive ? 50 : 55;
-      } else if (matchObj.isLive) {
-        matchObj.priorityScore = 70;
-      } else {
-        matchObj.priorityScore = 80;
-      }
+      matchObj.priorityScore = (matchObj.isFinished ? 3 : (matchObj.isVietnam || matchObj.isMu || matchObj.isPremierLeagueOrC1 || matchObj.isHot || matchObj.isFamous ? 1 : 2)) * 100;
 
       matches.push(matchObj);
     });
 
-    // Sort:
-    // 1. Priority Score (Tier 1 MU -> Tier 2 VN -> Tier 3 EPL/C1 -> Tier 4 Hot -> Tier 5 Major -> Tier 6 Grass Live -> Tier 7 Grass Upcoming -> Tier 8 Finished)
-    // 2. Chronological kickoff time
-    matches.sort((a, b) => {
-      const sA = a.priorityScore || 80;
-      const sB = b.priorityScore || 80;
-      if (sA !== sB) return sA - sB;
+    // Helper functions for ranking
+    function isGrassLeague(m) {
+      if (m.isVietnam) return false;
+      if (m.isMu || m.isMuFavorite) return false;
+      if (m.isPremierLeagueOrC1) return false;
+      if (m.isMajor) return false;
+      if (m.isHot) return false;
+      if (m.isFamous) return false;
+      return true;
+    }
 
-      if (a.matchTimestamp && b.matchTimestamp) {
-        return a.matchTimestamp - b.matchTimestamp;
+    function getGroupRank(m) {
+      if (m.isFinished) return 3;
+      if (isGrassLeague(m)) return 2;
+      return 1;
+    }
+
+    function getImportanceScore(m) {
+      if (m.isMu || m.isMuFavorite) return 10;
+      if (m.isVietnam) return 20;
+      if (m.isPremierLeagueOrC1) return 30;
+      if (m.isHot) return 40;
+      if (m.isMajor || m.isFamous) return 50;
+      return 70;
+    }
+
+    // Sort: Main matches (nearest to furthest) -> Grass leagues (nearest to furthest) -> Finished
+    matches.sort((a, b) => {
+      const gA = getGroupRank(a);
+      const gB = getGroupRank(b);
+      if (gA !== gB) return gA - gB;
+
+      const ongoingA = a.isLive ? 0 : 1;
+      const ongoingB = b.isLive ? 0 : 1;
+      if (ongoingA !== ongoingB) return ongoingA - ongoingB;
+
+      const tA = a.matchTimestamp || 0;
+      const tB = b.matchTimestamp || 0;
+      if (tA > 0 && tB > 0 && tA !== tB) {
+        return tA - tB;
       }
+      if (tA > 0 && tB <= 0) return -1;
+      if (tA <= 0 && tB > 0) return 1;
+
+      const impA = getImportanceScore(a);
+      const impB = getImportanceScore(b);
+      if (impA !== impB) return impA - impB;
+
       return 0;
     });
 

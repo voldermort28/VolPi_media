@@ -76,7 +76,7 @@ app.get(["/telegram", "/telegram.html"], authService.requireAuth, (req, res) => 
 });
 
 // Serve Main Web Dashboard (Protected)
-app.get(["/", "/index.html"], authService.requireAuth, (req, res) => {
+app.get(["/", "/index.html", "/admin", "/config"], authService.requireAuth, (req, res) => {
   return res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
@@ -297,12 +297,12 @@ app.post("/api/cleanup-downloads", (req, res) => {
     return res.json({ deleted: [] });
   }
 
-  const keepFiles = ["VolPi-Media-AndroidTV.apk", "VolPi-Media-iOS.ipa"];
+  const keepFiles = ["VolPi-Media-AndroidTV.apk", "VolPi-Media-iOS.ipa", "VolPi-Media-macOS.zip"];
   const deleted = [];
   const files = fs.readdirSync(downloadDir);
 
   for (const f of files) {
-    if (!keepFiles.includes(f) && (f.endsWith(".apk") || f.endsWith(".ipa") || f.endsWith(".tmp") || f.endsWith(".part"))) {
+    if (!keepFiles.includes(f) && (f.endsWith(".apk") || f.endsWith(".ipa") || f.endsWith(".zip") || f.endsWith(".tmp") || f.endsWith(".part"))) {
       try {
         fs.unlinkSync(path.join(downloadDir, f));
         deleted.push(f);
@@ -423,10 +423,6 @@ async function getYumeiPosterBase64(url) {
 // -------------------------------------------------------------
 // FRONTEND API ENDPOINTS
 // -------------------------------------------------------------
-
-app.get(["/", "/admin", "/config"], (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
 
 app.get("/api/status", async (req, res) => {
   const cfg = config.getConfig();

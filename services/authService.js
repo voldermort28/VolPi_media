@@ -247,8 +247,14 @@ function requireAuth(req, res, next) {
   const isHtmlRequest = (req.headers.accept && req.headers.accept.includes('text/html')) ||
                         req.path === '/' ||
                         req.path === '/index.html' ||
+                        req.path === '/admin' ||
+                        req.path === '/config' ||
                         req.path === '/iptv' ||
-                        req.path === '/iptv.html';
+                        req.path === '/iptv.html' ||
+                        req.path === '/gdrive' ||
+                        req.path === '/gdrive.html' ||
+                        req.path === '/telegram' ||
+                        req.path === '/telegram.html';
 
   if (isHtmlRequest) {
     const returnUrl = encodeURIComponent(req.originalUrl || '/');

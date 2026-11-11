@@ -567,52 +567,73 @@ class MatchModel {
     return isEnglishPl || isUefaC1;
   }
 
-  /// Priority score according to user preferences:
-  /// Tier 1: MU (10 live, 15 upcoming)
-  /// Tier 2: Vietnam (20 live, 25 upcoming) - Never demoted to grass league
-  /// Tier 3: Premier League & Champions League (30 live, 35 upcoming)
-  /// Tier 4: Hot matches from website (40 live, 45 upcoming)
-  /// Tier 5: Other Major Leagues (50 live, 55 upcoming)
-  /// Tier 6: Grass leagues live (70)
-  /// Tier 7: Grass leagues upcoming (80)
-  /// Tier 8: Finished matches (1000)
-  int get priorityScore {
-    if (isFinishedMatch) return 1000;
-    final bool ongoing = isOngoingNow;
-
-    if (isMuFavorite) {
-      return ongoing ? 10 : 15;
-    }
-    if (isVietnam) {
-      return ongoing ? 20 : 25;
-    }
-    if (isPremierLeagueOrC1) {
-      return ongoing ? 30 : 35;
-    }
-    if (isHot) {
-      return ongoing ? 40 : 45;
-    }
-    if (isMajorLeague || isFamous || isFavorite) {
-      return ongoing ? 50 : 55;
-    }
-    if (ongoing) {
-      return 70;
-    }
-    return 80;
+  /// Returns true if this match belongs to a grass/minor league.
+  /// NOTE: Matches involving Vietnam are NEVER considered grass leagues.
+  bool get isGrassLeague {
+    if (isVietnam) return false;
+    if (isMuFavorite) return false;
+    if (isPremierLeagueOrC1) return false;
+    if (isHot) return false;
+    if (isMajorLeague) return false;
+    if (isFamous) return false;
+    if (isFavorite) return false;
+    return true;
   }
 
-  /// Sorts a list of matches according to the priority score and chronological kickoff time.
+  /// High-level group rank:
+  /// Group 1: Main matches (Major Leagues, Hot, Famous, Vietnam, MU)
+  /// Group 2: Grass leagues (Lower/Minor divisions)
+  /// Group 3: Finished matches (FT)
+  int get groupRank {
+    if (isFinishedMatch) return 3;
+    if (isGrassLeague) return 2;
+    return 1;
+  }
+
+  /// Tie-breaker score within the same time slot (Lower score = higher importance)
+  int get importanceScore {
+    if (isMuFavorite) return 10;
+    if (isVietnam) return 20;
+    if (isPremierLeagueOrC1) return 30;
+    if (isHot) return 40;
+    if (isMajorLeague || isFamous || isFavorite) return 50;
+    return 70;
+  }
+
+  /// Priority score for backward compatibility
+  int get priorityScore => groupRank * 100 + importanceScore;
+
+  /// Sorts a list of matches:
+  /// 1. Group Rank: Main matches (1) -> Grass leagues (2) -> Finished matches (3)
+  /// 2. Within each group: Ongoing/Live matches (0) first, then upcoming (1)
+  /// 3. Chronological schedule from nearest to furthest (từ gần nhất đến xa nhất)
+  /// 4. In case of identical kickoff time: More important matches first
   static void sortByPriority(List<MatchModel> matches) {
     matches.sort((a, b) {
-      final sA = a.priorityScore;
-      final sB = b.priorityScore;
-      if (sA != sB) return sA.compareTo(sB);
+      // 1. Group Rank
+      final gA = a.groupRank;
+      final gB = b.groupRank;
+      if (gA != gB) return gA.compareTo(gB);
 
+      // 2. Ongoing matches first
+      final ongoingA = a.isOngoingNow ? 0 : 1;
+      final ongoingB = b.isOngoingNow ? 0 : 1;
+      if (ongoingA != ongoingB) return ongoingA.compareTo(ongoingB);
+
+      // 3. Chronological kickoff time (từ gần nhất đến xa nhất)
       final timeA = a.matchStartTime?.millisecondsSinceEpoch ?? a.matchTimestamp;
       final timeB = b.matchStartTime?.millisecondsSinceEpoch ?? b.matchTimestamp;
-      if (timeA > 0 && timeB > 0) {
+      if (timeA > 0 && timeB > 0 && timeA != timeB) {
         return timeA.compareTo(timeB);
       }
+      if (timeA > 0 && timeB <= 0) return -1;
+      if (timeA <= 0 && timeB > 0) return 1;
+
+      // 4. Same kickoff time: More important matches first
+      final impA = a.importanceScore;
+      final impB = b.importanceScore;
+      if (impA != impB) return impA.compareTo(impB);
+
       return 0;
     });
   }
