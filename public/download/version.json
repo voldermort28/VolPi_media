@@ -1,10 +1,10 @@
 {
-  "version": "2.2.43",
-  "build": 109,
-  "tag_name": "v2.2.43",
-  "changelog": "• VolPi Media v2.2.43:\n- Tối ưu thứ tự sắp xếp lịch thi đấu Bóng Đá: hiển thị chuẩn xác theo thời gian từ gần nhất đến xa nhất (trận đang đá -> trận sắp đá theo giờ kickoff).\n- Phân nhóm hợp lý: các trận của Việt Nam và giải lớn được sắp theo đúng mốc thời gian thi đấu, không bị đẩy cóc lên đầu khi còn nhiều ngày nữa mới đá.\n- Duy trì hạ ưu tiên các giải cỏ (hạng dưới, giải trẻ không phải VN) xuống phía sau các trận chính thống.",
+  "version": "2.2.44",
+  "build": 110,
+  "tag_name": "v2.2.44",
+  "changelog": "• VolPi Media v2.2.44:\n- Bóng Đá Tổng Hợp & Xôi Lạc: Giữ danh sách trận đấu hiển thị tức thì (0ms) khi chuyển qua lại giữa các tab, đồng bộ ngầm không hiện màn hình chờ và cập nhật nhãn nguồn chuẩn.\n- Tối ưu hóa Server & Bảo mật: Tự động chuyển đổi tên miền dự phòng SocoLive song song (Promise.any), giới hạn kích thước bộ nhớ đệm (Bounded LRU Cache) chống tràn RAM, tự động tắt nguồn IPTV chết (tinhlagi.pro) và khóa xác thực các đường dẫn quản trị (/admin, /config).\n- Giữ nguyên thuật toán sắp xếp lịch thi đấu Bóng Đá từ gần đến xa (v2.2.43).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-12T01:58:00Z"
+  "published_at": "2026-11-12T02:28:00Z"
 }
