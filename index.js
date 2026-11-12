@@ -124,7 +124,29 @@ app.post("/api/change-password", authService.requireAuth, (req, res) => {
 });
 
 // Static assets for Web Frontend (index: false prevents bypassing auth guard)
-app.use(express.static(path.join(__dirname, "public"), { index: false }));
+app.use(
+  express.static(path.join(__dirname, "public"), {
+    index: false,
+    setHeaders: (res, filePath) => {
+      const lower = filePath.toLowerCase();
+      if (lower.endsWith(".ipa") || lower.endsWith(".apk") || lower.endsWith(".zip")) {
+        const fname = path.basename(filePath);
+        if (lower.endsWith(".ipa")) {
+          res.setHeader("Content-Type", "application/octet-stream");
+        } else if (lower.endsWith(".apk")) {
+          res.setHeader("Content-Type", "application/vnd.android.package-archive");
+        } else {
+          res.setHeader("Content-Type", "application/zip");
+        }
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${fname}"; filename*=UTF-8''${encodeURIComponent(fname)}`
+        );
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      }
+    },
+  })
+);
 
 // OTA App Version & Update Endpoints
 const OTA_DEPLOY_TOKEN = process.env.OTA_DEPLOY_TOKEN || "volpi_ota_deploy_secret_9988";
@@ -219,10 +241,13 @@ app.post("/api/upload-release", (req, res) => {
         return res.status(400).json({ error: "Uploaded file is empty" });
       }
 
-      // STORAGE CLEANUP: Delete old versions and residual files of the same type
+      // Atomic rename tmp file to active release filename first (zero downtime / never 404)
+      fs.renameSync(tmpPath, finalFilePath);
+
+      // STORAGE CLEANUP: Delete other old versions and residual files of the same type
       const files = fs.readdirSync(downloadDir);
       for (const f of files) {
-        if (f !== `${targetFilename}.tmp`) {
+        if (f !== targetFilename && f !== `${targetFilename}.tmp`) {
           if (
             (isApk && f.toLowerCase().endsWith(".apk")) ||
             (isIpa && f.toLowerCase().endsWith(".ipa")) ||
@@ -239,9 +264,6 @@ app.post("/api/upload-release", (req, res) => {
           }
         }
       }
-
-      // Atomic rename tmp file to active release filename
-      fs.renameSync(tmpPath, finalFilePath);
 
       // Update version metadata
       const version = req.query.version;
