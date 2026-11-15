@@ -1,10 +1,10 @@
 {
-  "version": "2.2.44",
-  "build": 110,
-  "tag_name": "v2.2.44",
-  "changelog": "• VolPi Media v2.2.44:\n- Bóng Đá Tổng Hợp & Xôi Lạc: Giữ danh sách trận đấu hiển thị tức thì (0ms) khi chuyển qua lại giữa các tab, đồng bộ ngầm không hiện màn hình chờ và cập nhật nhãn nguồn chuẩn.\n- Tối ưu hóa Server & Bảo mật: Tự động chuyển đổi tên miền dự phòng SocoLive song song (Promise.any), giới hạn kích thước bộ nhớ đệm (Bounded LRU Cache) chống tràn RAM, tự động tắt nguồn IPTV chết (tinhlagi.pro) và khóa xác thực các đường dẫn quản trị (/admin, /config).\n- Giữ nguyên thuật toán sắp xếp lịch thi đấu Bóng Đá từ gần đến xa (v2.2.43).",
+  "version": "2.2.45",
+  "build": 111,
+  "tag_name": "v2.2.45",
+  "changelog": "• VolPi Media v2.2.45:\n- Sửa lỗi màn hình trắng khi khởi động trên Android TV: Chuyển MainActivity sang kế thừa AudioServiceActivity chuẩn của hệ thống phát nhạc nền, khởi tạo AudioService bất đồng bộ kèm cơ chế fallback tự động và đổi màn hình chờ gốc sang tông đen dịu mắt.\n- Tối ưu hóa OTA trên iOS Safari: Cố định tên file tải về luôn có đuôi .ipa chính xác.\n- Bóng Đá Tổng Hợp & Xôi Lạc: Giữ danh sách trận đấu hiển thị tức thì (0ms) khi chuyển tab và sắp xếp lịch thi đấu từ gần đến xa.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-12T02:28:00Z"
+  "published_at": "2026-11-16T00:05:00Z"
 }

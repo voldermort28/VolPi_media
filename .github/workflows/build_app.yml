@@ -75,6 +75,14 @@ jobs:
           mkdir -p /tmp/android_res_backup
           cp -r android/app/src/main/res/* /tmp/android_res_backup/ 2>/dev/null || true
           flutter create . --platforms=android --org=com.volpi --project-name=volpi_media
+          mkdir -p android/app/src/main/kotlin/com/volpi/volpi_media
+          cat << 'EOF' > android/app/src/main/kotlin/com/volpi/volpi_media/MainActivity.kt
+          package com.volpi.volpi_media
+
+          import com.ryanheise.audioservice.AudioServiceActivity
+
+          class MainActivity: AudioServiceActivity()
+          EOF
           mkdir -p android/app/src/main/res
           cp -r /tmp/android_res_backup/* android/app/src/main/res/ 2>/dev/null || true
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true

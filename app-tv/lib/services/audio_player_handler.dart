@@ -6,21 +6,33 @@ import 'package:just_audio/just_audio.dart';
 
 class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   static VolPiAudioHandler? _instance;
-  static VolPiAudioHandler get instance => _instance!;
+  static bool _isInitialized = false;
+  static Future<VolPiAudioHandler>? _initFuture;
 
-  static Future<VolPiAudioHandler> init() async {
-    if (_instance != null) return _instance!;
-    final handler = await AudioService.init(
-      builder: () => VolPiAudioHandler._internal(),
-      config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.volpi.volpiMedia.audio',
-        androidNotificationChannelName: 'VolPi Media Audio Playback',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
-        notificationColor: Color(0xFF0284C7),
-      ),
-    );
-    _instance = handler;
+  static VolPiAudioHandler get instance => _instance ??= VolPiAudioHandler._internal();
+
+  static Future<VolPiAudioHandler> init() {
+    if (_isInitialized && _instance != null) return Future.value(_instance!);
+    return _initFuture ??= _doInit();
+  }
+
+  static Future<VolPiAudioHandler> _doInit() async {
+    final handler = instance;
+    try {
+      await AudioService.init<VolPiAudioHandler>(
+        builder: () => handler,
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.volpi.volpiMedia.audio',
+          androidNotificationChannelName: 'VolPi Media Audio Playback',
+          androidNotificationOngoing: true,
+          androidStopForegroundOnPause: true,
+          notificationColor: Color(0xFF0284C7),
+        ),
+      ).timeout(const Duration(seconds: 4));
+      _isInitialized = true;
+    } catch (e) {
+      debugPrint('[VolPiAudioHandler] AudioService.init fallback (local player active): $e');
+    }
     return handler;
   }
 

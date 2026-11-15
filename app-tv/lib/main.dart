@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'api/api_service.dart';
@@ -17,25 +18,41 @@ void main() async {
   PaintingBinding.instance.imageCache.maximumSizeBytes = 25 << 20; // 25 MB
 
   // Allow all orientations (TV landscape, Phone portrait/landscape, iPad both)
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  try {
+    unawaited(
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]),
+    );
+  } catch (e) {
+    debugPrint('[Main] setPreferredOrientations warning: $e');
+  }
 
-  // Khởi tạo các service lưu trữ nền song song vào RAM & tự động dọn dẹp APK thừa
+  Future<void> safeInit(String name, Future<dynamic> Function() task) async {
+    try {
+      await task().timeout(const Duration(seconds: 2));
+    } catch (e) {
+      debugPrint('[Main] $name init fallback: $e');
+    }
+  }
+
+  // Khởi tạo các service lưu trữ nhẹ vào RAM (có timeout bảo vệ tuyệt đối không treo màn hình khởi động)
   await Future.wait([
-    WatchHistoryService.instance.init(),
-    FavoritesService.instance.init(),
-    PlayerSettingsService.instance.init(),
-    UpdateService.cleanupStaleApk(),
-    VolPiAudioHandler.init(),
+    safeInit('WatchHistory', () => WatchHistoryService.instance.init()),
+    safeInit('Favorites', () => FavoritesService.instance.init()),
+    safeInit('PlayerSettings', () => PlayerSettingsService.instance.init()),
   ]);
 
   final apiService = ApiService();
 
   runApp(VolPiMediaApp(apiService: apiService));
+
+  // Khởi tạo AudioService và dọn dẹp APK ngầm sau khi UI đã hiển thị (không bao giờ chặn runApp)
+  unawaited(VolPiAudioHandler.init());
+  unawaited(UpdateService.cleanupStaleApk());
 }
 
 class VolPiMediaApp extends StatelessWidget {
