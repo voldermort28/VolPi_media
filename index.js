@@ -1747,14 +1747,22 @@ app.get("/seg", async (req, res) => {
     });
 
     const buf = Buffer.from(segRes.data);
-    
-    let offset = 0;
+
+    // Tìm vị trí bắt đầu thực sự của gói MPEG-TS (chuẩn 188 bytes/packet, sync byte 0x47).
+    // Tránh lỗi khớp nhầm chữ 'G' (0x47) trong header '\x89PNG' của CDN ibyteimg/VLXX khiến ExoPlayer/AVPlayer báo lỗi.
+    let startSearch = 0;
     const iendIdx = buf.indexOf("IEND");
-    if (iendIdx !== -1) {
-      offset = iendIdx + 8;
-    } else if (buf[0] !== 0x47) {
-      const firstSync = buf.indexOf(0x47);
-      if (firstSync !== -1) offset = firstSync;
+    if (iendIdx !== -1 && iendIdx + 8 < buf.length) {
+      startSearch = iendIdx + 8;
+    }
+
+    let offset = startSearch;
+    const maxScan = Math.min(buf.length - 188 * 2, startSearch + 16384);
+    for (let i = startSearch; i < maxScan; i++) {
+      if (buf[i] === 0x47 && buf[i + 188] === 0x47 && buf[i + 376] === 0x47) {
+        offset = i;
+        break;
+      }
     }
 
     const tsBuf = offset > 0 ? buf.slice(offset) : buf;
@@ -1778,7 +1786,47 @@ app.get(["/xnhau/stream/:id/:server.mp4", "/xnhau/stream/:id/master.mp4", "/xnha
     if (!rawUrl) {
       return res.status(404).send("Stream not found");
     }
-    return res.redirect(rawUrl);
+
+    const reqHeaders = {
+      "User-Agent": xnhauScraper.USER_AGENT,
+      "Referer": xnhauScraper.getBaseUrl() + "/",
+    };
+    if (req.headers.range) {
+      reqHeaders["Range"] = req.headers.range;
+    }
+
+    const streamRes = await axios({
+      method: req.method === "HEAD" ? "HEAD" : "GET",
+      url: rawUrl,
+      headers: reqHeaders,
+      responseType: "stream",
+      timeout: 15000,
+      maxRedirects: 5,
+      validateStatus: (status) => status >= 200 && status < 400,
+    });
+
+    res.status(streamRes.status);
+    const forwardHeaders = ["content-type", "content-length", "content-range", "accept-ranges"];
+    for (const h of forwardHeaders) {
+      if (streamRes.headers[h]) {
+        res.setHeader(h, streamRes.headers[h]);
+      }
+    }
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    if (req.method === "HEAD") {
+      streamRes.data.destroy();
+      return res.end();
+    }
+
+    req.on("close", () => {
+      if (streamRes.data && !streamRes.data.destroyed) {
+        streamRes.data.destroy();
+      }
+    });
+
+    return streamRes.data.pipe(res);
   } catch (err) {
     console.error("Error loading xNhau stream:", err.message);
     return res.status(500).send("Error loading stream");
