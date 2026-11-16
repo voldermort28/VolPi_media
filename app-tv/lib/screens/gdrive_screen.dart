@@ -195,35 +195,33 @@ class GDriveScreenState extends State<GDriveScreen> {
     return false; // Reached root
   }
 
-  void _playVideo(GDriveItemModel video) {
+  void _playVideo(GDriveItemModel video, {BuildContext? replaceContext}) {
     final streamUrl = widget.apiService.getGDriveStreamUrl(video.id, fileName: video.name);
     final isPrivate = _selectedSource?.isPrivate ?? true;
     final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: streamUrl,
-          title: video.name,
-          subtitle: _selectedSource?.name ?? 'Google Drive',
-          mediaId: 'gdrive_${video.id}',
-          mediaCategory: isPrivate ? 'secret' : 'gdrive',
-          mediaPoster: video.thumbnailUrl ?? '',
-          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex + 1]);
-                }
-              : null,
-          onPrevious: (currentIndex > 0)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex - 1]);
-                }
-              : null,
-        ),
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: streamUrl,
+        title: video.name,
+        subtitle: _selectedSource?.name ?? 'Google Drive',
+        mediaId: 'gdrive_${video.id}',
+        mediaCategory: isPrivate ? 'secret' : 'gdrive',
+        mediaPoster: video.thumbnailUrl ?? '',
+        onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
+            ? () => _playVideo(_videos[currentIndex + 1], replaceContext: playerCtx)
+            : null,
+        onPrevious: (currentIndex > 0)
+            ? () => _playVideo(_videos[currentIndex - 1], replaceContext: playerCtx)
+            : null,
       ),
     );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
+    }
   }
 
   void _showSourceSelectionDialog() {
@@ -329,27 +327,22 @@ class GDriveScreenState extends State<GDriveScreen> {
     );
   }
 
+  bool handleBackNavigation() => _navigateBack();
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _breadcrumbs.length <= 1,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        _navigateBack();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTopBar(),
-              _buildBreadcrumbBar(),
-              Expanded(
-                child: _buildBody(),
-              ),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildTopBar(),
+            _buildBreadcrumbBar(),
+            Expanded(
+              child: _buildBody(),
+            ),
+          ],
         ),
       ),
     );

@@ -55,10 +55,17 @@ class VideoPlayerScreen extends StatefulWidget {
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+
+  static DateTime? lastExitTime;
+  static bool isRecentExit([int thresholdMs = 600]) {
+    if (lastExitTime == null) return false;
+    return DateTime.now().difference(lastExitTime!).inMilliseconds < thresholdMs;
+  }
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _saveProgressTimer;
+  DateTime? _lastBackHandledTime;
   late VideoPlayerController _controller;
   bool _isInitialized = false;
   bool _hasError = false;
@@ -220,10 +227,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _showBriefPlaybackHud('LOCK', 'Màn hình đang khóa');
       return;
     }
+    VideoPlayerScreen.lastExitTime = DateTime.now();
     Navigator.of(context).pop();
   }
 
   void _handleBackAction() {
+    final now = DateTime.now();
+    if (_lastBackHandledTime != null &&
+        now.difference(_lastBackHandledTime!).inMilliseconds < 400) {
+      return;
+    }
+    _lastBackHandledTime = now;
+
     if (_isScreenLocked) {
       setState(() {
         _showLockOverlay = true;
@@ -292,6 +307,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _replay10FocusNode,
       _forward10FocusNode,
       _skipIntroFocusNode,
+      _episodesButtonFocusNode,
       _channelsButtonFocusNode,
     ]) {
       node.addListener(() {
@@ -344,6 +360,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       if (mounted) {
         setState(() {
           _isInitialized = true;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_showControls) return;
+          if (!widget.isLive) {
+            _lastFocusedOnSeekBar = true;
+            _seekBarFocusNode.requestFocus();
+          } else {
+            _lastFocusedOnSeekBar = false;
+            _playPauseFocusNode.requestFocus();
+          }
         });
         _startHideControlsTimer();
         _saveProgressTimer?.cancel();
@@ -703,7 +729,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _startHideControlsTimer();
   }
 
-  void _showControlsBriefly({bool focusSeekBar = false}) {
+  void _showControlsBriefly({bool focusSeekBar = false, bool focusControls = false}) {
     if (_isScreenLocked) return;
     setState(() {
       _showControls = true;
@@ -711,6 +737,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _startHideControlsTimer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_showControls) return;
+      if (focusControls) {
+        _lastFocusedOnSeekBar = false;
+        _playPauseFocusNode.requestFocus();
+        return;
+      }
       if (!widget.isLive && (focusSeekBar || _lastFocusedOnSeekBar)) {
         _seekBarFocusNode.requestFocus();
         return;
@@ -1254,9 +1285,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           final bool isLeft = key == LogicalKeyboardKey.arrowLeft;
           final bool isRight = key == LogicalKeyboardKey.arrowRight;
 
-          final bool isBack = key == LogicalKeyboardKey.escape ||
-              key == LogicalKeyboardKey.goBack ||
-              key == LogicalKeyboardKey.backspace;
+          // Trên Android TV / iOS, phím Back được xử lý duy nhất qua PopScope.onPopInvoked
+          // để tránh lỗi 1 lần bấm Back kích hoạt kép (KeyDownEvent + onBackPressed lúc nhả phím)
+          final bool isBack = _isMacOrDesktop &&
+              (key == LogicalKeyboardKey.escape || key == LogicalKeyboardKey.backspace);
 
           if (event is KeyDownEvent) {
             if (isBack) {
@@ -1363,18 +1395,40 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               return KeyEventResult.handled;
             }
 
-            // Select / Enter
-            if (key == LogicalKeyboardKey.select || key == LogicalKeyboardKey.enter) {
+            // Select / Enter (Chuẩn YouTube Android TV: bấm Select sẽ tự động nhảy xuống hàng nút điều khiển bên dưới)
+            if (key == LogicalKeyboardKey.select ||
+                key == LogicalKeyboardKey.enter ||
+                key == LogicalKeyboardKey.gameButtonA) {
               if (!_showControls) {
-                _showControlsBriefly();
+                _lastFocusedOnSeekBar = false;
+                _showControlsBriefly(focusControls: true);
                 return KeyEventResult.handled;
               }
-              // When controls are visible, let the focused TvFocusableCard button handle Enter!
+              if (_showStreamSelector || _showEpisodeSelector) {
+                return KeyEventResult.ignored;
+              }
+              final anyControlButtonFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
+                  _backButtonFocusNode.hasFocus ||
+                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+              if (!anyControlButtonFocused) {
+                if (_isHoldingSeek) {
+                  _commitPendingSeek();
+                }
+                _lastFocusedOnSeekBar = false;
+                _playPauseFocusNode.requestFocus();
+                _startHideControlsTimer();
+                return KeyEventResult.handled;
+              }
+              // Khi đã focus vào một nút TvFocusableCard ở dưới, để nút đó xử lý sự kiện bấm
               return KeyEventResult.ignored;
             }
 
             // Left navigation / seek
             if (isLeft) {
+              if (_showStreamSelector || _showEpisodeSelector) {
+                _startHideControlsTimer();
+                return KeyEventResult.ignored;
+              }
               if (_isIOS) {
                 if (_lockFocusNode.hasFocus) {
                   _rotateFocusNode.requestFocus();
@@ -1387,16 +1441,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   return KeyEventResult.handled;
                 }
               }
-              if (!_showControls) {
-                _lastFocusedOnSeekBar = true;
-                if (_isHoldingSeek && _holdSeekDirection == -1) {
-                  _handleRemoteSeekRepeat(-1);
-                } else {
-                  _handleRemoteSeekStart(-1);
+              final controlNodes = _getActiveControlNodes();
+              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
+              final bool anyButtonFocused = currentIdx != -1 ||
+                  _backButtonFocusNode.hasFocus ||
+                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+
+              if (!_showControls || _seekBarFocusNode.hasFocus || !anyButtonFocused) {
+                if (widget.isLive) {
+                  _showControlsBriefly(focusControls: true);
+                  return KeyEventResult.handled;
                 }
-                return KeyEventResult.handled;
-              }
-              if (_seekBarFocusNode.hasFocus) {
                 _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == -1) {
                   _handleRemoteSeekRepeat(-1);
@@ -1407,19 +1462,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 return KeyEventResult.handled;
               }
               // Explicitly navigate between control buttons in the bottom bar
-              final controlNodes = _getActiveControlNodes();
-              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
               if (currentIdx > 0) {
                 controlNodes[currentIdx - 1].requestFocus();
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
               _startHideControlsTimer();
-              return KeyEventResult.ignored;
+              return KeyEventResult.handled;
             }
 
             // Right navigation / seek
             if (isRight) {
+              if (_showStreamSelector || _showEpisodeSelector) {
+                _startHideControlsTimer();
+                return KeyEventResult.ignored;
+              }
               if (_isIOS) {
                 if (_backButtonFocusNode.hasFocus) {
                   _rotateFocusNode.requestFocus();
@@ -1432,16 +1489,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   return KeyEventResult.handled;
                 }
               }
-              if (!_showControls) {
-                _lastFocusedOnSeekBar = true;
-                if (_isHoldingSeek && _holdSeekDirection == 1) {
-                  _handleRemoteSeekRepeat(1);
-                } else {
-                  _handleRemoteSeekStart(1);
+              final controlNodes = _getActiveControlNodes();
+              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
+              final bool anyButtonFocused = currentIdx != -1 ||
+                  _backButtonFocusNode.hasFocus ||
+                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+
+              if (!_showControls || _seekBarFocusNode.hasFocus || !anyButtonFocused) {
+                if (widget.isLive) {
+                  _showControlsBriefly(focusControls: true);
+                  return KeyEventResult.handled;
                 }
-                return KeyEventResult.handled;
-              }
-              if (_seekBarFocusNode.hasFocus) {
                 _lastFocusedOnSeekBar = true;
                 if (_isHoldingSeek && _holdSeekDirection == 1) {
                   _handleRemoteSeekRepeat(1);
@@ -1452,15 +1510,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 return KeyEventResult.handled;
               }
               // Explicitly navigate between control buttons in the bottom bar
-              final controlNodes = _getActiveControlNodes();
-              final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
               if (currentIdx != -1 && currentIdx + 1 < controlNodes.length) {
                 controlNodes[currentIdx + 1].requestFocus();
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
               _startHideControlsTimer();
-              return KeyEventResult.ignored;
+              return KeyEventResult.handled;
             }
 
             // Volume Shortcuts for macOS & Desktop (Key M for mute, +/- for volume)
@@ -1490,10 +1546,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
             if (isUp) {
               if (!_showControls) {
-                _showControlsBriefly();
+                _showControlsBriefly(focusControls: true);
                 return KeyEventResult.handled;
               }
-              if (_showStreamSelector) {
+              if (_showStreamSelector || _showEpisodeSelector) {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
@@ -1519,10 +1575,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
             if (isDown) {
               if (!_showControls) {
-                _showControlsBriefly();
+                _showControlsBriefly(focusControls: true);
                 return KeyEventResult.handled;
               }
-              if (_showStreamSelector) {
+              if (_showStreamSelector || _showEpisodeSelector) {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
@@ -1536,7 +1592,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
-              if (_seekBarFocusNode.hasFocus) {
+              final anyControlFocused = _getActiveControlNodes().any((n) => n.hasFocus);
+              if (_seekBarFocusNode.hasFocus || !anyControlFocused) {
                 _lastFocusedOnSeekBar = false;
                 _playPauseFocusNode.requestFocus();
                 _startHideControlsTimer();
@@ -1551,7 +1608,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
           } else if (event is KeyRepeatEvent) {
             if (_isScreenLocked) return KeyEventResult.ignored;
-            if (_isMacOrDesktop && !_showStreamSelector) {
+            if (_isMacOrDesktop && !_showStreamSelector && !_showEpisodeSelector) {
               if (isLeft) {
                 if (!widget.isLive) _seekDirectOffset(-10);
                 return KeyEventResult.handled;
@@ -1580,17 +1637,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               if (!widget.isLive) _handleRemoteSeekRepeat(-1);
               return KeyEventResult.handled;
             }
-            if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
+            if (isLeft && (_isHoldingSeek || !_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekRepeat(-1);
               return KeyEventResult.handled;
             }
-            if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
+            if (isRight && (_isHoldingSeek || !_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekRepeat(1);
               return KeyEventResult.handled;
             }
           } else if (event is KeyUpEvent) {
             if (_isScreenLocked) return KeyEventResult.ignored;
-            if (_isMacOrDesktop && !_showStreamSelector) {
+            if (_isMacOrDesktop && !_showStreamSelector && !_showEpisodeSelector) {
               if (isLeft || isRight || key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.arrowDown) {
                 return KeyEventResult.handled;
               }
@@ -1606,11 +1663,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               if (!widget.isLive) _handleRemoteSeekEnd(-1);
               return KeyEventResult.handled;
             }
-            if (isLeft && (!_showControls || _seekBarFocusNode.hasFocus)) {
+            if (isLeft && (_isHoldingSeek || !_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekEnd(-1);
               return KeyEventResult.handled;
             }
-            if (isRight && (!_showControls || _seekBarFocusNode.hasFocus)) {
+            if (isRight && (_isHoldingSeek || !_showControls || _seekBarFocusNode.hasFocus)) {
               _handleRemoteSeekEnd(1);
               return KeyEventResult.handled;
             }

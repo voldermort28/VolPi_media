@@ -169,19 +169,26 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
 
     final bool isNarrow = MediaQuery.of(context).size.width < 600;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Bar
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 20, vertical: isNarrow ? 8 : 12),
-              child: Row(
-                children: [
-                  TvFocusableCard(
-                    autoFocus: true,
-                    onTap: () => Navigator.of(context).pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        if (VideoPlayerScreen.isRecentExit()) return;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Top Bar
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 20, vertical: isNarrow ? 8 : 12),
+                child: Row(
+                  children: [
+                    TvFocusableCard(
+                      autoFocus: false,
+                      onTap: () => Navigator.of(context).pop(),
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
                       padding: const EdgeInsets.all(8),
@@ -514,12 +521,13 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                           mainAxisExtent: isNarrow ? 42 : 52,
                                         ),
                                         itemCount: episodes.length,
-                                        itemBuilder: (context, idx) {
-                                          final ep = episodes[idx];
-                                          final epHistoryId = 'anime:${anime.id}:ep:${ep.episode}';
-                                          final epSaved = WatchHistoryService.instance.getProgress(epHistoryId);
-                                          return TvFocusableCard(
-                                            onTap: () => _playEpisodeAtIndex(idx),
+                                          itemBuilder: (context, idx) {
+                                            final ep = episodes[idx];
+                                            final epHistoryId = 'anime:${anime.id}:ep:${ep.episode}';
+                                            final epSaved = WatchHistoryService.instance.getProgress(epHistoryId);
+                                            return TvFocusableCard(
+                                              autoFocus: idx == 0,
+                                              onTap: () => _playEpisodeAtIndex(idx),
                                             borderRadius: BorderRadius.circular(isNarrow ? 8 : 10),
                                             child: Container(
                                               color: const Color(0xFF1E293B),
@@ -564,7 +572,8 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -538,20 +538,37 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 900;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (isMobile) ...[
-              // Action Bar (Row 1 on Mobile)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Row(
-                  children: [
-                    TvFocusableCard(
-                      autoFocus: !_isSearching,
-                      onTap: () => Navigator.of(context).pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        if (VideoPlayerScreen.isRecentExit()) return;
+        if (_contentStackIndex == 1 && (_gdriveKey.currentState?.handleBackNavigation() ?? false)) {
+          return;
+        }
+        if (_isSearching) {
+          setState(() {
+            _isSearching = false;
+          });
+          if (_searchQuery != null) _clearSearch();
+          return;
+        }
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F172A),
+        body: SafeArea(
+          child: Column(
+            children: [
+              if (isMobile) ...[
+                // Action Bar (Row 1 on Mobile)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: Row(
+                    children: [
+                      TvFocusableCard(
+                        autoFocus: false,
+                        onTap: () => Navigator.of(context).pop(),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.all(8),
@@ -725,7 +742,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                 child: Row(
                   children: [
                     TvFocusableCard(
-                      autoFocus: !_isSearching,
+                      autoFocus: false,
                       onTap: () => Navigator.of(context).pop(),
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
@@ -1285,7 +1302,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildSectionTitle(String title, {String? count, VoidCallback? onSeeAll}) {

@@ -7,6 +7,7 @@ import '../screens/anime_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/music_screen.dart';
 import '../screens/secret_movie_screen.dart';
+import '../player/video_player_screen.dart';
 import '../services/player_settings_service.dart';
 import '../services/sync_service.dart';
 import '../services/update_service.dart';
@@ -156,6 +157,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
+        if (VideoPlayerScreen.isRecentExit()) return;
         ExitConfirmDialog.show(context);
       },
       child: LayoutBuilder(

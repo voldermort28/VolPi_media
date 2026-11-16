@@ -10,6 +10,7 @@ import '../screens/music_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
 import '../screens/secret_movie_screen.dart';
+import '../player/video_player_screen.dart';
 import '../services/player_settings_service.dart';
 import '../services/sync_service.dart';
 import '../services/update_service.dart';
@@ -320,10 +321,16 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
+        if (VideoPlayerScreen.isRecentExit()) return;
 
         // If in drawer mode: close drawer if open
         if (isDrawerMode && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
           Navigator.of(context).pop();
+          return;
+        }
+
+        // Nếu đang ở tab Nghe Nhạc / Video & Phim (Tab 5) và đang ở trong thư mục con -> lùi 1 cấp thư mục, giữ focus trong danh sách
+        if (_currentTabIndex == 5 && (_musicKey.currentState?.handleBackNavigation() ?? false)) {
           return;
         }
 

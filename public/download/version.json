@@ -1,10 +1,10 @@
 {
-  "version": "2.2.45",
-  "build": 111,
-  "tag_name": "v2.2.45",
-  "changelog": "• VolPi Media v2.2.45:\n- Sửa lỗi màn hình trắng khi khởi động trên Android TV: Chuyển MainActivity sang kế thừa AudioServiceActivity chuẩn của hệ thống phát nhạc nền, khởi tạo AudioService bất đồng bộ kèm cơ chế fallback tự động và đổi màn hình chờ gốc sang tông đen dịu mắt.\n- Tối ưu hóa OTA trên iOS Safari: Cố định tên file tải về luôn có đuôi .ipa chính xác.\n- Bóng Đá Tổng Hợp & Xôi Lạc: Giữ danh sách trận đấu hiển thị tức thì (0ms) khi chuyển tab và sắp xếp lịch thi đấu từ gần đến xa.",
+  "version": "2.2.46",
+  "build": 112,
+  "tag_name": "v2.2.46",
+  "changelog": "• VolPi Media v2.2.46:\n- Trình phát Video Android TV (Chuẩn YouTube TV): Khi đang xem video, bấm Qua Trái/Phải sẽ tua lùi/tới ngay lập tức; bấm nút Select (OK) sẽ tự động nhảy xuống hàng nút điều khiển bên dưới (Play/Pause, Next, Chọn Tập, Chọn Luồng).\n- Sửa triệt để lỗi nút Back trên Android TV: Khi đang hiện bảng điều khiển video, bấm Back sẽ chỉ tắt bảng điều khiển (không bị thoát video). Khi ẩn bảng điều khiển, bấm Back sẽ quay về đúng trang danh sách video/anime trước đó (không bị nhảy về trang Home).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-16T00:05:00Z"
+  "published_at": "2026-11-16T06:30:00Z"
 }

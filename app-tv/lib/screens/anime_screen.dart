@@ -528,6 +528,7 @@ class AnimeScreenState extends State<AnimeScreen> {
       canPop: _selectedCategoryIndex == 0,
       onPopInvoked: (didPop) {
         if (didPop) return;
+        if (VideoPlayerScreen.isRecentExit()) return;
         if (_selectedCategoryIndex != 0) {
           _loadCategory(0);
         }

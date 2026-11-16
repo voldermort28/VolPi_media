@@ -257,34 +257,32 @@ class MusicScreenState extends State<MusicScreen> {
     }
   }
 
-  void _playVideo(GDriveItemModel video) {
+  void _playVideo(GDriveItemModel video, {BuildContext? replaceContext}) {
     final streamUrl = widget.apiService.getGDriveStreamUrl(video.id, fileName: video.name);
     final currentIndex = _videos.indexWhere((v) => v.id == video.id);
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: streamUrl,
-          title: video.name,
-          subtitle: _selectedSource?.name ?? 'Google Drive Video',
-          mediaId: 'gdrive_${video.id}',
-          mediaCategory: 'gdrive',
-          mediaPoster: video.thumbnailUrl ?? '',
-          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex + 1]);
-                }
-              : null,
-          onPrevious: (currentIndex > 0)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex - 1]);
-                }
-              : null,
-        ),
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: streamUrl,
+        title: video.name,
+        subtitle: _selectedSource?.name ?? 'Google Drive Video',
+        mediaId: 'gdrive_${video.id}',
+        mediaCategory: 'gdrive',
+        mediaPoster: video.thumbnailUrl ?? '',
+        onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
+            ? () => _playVideo(_videos[currentIndex + 1], replaceContext: playerCtx)
+            : null,
+        onPrevious: (currentIndex > 0)
+            ? () => _playVideo(_videos[currentIndex - 1], replaceContext: playerCtx)
+            : null,
       ),
     );
+
+    if (replaceContext != null) {
+      Navigator.of(replaceContext).pushReplacement(playerRoute);
+    } else {
+      Navigator.of(context).push(playerRoute);
+    }
   }
 
   void _showSourceSelectionDialog() {
@@ -388,25 +386,26 @@ class MusicScreenState extends State<MusicScreen> {
     );
   }
 
+  bool handleBackNavigation() {
+    if (_breadcrumbs.length > 1) {
+      _navigateBack();
+      return true;
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _breadcrumbs.length <= 1,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        _navigateBack();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0B132B),
-        body: SafeArea(
-          child: Column(
-            children: [
-              _buildTopBar(),
-              _buildBreadcrumbBar(),
-              Expanded(child: _buildBody()),
-              _buildMiniPlayer(),
-            ],
-          ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B132B),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildTopBar(),
+            _buildBreadcrumbBar(),
+            Expanded(child: _buildBody()),
+            _buildMiniPlayer(),
+          ],
         ),
       ),
     );
