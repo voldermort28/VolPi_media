@@ -4,9 +4,9 @@ const path = require("path");
 const CONFIG_FILE = path.join(__dirname, "config.json");
 
 const DEFAULT_CONFIG = {
-  xoilacBaseUrl: "https://xoilaczzw.cc",
-  socoliveBaseUrl: "https://socolive2.top",
-  gavangBaseUrl: "https://gavang1.xyz",
+  xoilacBaseUrl: "https://xoilaczzh.io",
+  socoliveBaseUrl: "https://socolive377.co",
+  gavangBaseUrl: "https://gavang3.tv",
   veboBaseUrl: "https://vebozbn.cc",
   vlxxBaseUrl: "https://vlxx.phd",
   viet69BaseUrl: "https://viet69.be",

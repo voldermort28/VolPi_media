@@ -4,9 +4,16 @@ const config = require('../config');
 
 let resolvedBaseUrl = null;
 
+const CANDIDATE_DOMAINS = [
+  'https://gavang3.tv',
+  'https://gavangtv11.top',
+  'https://gavang21.tv',
+  'https://gavangtv.co',
+];
+
 function getBaseUrl() {
   if (resolvedBaseUrl) return resolvedBaseUrl;
-  return config.getConfig().gavangBaseUrl || 'https://gavang1.xyz';
+  return config.getConfig().gavangBaseUrl || 'https://gavang3.tv';
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -199,21 +206,43 @@ async function getLiveMatches() {
     return cachedMatches;
   }
 
-  const baseUrl = getBaseUrl();
+  let baseUrl = getBaseUrl();
   let matches = [];
 
-  // 1. Try REST API endpoint first
+  // 1. Try REST API endpoint first (with automatic fallback to CANDIDATE_DOMAINS)
   try {
-    const apiUrl = `${baseUrl}/wp-json/gavang33live/v1/matches?gavang33live_v=2.0.13.24`;
-    const res = await axios.get(apiUrl, {
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Referer': baseUrl,
-      },
-      timeout: 10000,
-    });
+    const fetchGavangApi = async (domain, timeoutMs = 6000) => {
+      const apiUrl = `${domain}/wp-json/gavang33live/v1/matches?gavang33live_v=2.0.13.24`;
+      const r = await axios.get(apiUrl, {
+        headers: {
+          'User-Agent': USER_AGENT,
+          'Referer': domain,
+        },
+        timeout: timeoutMs,
+      });
+      if (!r.data || !r.data.success || !Array.isArray(r.data.data) || r.data.data.length === 0) {
+        throw new Error(`Invalid GaVang API response from ${domain}`);
+      }
+      return { res: r, domain };
+    };
 
-    if (res.data && res.data.success && Array.isArray(res.data.data)) {
+    let res = null;
+    try {
+      const primary = await fetchGavangApi(baseUrl, 5000);
+      res = primary.res;
+      baseUrl = primary.domain;
+      resolvedBaseUrl = baseUrl;
+    } catch (primaryErr) {
+      const backups = CANDIDATE_DOMAINS.filter((d) => d !== baseUrl);
+      if (backups.length > 0) {
+        const winner = await Promise.any(backups.map((d) => fetchGavangApi(d, 6000)));
+        res = winner.res;
+        baseUrl = winner.domain;
+        resolvedBaseUrl = baseUrl;
+      }
+    }
+
+    if (res && res.data && res.data.success && Array.isArray(res.data.data)) {
       const dataList = res.data.data;
       dataList.forEach((item) => {
         const slug = item.slug || item.match_id;

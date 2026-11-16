@@ -5,16 +5,14 @@ const config = require('../config');
 let resolvedBaseUrl = null;
 
 const CANDIDATE_DOMAINS = [
-  'https://socolive2.top',
-  'https://socolivevq.top',
-  'https://socolive85.live',
-  'https://socolivetvz.top',
-  'https://webfifa55.live',
+  'https://socolive377.co',
+  'https://socoliveptt.top',
+  'https://socolive.cfd',
 ];
 
 function getBaseUrl() {
   if (resolvedBaseUrl) return resolvedBaseUrl;
-  return config.getConfig().socoliveBaseUrl || 'https://socolive2.top';
+  return config.getConfig().socoliveBaseUrl || 'https://socolive377.co';
 }
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -317,8 +315,8 @@ async function getLiveMatches() {
         timeout: timeoutMs,
         maxRedirects: 5,
       });
-      if (!r || r.status !== 200 || !r.data) {
-        throw new Error(`Invalid status from ${domain}`);
+      if (!r || r.status !== 200 || !r.data || !String(r.data).includes('match-item')) {
+        throw new Error(`Invalid status or missing match items from ${domain}`);
       }
       return { res: r, domain };
     };

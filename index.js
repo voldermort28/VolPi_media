@@ -1169,9 +1169,16 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
           "Referer": cleanUrl,
         },
         timeout: 8000,
+        maxRedirects: 5,
       });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        return res.json({ success: true, count: response.data.data.length, redirectedUrl: cleanUrl });
+        return res.json({ success: true, count: response.data.data.length, redirectedUrl: finalOrigin });
       } else {
         return res.json({ success: false, error: "Không tìm thấy dữ liệu trận đấu Gà Vàng từ domain này" });
       }
@@ -1181,11 +1188,18 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
           "User-Agent": veboScraper.USER_AGENT,
         },
         timeout: 8000,
+        maxRedirects: 5,
       });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
       const $ = cheerio.load(response.data);
       const items = $(".match-football-item, .grid-matches__item");
       if (items.length > 0) {
-        return res.json({ success: true, count: items.length, redirectedUrl: cleanUrl });
+        return res.json({ success: true, count: items.length, redirectedUrl: finalOrigin });
       } else {
         return res.json({ success: false, error: "Không tìm thấy danh sách trận đấu Về Bờ từ domain này" });
       }
