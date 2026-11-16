@@ -11,6 +11,7 @@ const DEFAULT_CONFIG = {
   vlxxBaseUrl: "https://vlxx.phd",
   viet69BaseUrl: "https://viet69.be",
   xnhauBaseUrl: "https://xnhau.pink",
+  qmhBaseUrl: "https://qmhphimsex.com",
   yumeiBaseUrl: "https://yumei-anime.com",
   autoCleanCache: true,
 };
@@ -75,6 +76,12 @@ function saveConfig(newConfig) {
       currentConfig.xnhauBaseUrl = currentConfig.xnhauBaseUrl.trim().replace(/\/+$/, "");
       if (!currentConfig.xnhauBaseUrl.startsWith("http://") && !currentConfig.xnhauBaseUrl.startsWith("https://")) {
         currentConfig.xnhauBaseUrl = "https://" + currentConfig.xnhauBaseUrl;
+      }
+    }
+    if (currentConfig.qmhBaseUrl) {
+      currentConfig.qmhBaseUrl = currentConfig.qmhBaseUrl.trim().replace(/\/+$/, "");
+      if (!currentConfig.qmhBaseUrl.startsWith("http://") && !currentConfig.qmhBaseUrl.startsWith("https://")) {
+        currentConfig.qmhBaseUrl = "https://" + currentConfig.qmhBaseUrl;
       }
     }
     if (currentConfig.yumeiBaseUrl) {

@@ -11,12 +11,14 @@ const unifiedAddon = require("./addon");
 const vlxxAddon = require("./addons/vlxxAddon");
 const viet69Addon = require("./addons/viet69Addon");
 const xnhauAddon = require("./addons/xnhauAddon");
+const qmhAddon = require("./addons/qmhAddon");
 const xoilacAddon = require("./addons/xoilacAddon");
 const socoliveAddon = require("./addons/socoliveAddon");
 const yumeiAddon = require("./addons/yumeiAddon");
 const vlxxScraper = require("./scrapers/vlxx");
 const viet69Scraper = require("./scrapers/viet69");
 const xnhauScraper = require("./scrapers/xnhau");
+const qmhScraper = require("./scrapers/qmh");
 const xoilacScraper = require("./scrapers/xoilac");
 const socoliveScraper = require("./scrapers/socolive");
 const gavangScraper = require("./scrapers/gavang");
@@ -886,8 +888,8 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
       socoliveScraper.clearCache();
@@ -896,6 +898,7 @@ app.post("/api/config", authService.requireAuth, (req, res) => {
       vlxxScraper.clearCache();
       viet69Scraper.clearCache();
       xnhauScraper.clearCache();
+      qmhScraper.clearCache();
       yumeiScraper.clearCache();
       logoCache.clear();
       vlxxPosterCache.clear();
@@ -1104,6 +1107,23 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
       }
       const $ = cheerio.load(response.data);
       const items = $(".list-videos .item");
+      return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
+    } else if (type === "qmh") {
+      const response = await axios.get(cleanUrl, {
+        headers: {
+          "User-Agent": qmhScraper.USER_AGENT,
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $(".item-video, .clip-link");
       return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
     } else if (type === "yumei") {
       const response = await axios.get(cleanUrl + "/thu-vien", {
@@ -1565,6 +1585,7 @@ app.get("/thumb/yumei/:id.svg", async (req, res) => {
 app.use("/vlxx", getRouter(vlxxAddon));
 app.use("/viet69", getRouter(viet69Addon));
 app.use("/xnhau", getRouter(xnhauAddon));
+app.use("/qmh", getRouter(qmhAddon));
 app.use("/xoilac", getRouter(xoilacAddon));
 app.use("/socolive", getRouter(socoliveAddon));
 app.use("/yumei", getRouter(yumeiAddon));
@@ -1591,6 +1612,19 @@ app.get("/thumb/xnhau/:id.jpg", async (req, res) => {
   try {
     const rawId = req.params.id;
     const info = await xnhauScraper.getVideoInfo(rawId);
+    if (info && info.poster) {
+      return res.redirect(info.poster);
+    }
+    return res.status(404).send("Not found");
+  } catch (e) {
+    return res.status(404).send("Not found");
+  }
+});
+
+app.get("/thumb/qmh/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const info = await qmhScraper.getVideoInfo(rawId);
     if (info && info.poster) {
       return res.redirect(info.poster);
     }
@@ -1734,6 +1768,50 @@ app.get(["/xnhau/stream/:id/:server.mp4", "/xnhau/stream/:id/master.mp4", "/xnha
   }
 });
 
+app.get(["/qmh/hls/:id/:server/master.m3u8", "/qmh/hls/:id/master.m3u8"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const manifestInfo = await qmhScraper.getRawManifestUrl(id);
+    if (!manifestInfo || !manifestInfo.url) {
+      return res.status(404).send("Stream manifest not found");
+    }
+
+    const rawUrl = manifestInfo.url;
+    if (!rawUrl.includes(".m3u8")) {
+      return res.redirect(rawUrl);
+    }
+
+    const manifestRes = await axios.get(rawUrl, {
+      headers: {
+        "Referer": manifestInfo.referer || "https://streamvl.online/",
+        "User-Agent": qmhScraper.USER_AGENT,
+      },
+      timeout: 10000,
+    });
+
+    const host = process.env.BASE_HOST || "https://" + req.get("host");
+    const m3u8Base = rawUrl.substring(0, rawUrl.lastIndexOf("/") + 1);
+    const lines = manifestRes.data.split("\n");
+    const rewritten = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      let segUrl = trimmed;
+      if (!segUrl.startsWith("http://") && !segUrl.startsWith("https://")) {
+        segUrl = m3u8Base + segUrl;
+      }
+      return host + "/seg?u=" + encodeURIComponent(segUrl);
+    }).join("\n");
+
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Accel-Buffering", "no");
+    return res.send(rewritten);
+  } catch (err) {
+    console.error("Error generating QMH HLS manifest:", err.message);
+    return res.status(500).send("Error loading playlist");
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log("\n======================================================");
   console.log("🚀 Stremio Addon Server running on port " + PORT);
@@ -1743,6 +1821,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("👉 VLXX Only:       http://localhost:" + PORT + "/vlxx/manifest.json");
   console.log("👉 Viet69 Only:     http://localhost:" + PORT + "/viet69/manifest.json");
   console.log("👉 xNhau Only:      http://localhost:" + PORT + "/xnhau/manifest.json");
+  console.log("👉 QMH Only:        http://localhost:" + PORT + "/qmh/manifest.json");
   console.log("👉 Combo Tất Cả:    http://localhost:" + PORT + "/manifest.json");
   console.log("======================================================\n");
 });

@@ -403,6 +403,54 @@ class ApiService {
   }
 
   // =========================================================================
+  // 3.3 QMH / KHO PHIM RIÊNG TƯ MỚI (TAB QMH)
+  // =========================================================================
+
+  Future<List<MovieModel>> getQmhCatalog({String? searchQuery, int skip = 0, String? genre}) async {
+    String url = skip > 0
+        ? '$baseUrl/qmh/catalog/movie/qmh-catalog/skip=$skip.json'
+        : '$baseUrl/qmh/catalog/movie/qmh-catalog.json';
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/qmh/catalog/movie/qmh-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/qmh/catalog/movie/qmh-catalog/search=$encoded.json';
+    } else if (genre != null && genre.isNotEmpty && genre != 'Tất cả') {
+      final encodedGenre = Uri.encodeComponent(genre);
+      url = skip > 0
+          ? '$baseUrl/qmh/catalog/movie/qmh-catalog/genre=$encodedGenre&skip=$skip.json'
+          : '$baseUrl/qmh/catalog/movie/qmh-catalog/genre=$encodedGenre.json';
+    }
+
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data['metas'] != null) {
+          final List list = data['metas'];
+          return list.map((item) => MovieModel.fromJson(item)).toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  /// Get HLS stream URLs for QMH
+  List<StreamChannel> getQmhStreams(String rawId) {
+    final cleanId = rawId.replaceFirst('qmh:', '');
+    return [
+      StreamChannel(
+        name: 'QMH',
+        title: 'Server #1 (Full HD M3U8 - Không quảng cáo)',
+        url: '$baseUrl/qmh/hls/$cleanId/master.m3u8',
+        headers: {},
+      ),
+    ];
+  }
+
+  // =========================================================================
   // 4. IPTV / TRUYỀN HÌNH TRỰC TUYẾN
   // =========================================================================
 
