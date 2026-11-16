@@ -4,9 +4,17 @@ const config = require('../config');
 
 let resolvedBaseUrl = null;
 
+const CANDIDATE_DOMAINS = [
+  'https://vlxx.net',
+  'https://vlxx.phd',
+  'https://vlxx.sex',
+  'https://vlxx.moe',
+  'https://vlxx.lol',
+];
+
 function getBaseUrl() {
   if (resolvedBaseUrl) return resolvedBaseUrl;
-  return config.getConfig().vlxxBaseUrl || 'https://vlxx.phd';
+  return config.getConfig().vlxxBaseUrl || 'https://vlxx.net';
 }
 
 function updateResolvedBaseUrl(url) {
@@ -143,9 +151,39 @@ function parseVideoItem($, el) {
   return item;
 }
 
+async function fetchWithFallback(pathUrl) {
+  try {
+    return await client.get(pathUrl, { timeout: 6000 });
+  } catch (primaryErr) {
+    const current = getBaseUrl();
+    const backups = CANDIDATE_DOMAINS.filter((d) => d !== current);
+    if (backups.length === 0) throw primaryErr;
+    const winner = await Promise.any(
+      backups.map(async (domain) => {
+        const r = await axios.get(`${domain}${pathUrl}`, {
+          headers: {
+            'User-Agent': USER_AGENT,
+            'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
+          },
+          timeout: 6000,
+          maxRedirects: 5,
+        });
+        if (!r || r.status !== 200 || !r.data) throw new Error('Invalid VLXX response');
+        return { res: r, domain };
+      })
+    );
+    if (winner.res.request && winner.res.request.res && winner.res.request.res.responseUrl) {
+      updateResolvedBaseUrl(winner.res.request.res.responseUrl);
+    } else {
+      resolvedBaseUrl = winner.domain;
+    }
+    return winner.res;
+  }
+}
+
 async function getLatest(page = 1) {
   const url = page === 1 ? '/' : `/new/${page}/`;
-  const res = await client.get(url);
+  const res = await fetchWithFallback(url);
   const $ = cheerio.load(res.data);
   const videos = [];
 
@@ -174,7 +212,7 @@ async function getByCategory(category, page = 1) {
     : (page === 1 ? `/${catSlug}/` : `/${catSlug}/${page}/`);
 
   try {
-    const res = await client.get(url);
+    const res = await fetchWithFallback(url);
     const $ = cheerio.load(res.data);
     const videos = [];
 
@@ -196,7 +234,7 @@ async function search(query, page = 1) {
 
   const url = page === 1 ? `/search/${slug}/` : `/search/${slug}/${page}/`;
   try {
-    const res = await client.get(url);
+    const res = await fetchWithFallback(url);
     const $ = cheerio.load(res.data);
     const videos = [];
 
@@ -214,9 +252,7 @@ async function search(query, page = 1) {
 
 async function getVideoDetails(rawId) {
   try {
-    const res = await client.get(`/${rawId}`, {
-      maxRedirects: 5,
-    });
+    const res = await fetchWithFallback(`/${rawId}`);
     const $ = cheerio.load(res.data);
 
     const title = $('h1.page-title').text().trim() || `Video ${rawId}`;

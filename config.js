@@ -4,11 +4,11 @@ const path = require("path");
 const CONFIG_FILE = path.join(__dirname, "config.json");
 
 const DEFAULT_CONFIG = {
-  xoilacBaseUrl: "https://xoilaczzh.io",
+  xoilacBaseUrl: "https://xoilaczcn.tv",
   socoliveBaseUrl: "https://socolive377.co",
   gavangBaseUrl: "https://gavang3.tv",
   veboBaseUrl: "https://vebozbn.cc",
-  vlxxBaseUrl: "https://vlxx.phd",
+  vlxxBaseUrl: "https://vlxx.net",
   viet69BaseUrl: "https://viet69.be",
   xnhauBaseUrl: "https://xnhau.pink",
   qmhBaseUrl: "https://qmhphimsex.com",
@@ -16,13 +16,40 @@ const DEFAULT_CONFIG = {
   autoCleanCache: true,
 };
 
+const URL_KEYS = [
+  "xoilacBaseUrl",
+  "socoliveBaseUrl",
+  "gavangBaseUrl",
+  "veboBaseUrl",
+  "vlxxBaseUrl",
+  "viet69BaseUrl",
+  "xnhauBaseUrl",
+  "qmhBaseUrl",
+  "yumeiBaseUrl",
+];
+
+function normalizeUrl(val, fallback) {
+  if (typeof val !== "string" || !val.trim()) {
+    return fallback;
+  }
+  let clean = val.trim().replace(/\/+$/, "");
+  if (!clean.startsWith("http://") && !clean.startsWith("https://")) {
+    clean = "https://" + clean;
+  }
+  return clean;
+}
+
 let currentConfig = { ...DEFAULT_CONFIG };
 
 function loadConfig() {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
-      const data = fs.readFileSync(CONFIG_FILE, "utf8");
-      currentConfig = { ...DEFAULT_CONFIG, ...JSON.parse(data) };
+      const data = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+      const merged = { ...DEFAULT_CONFIG, ...data };
+      for (const key of URL_KEYS) {
+        merged[key] = normalizeUrl(data[key], DEFAULT_CONFIG[key]);
+      }
+      currentConfig = merged;
     } else {
       saveConfig(DEFAULT_CONFIG);
     }
@@ -33,63 +60,20 @@ function loadConfig() {
   return currentConfig;
 }
 
-function saveConfig(newConfig) {
+function saveConfig(newConfig = {}) {
   try {
-    currentConfig = { ...currentConfig, ...newConfig };
-    if (currentConfig.xoilacBaseUrl) {
-      currentConfig.xoilacBaseUrl = currentConfig.xoilacBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.xoilacBaseUrl.startsWith("http://") && !currentConfig.xoilacBaseUrl.startsWith("https://")) {
-        currentConfig.xoilacBaseUrl = "https://" + currentConfig.xoilacBaseUrl;
+    const updated = { ...currentConfig };
+    for (const key of URL_KEYS) {
+      if (newConfig[key] !== undefined && String(newConfig[key]).trim() !== "") {
+        updated[key] = normalizeUrl(newConfig[key], currentConfig[key] || DEFAULT_CONFIG[key]);
+      } else {
+        updated[key] = normalizeUrl(currentConfig[key], DEFAULT_CONFIG[key]);
       }
     }
-    if (currentConfig.socoliveBaseUrl) {
-      currentConfig.socoliveBaseUrl = currentConfig.socoliveBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.socoliveBaseUrl.startsWith("http://") && !currentConfig.socoliveBaseUrl.startsWith("https://")) {
-        currentConfig.socoliveBaseUrl = "https://" + currentConfig.socoliveBaseUrl;
-      }
+    if (typeof newConfig.autoCleanCache === "boolean") {
+      updated.autoCleanCache = newConfig.autoCleanCache;
     }
-    if (currentConfig.gavangBaseUrl) {
-      currentConfig.gavangBaseUrl = currentConfig.gavangBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.gavangBaseUrl.startsWith("http://") && !currentConfig.gavangBaseUrl.startsWith("https://")) {
-        currentConfig.gavangBaseUrl = "https://" + currentConfig.gavangBaseUrl;
-      }
-    }
-    if (currentConfig.veboBaseUrl) {
-      currentConfig.veboBaseUrl = currentConfig.veboBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.veboBaseUrl.startsWith("http://") && !currentConfig.veboBaseUrl.startsWith("https://")) {
-        currentConfig.veboBaseUrl = "https://" + currentConfig.veboBaseUrl;
-      }
-    }
-    if (currentConfig.vlxxBaseUrl) {
-      currentConfig.vlxxBaseUrl = currentConfig.vlxxBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.vlxxBaseUrl.startsWith("http://") && !currentConfig.vlxxBaseUrl.startsWith("https://")) {
-        currentConfig.vlxxBaseUrl = "https://" + currentConfig.vlxxBaseUrl;
-      }
-    }
-    if (currentConfig.viet69BaseUrl) {
-      currentConfig.viet69BaseUrl = currentConfig.viet69BaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.viet69BaseUrl.startsWith("http://") && !currentConfig.viet69BaseUrl.startsWith("https://")) {
-        currentConfig.viet69BaseUrl = "https://" + currentConfig.viet69BaseUrl;
-      }
-    }
-    if (currentConfig.xnhauBaseUrl) {
-      currentConfig.xnhauBaseUrl = currentConfig.xnhauBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.xnhauBaseUrl.startsWith("http://") && !currentConfig.xnhauBaseUrl.startsWith("https://")) {
-        currentConfig.xnhauBaseUrl = "https://" + currentConfig.xnhauBaseUrl;
-      }
-    }
-    if (currentConfig.qmhBaseUrl) {
-      currentConfig.qmhBaseUrl = currentConfig.qmhBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.qmhBaseUrl.startsWith("http://") && !currentConfig.qmhBaseUrl.startsWith("https://")) {
-        currentConfig.qmhBaseUrl = "https://" + currentConfig.qmhBaseUrl;
-      }
-    }
-    if (currentConfig.yumeiBaseUrl) {
-      currentConfig.yumeiBaseUrl = currentConfig.yumeiBaseUrl.trim().replace(/\/+$/, "");
-      if (!currentConfig.yumeiBaseUrl.startsWith("http://") && !currentConfig.yumeiBaseUrl.startsWith("https://")) {
-        currentConfig.yumeiBaseUrl = "https://" + currentConfig.yumeiBaseUrl;
-      }
-    }
+    currentConfig = updated;
     fs.writeFileSync(CONFIG_FILE, JSON.stringify(currentConfig, null, 2), "utf8");
     return true;
   } catch (err) {

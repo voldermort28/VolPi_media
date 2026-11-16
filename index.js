@@ -460,8 +460,11 @@ app.get("/api/status", async (req, res) => {
   const cfg = config.getConfig();
   let matchesCount = 0;
   try {
-    const matches = await xoilacScraper.getLiveMatches();
-    matchesCount = matches ? matches.length : 0;
+    const matches = await Promise.race([
+      xoilacScraper.getLiveMatches(),
+      new Promise((resolve) => setTimeout(() => resolve([]), 1200)),
+    ]);
+    matchesCount = Array.isArray(matches) ? matches.length : 0;
   } catch (e) {}
 
   const uptimeSec = Math.floor(process.uptime());
