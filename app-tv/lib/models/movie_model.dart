@@ -21,7 +21,7 @@ class MovieModel {
 
   factory MovieModel.fromJson(Map<String, dynamic> json) {
     final String fullId = json['id'] ?? '';
-    final String raw = json['rawId'] ?? fullId.replaceFirst('vlxx:', '').replaceFirst('viet69:', '').replaceFirst('xnhau:', '').replaceFirst('qmh:', '');
+    final String raw = json['rawId'] ?? fullId.replaceFirst('vlxx:', '').replaceFirst('viet69:', '').replaceFirst('xnhau:', '').replaceFirst('qmh:', '').replaceFirst('heoav:', '').replaceFirst('phe69:', '');
 
     final List<String> genreList = [];
     if (json['genres'] != null) {

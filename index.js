@@ -12,6 +12,8 @@ const vlxxAddon = require("./addons/vlxxAddon");
 const viet69Addon = require("./addons/viet69Addon");
 const xnhauAddon = require("./addons/xnhauAddon");
 const qmhAddon = require("./addons/qmhAddon");
+const heoavAddon = require("./addons/heoavAddon");
+const phe69Addon = require("./addons/phe69Addon");
 const xoilacAddon = require("./addons/xoilacAddon");
 const socoliveAddon = require("./addons/socoliveAddon");
 const yumeiAddon = require("./addons/yumeiAddon");
@@ -19,6 +21,8 @@ const vlxxScraper = require("./scrapers/vlxx");
 const viet69Scraper = require("./scrapers/viet69");
 const xnhauScraper = require("./scrapers/xnhau");
 const qmhScraper = require("./scrapers/qmh");
+const heoavScraper = require("./scrapers/heoav");
+const phe69Scraper = require("./scrapers/phe69");
 const xoilacScraper = require("./scrapers/xoilac");
 const socoliveScraper = require("./scrapers/socolive");
 const gavangScraper = require("./scrapers/gavang");
@@ -891,8 +895,8 @@ app.get("/api/config", (req, res) => {
 
 app.post("/api/config", authService.requireAuth, (req, res) => {
   try {
-    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl } = req.body;
-    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl });
+    const { xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, heoavBaseUrl, phe69BaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl } = req.body;
+    const saved = config.saveConfig({ xoilacBaseUrl, vlxxBaseUrl, viet69BaseUrl, xnhauBaseUrl, qmhBaseUrl, heoavBaseUrl, phe69BaseUrl, yumeiBaseUrl, socoliveBaseUrl, gavangBaseUrl, veboBaseUrl });
     if (saved) {
       xoilacScraper.clearCache();
       socoliveScraper.clearCache();
@@ -902,6 +906,8 @@ app.post("/api/config", authService.requireAuth, (req, res) => {
       viet69Scraper.clearCache();
       xnhauScraper.clearCache();
       qmhScraper.clearCache();
+      heoavScraper.clearCache();
+      phe69Scraper.clearCache();
       yumeiScraper.clearCache();
       logoCache.clear();
       vlxxPosterCache.clear();
@@ -1127,6 +1133,40 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
       }
       const $ = cheerio.load(response.data);
       const items = $(".item-video, .clip-link");
+      return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
+    } else if (type === "heoav") {
+      const response = await axios.get(cleanUrl + "/phim-moi/", {
+        headers: {
+          "User-Agent": heoavScraper.USER_AGENT,
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $("article.thumb-block, article.video-preview-item");
+      return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
+    } else if (type === "phe69") {
+      const response = await axios.get(cleanUrl + "/", {
+        headers: {
+          "User-Agent": phe69Scraper.USER_AGENT,
+        },
+        timeout: 8000,
+        maxRedirects: 5,
+      });
+      if (response.request && response.request.res && response.request.res.responseUrl) {
+        try {
+          const fo = new URL(response.request.res.responseUrl).origin;
+          if (fo !== new URL(cleanUrl).origin) finalOrigin = fo;
+        } catch (e) {}
+      }
+      const $ = cheerio.load(response.data);
+      const items = $("article.thumb-block, article.loop-video, article.video-preview-item");
       return res.json({ success: true, count: items.length || 1, redirectedUrl: finalOrigin });
     } else if (type === "yumei") {
       const response = await axios.get(cleanUrl + "/thu-vien", {
@@ -1603,6 +1643,8 @@ app.use("/vlxx", getRouter(vlxxAddon));
 app.use("/viet69", getRouter(viet69Addon));
 app.use("/xnhau", getRouter(xnhauAddon));
 app.use("/qmh", getRouter(qmhAddon));
+app.use("/heoav", getRouter(heoavAddon));
+app.use("/phe69", getRouter(phe69Addon));
 app.use("/xoilac", getRouter(xoilacAddon));
 app.use("/socolive", getRouter(socoliveAddon));
 app.use("/yumei", getRouter(yumeiAddon));
@@ -1642,6 +1684,32 @@ app.get("/thumb/qmh/:id.jpg", async (req, res) => {
   try {
     const rawId = req.params.id;
     const info = await qmhScraper.getVideoInfo(rawId);
+    if (info && info.poster) {
+      return res.redirect(info.poster);
+    }
+    return res.status(404).send("Not found");
+  } catch (e) {
+    return res.status(404).send("Not found");
+  }
+});
+
+app.get("/thumb/heoav/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const info = await heoavScraper.getVideoInfo(rawId);
+    if (info && info.poster) {
+      return res.redirect(info.poster);
+    }
+    return res.status(404).send("Not found");
+  } catch (e) {
+    return res.status(404).send("Not found");
+  }
+});
+
+app.get("/thumb/phe69/:id.jpg", async (req, res) => {
+  try {
+    const rawId = req.params.id;
+    const info = await phe69Scraper.getVideoInfo(rawId);
     if (info && info.poster) {
       return res.redirect(info.poster);
     }
@@ -1738,11 +1806,16 @@ app.get("/seg", async (req, res) => {
       return res.status(400).send("Missing segment URL");
     }
 
+    const segHeaders = {
+      "User-Agent": vlxxScraper.USER_AGENT,
+    };
+    if (req.query.r) {
+      segHeaders["Referer"] = req.query.r;
+    }
+
     const segRes = await axios.get(targetUrl, {
       responseType: "arraybuffer",
-      headers: {
-        "User-Agent": vlxxScraper.USER_AGENT,
-      },
+      headers: segHeaders,
       timeout: 15000,
     });
 
@@ -1877,6 +1950,131 @@ app.get(["/qmh/hls/:id/:server/master.m3u8", "/qmh/hls/:id/master.m3u8"], async 
   }
 });
 
+app.get(["/heoav/hls/:id/:server/master.m3u8", "/heoav/hls/:id/master.m3u8"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const manifestInfo = await heoavScraper.getRawManifestUrl(id);
+    if (!manifestInfo || !manifestInfo.url) {
+      return res.status(404).send("Stream manifest not found");
+    }
+
+    const rawUrl = manifestInfo.url;
+    const referer = manifestInfo.referer || (heoavScraper.getBaseUrl() + "/");
+
+    const manifestRes = await axios.get(rawUrl, {
+      headers: {
+        "Referer": referer,
+        "User-Agent": heoavScraper.USER_AGENT,
+      },
+      timeout: 12000,
+    });
+
+    const manifestText = typeof manifestRes.data === "string" ? manifestRes.data : String(manifestRes.data || "");
+    if (!manifestText.includes("#EXTM3U")) {
+      return res.status(404).send("Invalid HLS manifest");
+    }
+
+    const host = process.env.BASE_HOST || "https://" + req.get("host");
+    const lines = manifestText.split(/\r?\n/);
+    const rewritten = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      let segUrl = trimmed;
+      try {
+        segUrl = new URL(trimmed, rawUrl).toString();
+      } catch (e) {}
+      return host + "/seg?u=" + encodeURIComponent(segUrl) + "&r=" + encodeURIComponent(referer);
+    }).join("\n");
+
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Accel-Buffering", "no");
+    return res.send(rewritten);
+  } catch (err) {
+    console.error("Error generating HeoAV HLS manifest:", err.message);
+    return res.status(500).send("Error loading playlist");
+  }
+});
+
+app.get(["/phe69/hls/:id/:server/master.m3u8", "/phe69/hls/:id/master.m3u8"], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const manifestInfo = await phe69Scraper.getRawManifestUrl(id);
+    if (!manifestInfo || !manifestInfo.url) {
+      return res.status(404).send("Stream manifest not found");
+    }
+
+    let rawUrl = manifestInfo.url;
+    if (!rawUrl.includes(".m3u8")) {
+      return res.redirect(rawUrl);
+    }
+
+    const referer = manifestInfo.referer || (phe69Scraper.getBaseUrl() + "/");
+    const fetchManifest = async (url) => {
+      const r = await axios.get(url, {
+        headers: {
+          "Referer": referer,
+          "User-Agent": phe69Scraper.USER_AGENT,
+        },
+        timeout: 12000,
+      });
+      return typeof r.data === "string" ? r.data : String(r.data || "");
+    };
+
+    let manifestText = await fetchManifest(rawUrl);
+    if (!manifestText.includes("#EXTM3U")) {
+      return res.status(404).send("Invalid HLS manifest");
+    }
+
+    // If master playlist contains variants, resolve the highest-bandwidth media playlist
+    if (manifestText.includes("#EXT-X-STREAM-INF")) {
+      const rawLines = manifestText.split(/\r?\n/);
+      let bestUrl = null;
+      let bestBw = -1;
+      for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i].trim();
+        if (line.startsWith("#EXT-X-STREAM-INF")) {
+          const bwMatch = line.match(/BANDWIDTH=(\d+)/i);
+          const bw = bwMatch ? parseInt(bwMatch[1], 10) : 0;
+          const nextLine = (rawLines[i + 1] || "").trim();
+          if (nextLine && !nextLine.startsWith("#") && bw >= bestBw) {
+            bestBw = bw;
+            try {
+              bestUrl = new URL(nextLine, rawUrl).toString();
+            } catch (e) {
+              bestUrl = nextLine;
+            }
+          }
+        }
+      }
+      if (bestUrl) {
+        rawUrl = bestUrl;
+        manifestText = await fetchManifest(rawUrl);
+      }
+    }
+
+    const host = process.env.BASE_HOST || "https://" + req.get("host");
+    const lines = manifestText.split(/\r?\n/);
+    const rewritten = lines.map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return line;
+      let segUrl = trimmed;
+      try {
+        segUrl = new URL(trimmed, rawUrl).toString();
+      } catch (e) {}
+      return host + "/seg?u=" + encodeURIComponent(segUrl) + "&r=" + encodeURIComponent(referer);
+    }).join("\n");
+
+    res.setHeader("Content-Type", "application/vnd.apple.mpegurl");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.setHeader("X-Accel-Buffering", "no");
+    return res.send(rewritten);
+  } catch (err) {
+    console.error("Error generating Phe69 HLS manifest:", err.message);
+    return res.status(500).send("Error loading playlist");
+  }
+});
+
 app.listen(PORT, "0.0.0.0", () => {
   console.log("\n======================================================");
   console.log("🚀 Stremio Addon Server running on port " + PORT);
@@ -1887,6 +2085,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log("👉 Viet69 Only:     http://localhost:" + PORT + "/viet69/manifest.json");
   console.log("👉 xNhau Only:      http://localhost:" + PORT + "/xnhau/manifest.json");
   console.log("👉 QMH Only:        http://localhost:" + PORT + "/qmh/manifest.json");
+  console.log("👉 HeoAV Only:      http://localhost:" + PORT + "/heoav/manifest.json");
+  console.log("👉 Phe69 Only:      http://localhost:" + PORT + "/phe69/manifest.json");
   console.log("👉 Combo Tất Cả:    http://localhost:" + PORT + "/manifest.json");
   console.log("======================================================\n");
 });

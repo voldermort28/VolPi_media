@@ -451,6 +451,102 @@ class ApiService {
   }
 
   // =========================================================================
+  // 3.4 HEOAV / KHO PHIM RIÊNG TƯ MỚI (TAB HEOAV)
+  // =========================================================================
+
+  Future<List<MovieModel>> getHeoavCatalog({String? searchQuery, int skip = 0, String? genre}) async {
+    String url = skip > 0
+        ? '$baseUrl/heoav/catalog/movie/heoav-catalog/skip=$skip.json'
+        : '$baseUrl/heoav/catalog/movie/heoav-catalog.json';
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/heoav/catalog/movie/heoav-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/heoav/catalog/movie/heoav-catalog/search=$encoded.json';
+    } else if (genre != null && genre.isNotEmpty && genre != 'Tất cả') {
+      final encodedGenre = Uri.encodeComponent(genre);
+      url = skip > 0
+          ? '$baseUrl/heoav/catalog/movie/heoav-catalog/genre=$encodedGenre&skip=$skip.json'
+          : '$baseUrl/heoav/catalog/movie/heoav-catalog/genre=$encodedGenre.json';
+    }
+
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data['metas'] != null) {
+          final List list = data['metas'];
+          return list.map((item) => MovieModel.fromJson(item)).toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  /// Get HLS stream URLs for HeoAV
+  List<StreamChannel> getHeoavStreams(String rawId) {
+    final cleanId = rawId.replaceFirst('heoav:', '');
+    return [
+      StreamChannel(
+        name: 'HeoAV',
+        title: 'Server #1 (Full HD M3U8 - Không quảng cáo)',
+        url: '$baseUrl/heoav/hls/$cleanId/master.m3u8',
+        headers: {},
+      ),
+    ];
+  }
+
+  // =========================================================================
+  // 3.5 PHE69 / KHO PHIM RIÊNG TƯ MỚI (TAB PHE69)
+  // =========================================================================
+
+  Future<List<MovieModel>> getPhe69Catalog({String? searchQuery, int skip = 0, String? genre}) async {
+    String url = skip > 0
+        ? '$baseUrl/phe69/catalog/movie/phe69-catalog/skip=$skip.json'
+        : '$baseUrl/phe69/catalog/movie/phe69-catalog.json';
+    if (searchQuery != null && searchQuery.trim().isNotEmpty) {
+      final encoded = Uri.encodeComponent(searchQuery.trim());
+      url = skip > 0
+          ? '$baseUrl/phe69/catalog/movie/phe69-catalog/search=$encoded&skip=$skip.json'
+          : '$baseUrl/phe69/catalog/movie/phe69-catalog/search=$encoded.json';
+    } else if (genre != null && genre.isNotEmpty && genre != 'Tất cả') {
+      final encodedGenre = Uri.encodeComponent(genre);
+      url = skip > 0
+          ? '$baseUrl/phe69/catalog/movie/phe69-catalog/genre=$encodedGenre&skip=$skip.json'
+          : '$baseUrl/phe69/catalog/movie/phe69-catalog/genre=$encodedGenre.json';
+    }
+
+    try {
+      final res = await _client.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      if (res.statusCode == 200) {
+        final data = json.decode(utf8.decode(res.bodyBytes));
+        if (data['metas'] != null) {
+          final List list = data['metas'];
+          return list.map((item) => MovieModel.fromJson(item)).toList();
+        }
+      }
+    } catch (e) {
+      // Log error
+    }
+    return [];
+  }
+
+  /// Get HLS stream URLs for Phe69
+  List<StreamChannel> getPhe69Streams(String rawId) {
+    final cleanId = rawId.replaceFirst('phe69:', '');
+    return [
+      StreamChannel(
+        name: 'Phe69',
+        title: 'Server #1 (Full HD M3U8 - Không quảng cáo)',
+        url: '$baseUrl/phe69/hls/$cleanId/master.m3u8',
+        headers: {},
+      ),
+    ];
+  }
+
+  // =========================================================================
   // 4. IPTV / TRUYỀN HÌNH TRỰC TUYẾN
   // =========================================================================
 

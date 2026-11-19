@@ -37,7 +37,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
-  // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: QMH, Tab 4: Google Drive, Tab 5: Telegram Phim, Tab 6: Yêu thích
+  // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: QMH, Tab 4: HeoAV, Tab 5: Phe69, Tab 6: Google Drive, Tab 7: Telegram Phim, Tab 8: Yêu thích
   int _selectedSourceIndex = 0;
   String _selectedGenre = 'Tất cả';
 
@@ -45,9 +45,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final GlobalKey<TelegramScreenState> _telegramKey = GlobalKey<TelegramScreenState>();
 
   int get _contentStackIndex {
-    if (_selectedSourceIndex < 4) return 0;
-    if (_selectedSourceIndex == 4) return 1;
-    if (_selectedSourceIndex == 5) return 2;
+    if (_selectedSourceIndex < 6) return 0;
+    if (_selectedSourceIndex == 6) return 1;
+    if (_selectedSourceIndex == 7) return 2;
     return 3;
   }
 
@@ -114,11 +114,48 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     'XVIDEOS',
   ];
 
+  final List<String> _heoavGenres = const [
+    'Tất cả',
+    'Hot Tuần',
+    'Xem nhiều',
+    'Thích nhiều',
+    'Điểm cao',
+    'Decen/LTX',
+    'Không che',
+    'Vietsub',
+    'Nữ sinh',
+    'Gái xinh',
+    'Loạn luân',
+    'Vú to',
+    'Lén lút',
+    'Threesome',
+    'Bố dượng',
+    'Thuốc kích dục',
+  ];
+
+  final List<String> _phe69Genres = const [
+    'Tất cả',
+    'Việt Nam',
+    'Phim mới',
+    'Sinh viên',
+    'Không che',
+    'Mình dây',
+    'Check hàng',
+    'Doggy',
+    'Gái dâm',
+    'Camera',
+    'BDSM',
+    'Máy bay',
+    'JAV HD',
+  ];
+
   List<String> _getCurrentGenres() {
     if (_selectedSourceIndex == 0) return _vlxxGenres;
     if (_selectedSourceIndex == 1) return _viet69Genres;
     if (_selectedSourceIndex == 2) return _xnhauGenres;
     if (_selectedSourceIndex == 3) return _qmhGenres;
+    if (_selectedSourceIndex == 4) return _heoavGenres;
+    if (_selectedSourceIndex == 5) return _phe69Genres;
     return const [];
   }
 
@@ -127,6 +164,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     if (_selectedSourceIndex == 1) return const Color(0xFFEA580C);
     if (_selectedSourceIndex == 2) return const Color(0xFFEC4899);
     if (_selectedSourceIndex == 3) return const Color(0xFF8B5CF6);
+    if (_selectedSourceIndex == 4) return const Color(0xFF10B981);
+    if (_selectedSourceIndex == 5) return const Color(0xFFF59E0B);
     return const Color(0xFF38BDF8);
   }
 
@@ -187,7 +226,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   Future<void> _loadMovies({String? search}) async {
-    if (_selectedSourceIndex >= 4) {
+    if (_selectedSourceIndex >= 6) {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -233,6 +272,20 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         skip: 0,
         genre: _selectedGenre,
       );
+    } else if (_selectedSourceIndex == 4) {
+      // HeoAV
+      results = await widget.apiService.getHeoavCatalog(
+        searchQuery: search,
+        skip: 0,
+        genre: _selectedGenre,
+      );
+    } else if (_selectedSourceIndex == 5) {
+      // Phe69
+      results = await widget.apiService.getPhe69Catalog(
+        searchQuery: search,
+        skip: 0,
+        genre: _selectedGenre,
+      );
     }
 
     if (mounted) {
@@ -247,7 +300,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   Future<void> _loadMoreMovies() async {
-    if (_selectedSourceIndex >= 4) return;
+    if (_selectedSourceIndex >= 6) return;
     if (_isLoadingMore || !_hasMore) return;
 
     setState(() {
@@ -278,6 +331,18 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       );
     } else if (_selectedSourceIndex == 3) {
       nextResults = await widget.apiService.getQmhCatalog(
+        searchQuery: _searchQuery,
+        skip: currentSkip,
+        genre: _selectedGenre,
+      );
+    } else if (_selectedSourceIndex == 4) {
+      nextResults = await widget.apiService.getHeoavCatalog(
+        searchQuery: _searchQuery,
+        skip: currentSkip,
+        genre: _selectedGenre,
+      );
+    } else if (_selectedSourceIndex == 5) {
+      nextResults = await widget.apiService.getPhe69Catalog(
         searchQuery: _searchQuery,
         skip: currentSkip,
         genre: _selectedGenre,
@@ -313,9 +378,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _searchController.clear();
       _searchQuery = null;
     });
-    if (index < 4) {
+    if (index < 6) {
       _loadMovies();
-    } else if (index == 6) {
+    } else if (index == 8) {
       _loadSecretData();
     }
   }
@@ -354,18 +419,24 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     }
 
     final String cleanId = id.replaceFirst('movie:', '');
+    final bool isPhe69 = cleanId.startsWith('phe69:');
+    final bool isHeoav = cleanId.startsWith('heoav:');
     final bool isQmh = cleanId.startsWith('qmh:');
     final bool isXnhau = cleanId.startsWith('xnhau:');
     final bool isViet69 = cleanId.startsWith('viet69:');
-    final String rawId = cleanId.replaceFirst('qmh:', '').replaceFirst('xnhau:', '').replaceFirst('viet69:', '').replaceFirst('vlxx:', '');
+    final String rawId = cleanId.replaceFirst('phe69:', '').replaceFirst('heoav:', '').replaceFirst('qmh:', '').replaceFirst('xnhau:', '').replaceFirst('viet69:', '').replaceFirst('vlxx:', '');
 
-    final List<StreamChannel> servers = isQmh
-        ? widget.apiService.getQmhStreams(rawId)
-        : (isXnhau
-            ? widget.apiService.getXnhauStreams(rawId)
-            : (isViet69
-                ? widget.apiService.getViet69Streams(rawId)
-                : widget.apiService.getVlxxStreams(rawId)));
+    final List<StreamChannel> servers = isPhe69
+        ? widget.apiService.getPhe69Streams(rawId)
+        : (isHeoav
+            ? widget.apiService.getHeoavStreams(rawId)
+            : (isQmh
+                ? widget.apiService.getQmhStreams(rawId)
+                : (isXnhau
+                    ? widget.apiService.getXnhauStreams(rawId)
+                    : (isViet69
+                        ? widget.apiService.getViet69Streams(rawId)
+                        : widget.apiService.getVlxxStreams(rawId)))));
 
     if (servers.isEmpty) {
       if (streamUrl != null && streamUrl.isNotEmpty) {
@@ -510,16 +581,22 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       }
     }
 
+    final bool isPhe69 = _selectedSourceIndex == 5 || movie.id.startsWith('phe69:');
+    final bool isHeoav = _selectedSourceIndex == 4 || movie.id.startsWith('heoav:');
     final bool isQmh = _selectedSourceIndex == 3 || movie.id.startsWith('qmh:');
     final bool isXnhau = _selectedSourceIndex == 2 || movie.id.startsWith('xnhau:');
     final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
-    final List<StreamChannel> servers = isQmh
-        ? widget.apiService.getQmhStreams(movie.rawId)
-        : (isXnhau
-            ? widget.apiService.getXnhauStreams(movie.rawId)
-            : (isViet69
-                ? widget.apiService.getViet69Streams(movie.rawId)
-                : widget.apiService.getVlxxStreams(movie.rawId)));
+    final List<StreamChannel> servers = isPhe69
+        ? widget.apiService.getPhe69Streams(movie.rawId)
+        : (isHeoav
+            ? widget.apiService.getHeoavStreams(movie.rawId)
+            : (isQmh
+                ? widget.apiService.getQmhStreams(movie.rawId)
+                : (isXnhau
+                    ? widget.apiService.getXnhauStreams(movie.rawId)
+                    : (isViet69
+                        ? widget.apiService.getViet69Streams(movie.rawId)
+                        : widget.apiService.getVlxxStreams(movie.rawId)))));
 
     if (servers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -565,17 +642,21 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final themeColor = _selectedSourceIndex == 6
+    final themeColor = _selectedSourceIndex == 8
         ? const Color(0xFFE11D48)
-        : (_selectedSourceIndex == 5
+        : (_selectedSourceIndex == 7
             ? const Color(0xFF0EA5E9)
-            : (_selectedSourceIndex == 4
+            : (_selectedSourceIndex == 6
                 ? const Color(0xFF0284C7)
-                : (_selectedSourceIndex == 3
-                    ? const Color(0xFF8B5CF6)
-                    : (_selectedSourceIndex == 2
-                        ? const Color(0xFFEC4899)
-                        : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E))))));
+                : (_selectedSourceIndex == 5
+                    ? const Color(0xFFF59E0B)
+                    : (_selectedSourceIndex == 4
+                        ? const Color(0xFF10B981)
+                        : (_selectedSourceIndex == 3
+                            ? const Color(0xFF8B5CF6)
+                            : (_selectedSourceIndex == 2
+                                ? const Color(0xFFEC4899)
+                                : (_selectedSourceIndex == 1 ? const Color(0xFFEA580C) : const Color(0xFFF43F5E))))))));
 
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 900;
@@ -622,7 +703,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    if (_isSearching && _selectedSourceIndex < 4) ...[
+                    if (_isSearching && _selectedSourceIndex < 6) ...[
                       Expanded(
                         child: Container(
                           height: 38,
@@ -642,13 +723,17 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                   focusNode: _searchFocusNode,
                                   style: const TextStyle(color: Colors.white, fontSize: 13),
                                   decoration: InputDecoration(
-                                    hintText: _selectedSourceIndex == 3
-                                        ? 'Tìm phim QMH...'
-                                        : (_selectedSourceIndex == 2
-                                            ? 'Tìm clip xNhau...'
-                                            : (_selectedSourceIndex == 1
-                                                ? 'Tìm clip Viet69...'
-                                                : 'Tìm phim VLFilm...')),
+                                    hintText: _selectedSourceIndex == 5
+                                        ? 'Tìm phim Phe69...'
+                                        : (_selectedSourceIndex == 4
+                                            ? 'Tìm phim HeoAV...'
+                                            : (_selectedSourceIndex == 3
+                                                ? 'Tìm phim QMH...'
+                                                : (_selectedSourceIndex == 2
+                                                    ? 'Tìm clip xNhau...'
+                                                    : (_selectedSourceIndex == 1
+                                                        ? 'Tìm clip Viet69...'
+                                                        : 'Tìm phim VLFilm...')))),
                                     hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                                     border: InputBorder.none,
                                     isDense: true,
@@ -683,7 +768,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         ),
                       ),
                     ] else ...[
-                      if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 4) ...[
+                      if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 6) ...[
                         Expanded(
                           child: Row(
                             children: [
@@ -713,8 +798,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         ),
                       ],
                       const SizedBox(width: 6),
-                      // Search Toggle Button (Tabs 0, 1, 2, 3)
-                      if (_selectedSourceIndex < 4) ...[
+                      // Search Toggle Button (Tabs 0, 1, 2, 3, 4, 5)
+                      if (_selectedSourceIndex < 6) ...[
                         TvFocusableCard(
                           onTap: () {
                             setState(() {
@@ -810,7 +895,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                     ),
 
                     const SizedBox(width: 12),
-                    if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 4) ...[
+                    if (_searchQuery != null && _searchQuery!.isNotEmpty && _selectedSourceIndex < 6) ...[
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 220),
                         child: Text(
@@ -822,8 +907,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                       const SizedBox(width: 8),
                     ],
 
-                    // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2, 3)
-                    if (_selectedSourceIndex < 4) ...[
+                    // Search toggle button or search input (Only for adult catalog tabs 0, 1, 2, 3, 4, 5)
+                    if (_selectedSourceIndex < 6) ...[
                       if (_isSearching)
                         Expanded(
                           flex: 3,
@@ -846,13 +931,17 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                     focusNode: _searchFocusNode,
                                     style: const TextStyle(color: Colors.white, fontSize: 13),
                                     decoration: InputDecoration(
-                                      hintText: _selectedSourceIndex == 3
-                                          ? 'Tìm phim QMH (Việt Nam, Gái xinh, Học sinh...)'
-                                          : (_selectedSourceIndex == 2
-                                              ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
-                                              : (_selectedSourceIndex == 1
-                                                  ? 'Nhập từ khóa clip, sinh viên, teen...'
-                                                  : 'Nhập từ khóa, mã phim...')),
+                                      hintText: _selectedSourceIndex == 5
+                                          ? 'Tìm phim Phe69 (Việt Nam, Sinh viên, JAV HD...)'
+                                          : (_selectedSourceIndex == 4
+                                              ? 'Tìm phim HeoAV (mã phim, diễn viên, Vietsub...)'
+                                              : (_selectedSourceIndex == 3
+                                                  ? 'Tìm phim QMH (Việt Nam, Gái xinh, Học sinh...)'
+                                                  : (_selectedSourceIndex == 2
+                                                      ? 'Tìm clip xNhau (Việt Nam, Tự quay, Gái xinh...)'
+                                                      : (_selectedSourceIndex == 1
+                                                          ? 'Nhập từ khóa clip, sinh viên, teen...'
+                                                          : 'Nhập từ khóa, mã phim...')))),
                                       hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                                       border: InputBorder.none,
                                       isDense: true,
@@ -918,8 +1007,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
               ),
             ],
 
-            // Category Bar / Dropdown (Visible when VLFilm, Viet69, xNhau or QMH tab is active & not in search mode)
-            if (_selectedSourceIndex < 4 && (_searchQuery == null || _searchQuery!.isEmpty))
+            // Category Bar / Dropdown (Visible when VLFilm, Viet69, xNhau, QMH, HeoAV or Phe69 tab is active & not in search mode)
+            if (_selectedSourceIndex < 6 && (_searchQuery == null || _searchQuery!.isEmpty))
               Builder(
                 builder: (context) {
                   final genres = _getCurrentGenres();
@@ -1116,7 +1205,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                               _buildSectionTitle(
                                                 '❤️ PHIM YÊU THÍCH',
                                                 count: '${_secretFavorites.length}',
-                                                onSeeAll: () => _switchSource(6),
+                                                onSeeAll: () => _switchSource(8),
                                               ),
                                               SizedBox(
                                                 height: 180,
@@ -1166,13 +1255,17 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                       if (_searchQuery == null || _searchQuery!.isEmpty)
                                         SliverToBoxAdapter(
                                           child: _buildSectionTitle(
-                                            _selectedSourceIndex == 3
-                                                ? '💜 DANH SÁCH QMH'
-                                                : (_selectedSourceIndex == 2
-                                                    ? '⚡ DANH SÁCH XNHAU'
-                                                    : (_selectedSourceIndex == 1
-                                                        ? '🔥 DANH SÁCH VIET69'
-                                                        : '🎬 DANH SÁCH VLFILM')),
+                                            _selectedSourceIndex == 5
+                                                ? '🌟 DANH SÁCH PHE69'
+                                                : (_selectedSourceIndex == 4
+                                                    ? '💎 DANH SÁCH HEOAV'
+                                                    : (_selectedSourceIndex == 3
+                                                        ? '💜 DANH SÁCH QMH'
+                                                        : (_selectedSourceIndex == 2
+                                                            ? '⚡ DANH SÁCH XNHAU'
+                                                            : (_selectedSourceIndex == 1
+                                                                ? '🔥 DANH SÁCH VIET69'
+                                                                : '🎬 DANH SÁCH VLFILM')))),
                                           ),
                                         ),
 
@@ -1755,20 +1848,34 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
           const SizedBox(width: 3),
           _buildSourceTab(
             index: 4,
+            label: 'HeoAV',
+            icon: Icons.hd_rounded,
+            activeColor: const Color(0xFF10B981),
+          ),
+          const SizedBox(width: 3),
+          _buildSourceTab(
+            index: 5,
+            label: 'Phe69',
+            icon: Icons.whatshot_rounded,
+            activeColor: const Color(0xFFF59E0B),
+          ),
+          const SizedBox(width: 3),
+          _buildSourceTab(
+            index: 6,
             label: 'GDrive',
             icon: Icons.cloud_circle_rounded,
             activeColor: const Color(0xFF0284C7),
           ),
           const SizedBox(width: 3),
           _buildSourceTab(
-            index: 5,
+            index: 7,
             label: 'Telegram',
             icon: Icons.send_rounded,
             activeColor: const Color(0xFF0EA5E9),
           ),
           const SizedBox(width: 3),
           _buildSourceTab(
-            index: 6,
+            index: 8,
             label: _secretFavorites.isNotEmpty ? 'Yêu thích (${_secretFavorites.length})' : 'Yêu thích',
             icon: Icons.favorite_rounded,
             activeColor: const Color(0xFFE11D48),

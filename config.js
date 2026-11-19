@@ -12,6 +12,8 @@ const DEFAULT_CONFIG = {
   viet69BaseUrl: "https://viet69.be",
   xnhauBaseUrl: "https://xnhau.pink",
   qmhBaseUrl: "https://qmhphimsex.com",
+  heoavBaseUrl: "https://heoav.com",
+  phe69BaseUrl: "https://phe69.shop",
   yumeiBaseUrl: "https://yumei-anime.com",
   autoCleanCache: true,
 };
@@ -25,6 +27,8 @@ const URL_KEYS = [
   "viet69BaseUrl",
   "xnhauBaseUrl",
   "qmhBaseUrl",
+  "heoavBaseUrl",
+  "phe69BaseUrl",
   "yumeiBaseUrl",
 ];
 

@@ -350,6 +350,78 @@
           </div>
         </div>
 
+        <!-- HeoAV Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-emerald-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">💎</span>
+              <span>HeoAV Stream</span>
+            </div>
+            <span id="heoav-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-heoav-domain" value="https://heoav.com" placeholder="https://heoav.com" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setHeoavDomain('https://heoav.com')" class="text-[11px] bg-slate-800 hover:bg-emerald-600/30 hover:border-emerald-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                heoav.com ⭐
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('heoav')" id="btn-test-heoav" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Phe69 Domain Box -->
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-amber-500">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 font-bold text-white">
+              <span class="text-lg">🌟</span>
+              <span>Phe69 Stream</span>
+            </div>
+            <span id="phe69-status-badge" class="text-xs px-2 py-0.5 rounded font-medium bg-slate-800 text-slate-400 border border-slate-700">Chưa test</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-slate-300 mb-1.5">Tên miền hiện tại / Mới:</label>
+            <div class="relative">
+              <input type="text" id="input-phe69-domain" value="https://phe69.shop" placeholder="https://phe69.shop" 
+                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition font-mono">
+            </div>
+          </div>
+
+          <!-- Presets -->
+          <div>
+            <span class="text-xs text-slate-400 block mb-1.5">Domain gợi ý:</span>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onclick="setPhe69Domain('https://phe69.shop')" class="text-[11px] bg-slate-800 hover:bg-amber-600/30 hover:border-amber-500 text-slate-300 hover:text-white px-2.5 py-1 rounded-md border border-slate-700 transition cursor-pointer">
+                phe69.shop ⭐
+              </button>
+            </div>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="testDomain('phe69')" id="btn-test-phe69" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-semibold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Kiểm tra</span>
+            </button>
+          </div>
+        </div>
+
         <!-- Socolive Domain Box -->
         <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-emerald-500">
           <div class="flex items-center justify-between">
@@ -838,6 +910,18 @@
       }
     }
 
+    function setHeoavDomain(url) {
+      if (document.getElementById('input-heoav-domain')) {
+        document.getElementById('input-heoav-domain').value = url;
+      }
+    }
+
+    function setPhe69Domain(url) {
+      if (document.getElementById('input-phe69-domain')) {
+        document.getElementById('input-phe69-domain').value = url;
+      }
+    }
+
     async function fetchStatus(showNotification) {
       try {
         const res = await fetch('/api/status');
@@ -867,6 +951,12 @@
           }
           if (document.getElementById('input-xnhau-domain') && data.config.xnhauBaseUrl) {
             document.getElementById('input-xnhau-domain').value = data.config.xnhauBaseUrl;
+          }
+          if (document.getElementById('input-heoav-domain') && data.config.heoavBaseUrl) {
+            document.getElementById('input-heoav-domain').value = data.config.heoavBaseUrl;
+          }
+          if (document.getElementById('input-phe69-domain') && data.config.phe69BaseUrl) {
+            document.getElementById('input-phe69-domain').value = data.config.phe69BaseUrl;
           }
         }
 
@@ -915,6 +1005,14 @@
         inputEl = document.getElementById('input-xnhau-domain');
         badgeEl = document.getElementById('xnhau-status-badge');
         btnEl = document.getElementById('btn-test-xnhau');
+      } else if (type === 'heoav') {
+        inputEl = document.getElementById('input-heoav-domain');
+        badgeEl = document.getElementById('heoav-status-badge');
+        btnEl = document.getElementById('btn-test-heoav');
+      } else if (type === 'phe69') {
+        inputEl = document.getElementById('input-phe69-domain');
+        badgeEl = document.getElementById('phe69-status-badge');
+        btnEl = document.getElementById('btn-test-phe69');
       } else {
         inputEl = document.getElementById('input-vlxx-domain');
         badgeEl = document.getElementById('vlxx-status-badge');
@@ -973,6 +1071,8 @@
       const vlxxBaseUrl = document.getElementById('input-vlxx-domain').value.trim();
       const viet69BaseUrl = document.getElementById('input-viet69-domain') ? document.getElementById('input-viet69-domain').value.trim() : '';
       const xnhauBaseUrl = document.getElementById('input-xnhau-domain') ? document.getElementById('input-xnhau-domain').value.trim() : '';
+      const heoavBaseUrl = document.getElementById('input-heoav-domain') ? document.getElementById('input-heoav-domain').value.trim() : '';
+      const phe69BaseUrl = document.getElementById('input-phe69-domain') ? document.getElementById('input-phe69-domain').value.trim() : '';
       const saveBtn = document.getElementById('btn-save-config');
 
       saveBtn.disabled = true;
@@ -991,6 +1091,8 @@
             vlxxBaseUrl: vlxxBaseUrl,
             viet69BaseUrl: viet69BaseUrl,
             xnhauBaseUrl: xnhauBaseUrl,
+            heoavBaseUrl: heoavBaseUrl,
+            phe69BaseUrl: phe69BaseUrl,
           }),
         });
         const data = await res.json();
