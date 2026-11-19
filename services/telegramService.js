@@ -7,9 +7,9 @@ const { StringSession } = require('telegram/sessions');
 const CONFIG_PATH = path.join(__dirname, '..', 'telegram_config.json');
 const CACHE_FILE_PATH = path.join(__dirname, '..', 'telegram_cache.json');
 
-// Memory Cache with 30-minute TTL for channel video lists
+// Memory Cache with 12-hour TTL for channel video lists
 const channelCache = new Map();
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 function loadDiskCache() {
   try {
@@ -591,14 +591,29 @@ async function resolveChannelEntity(client, channelIdentifier) {
       resolved = await client.getEntity(new Api.PeerChannel({ channelId: BigInt(rawId) }));
     } catch (_) {
       try {
-        resolved = await client.getInputEntity(BigInt(idStr));
+        // If not found in session entity cache, load dialogs to populate GramJS entity access_hash cache
+        await client.getDialogs({ limit: 100 });
+        resolved = await client.getEntity(new Api.PeerChannel({ channelId: BigInt(rawId) }));
       } catch (__) {
-        resolved = await client.getEntity(BigInt(idStr));
+        try {
+          resolved = await client.getInputEntity(BigInt(idStr));
+        } catch (___) {
+          resolved = await client.getEntity(BigInt(idStr));
+        }
       }
     }
   } else {
     // If username @...
-    resolved = await client.getEntity(idStr);
+    try {
+      resolved = await client.getEntity(idStr);
+    } catch (_) {
+      try {
+        await client.getDialogs({ limit: 100 });
+        resolved = await client.getEntity(idStr);
+      } catch (__) {
+        resolved = await client.getEntity(idStr);
+      }
+    }
   }
 
   if (resolved) {
@@ -616,7 +631,7 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 
   let fullResult = null;
 
-  // Check cache
+  // Check cache (memory or loaded from disk)
   if (!forceRefresh && channelCache.has(cacheKey)) {
     const entry = channelCache.get(cacheKey);
     if (Date.now() - entry.time < CACHE_TTL_MS && entry.data && entry.data.videos && entry.data.videos.length > 0) {
@@ -625,127 +640,152 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
   }
 
   if (!fullResult) {
-    const client = await getClient();
-    const entity = await resolveChannelEntity(client, channelId);
-
-    const channelTitle = entity.title || entity.username || channelId;
-
-    // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
-    const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
-
-    // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
-    const messages = await client.getMessages(entity, {
-      limit: targetLimit,
-      waitTime: 0.05,
-    });
-
-    const videos = [];
-
-    for (const msg of messages) {
-      if (!msg.media) continue;
-
-      const media = msg.media;
-      let document = null;
-
-      if (media.document) {
-        document = media.document;
-      }
-
-      if (!document) continue;
-
-      // Check if video by mimeType or extension
-      const mimeType = document.mimeType || '';
-      let fileName = '';
-      let duration = 0;
-      let width = 0;
-      let height = 0;
-      let isVideo = mimeType.startsWith('video/');
-
-      if (document.attributes) {
-        for (const attr of document.attributes) {
-          if (attr.className === 'DocumentAttributeFilename') {
-            fileName = attr.fileName || '';
-          }
-          if (attr.className === 'DocumentAttributeVideo') {
-            isVideo = true;
-            duration = attr.duration || 0;
-            width = attr.w || 0;
-            height = attr.h || 0;
-          }
-        }
-      }
-
-      // Check file extension
-      const lowerName = fileName.toLowerCase();
-      if (!isVideo) {
-        if (
-          lowerName.endsWith('.mp4') ||
-          lowerName.endsWith('.mkv') ||
-          lowerName.endsWith('.webm') ||
-          lowerName.endsWith('.avi') ||
-          lowerName.endsWith('.ts') ||
-          lowerName.endsWith('.mov') ||
-          lowerName.endsWith('.m4v') ||
-          lowerName.endsWith('.flv') ||
-          lowerName.endsWith('.wmv') ||
-          lowerName.endsWith('.3gp')
-        ) {
-          isVideo = true;
-        }
-      }
-
-      if (!isVideo) continue;
-
-      // Use message caption or file name as movie title
-      let title = (msg.message || '').split('\n')[0].trim();
-      if (!title || title.length > 120 || title.startsWith('http')) {
-        title = fileName || 'Video';
-      }
-
-      const size = parseInt(document.size || 0, 10);
-      const hasThumb = !!(document.thumbs && document.thumbs.length > 0);
-
-      videos.push({
-        id: msg.id,
-        channelId,
-        title,
-        fileName,
-        caption: msg.message || '',
-        size,
-        formattedSize: formatBytes(size),
-        duration,
-        formattedDuration: formatDuration(duration),
-        width,
-        height,
-        mimeType: mimeType || 'video/mp4',
-        thumbnailUrl: hasThumb ? `/api/telegram/thumb/${encodeURIComponent(channelId)}/${msg.id}` : null,
-        date: msg.date ? msg.date * 1000 : Date.now(),
-      });
-    }
-
-    fullResult = {
-      channelId,
-      channelTitle,
-      videos,
-      total: videos.length,
-      timestamp: Date.now(),
-    };
-
-    channelCache.set(cacheKey, { time: Date.now(), data: fullResult });
-    saveDiskCache();
-
-    // Also sync source lastCount in config
     try {
-      const cfg = loadConfig();
-      const src = (cfg.sources || []).find((s) => s.channelId === channelId);
-      if (src) {
-        src.lastCount = videos.length;
-        if (channelTitle && (!src.name || src.name === channelId)) {
-          src.name = channelTitle;
+      const client = await getClient();
+      const entity = await resolveChannelEntity(client, channelId);
+
+      const channelTitle = entity.title || entity.username || channelId;
+
+      // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
+      const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
+
+      // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
+      const messages = await client.getMessages(entity, {
+        limit: targetLimit,
+        waitTime: 0.05,
+      });
+
+      const videos = [];
+
+      for (const msg of messages) {
+        if (!msg.media) continue;
+
+        const media = msg.media;
+        let document = null;
+
+        if (media.document) {
+          document = media.document;
         }
-        saveConfig(cfg);
+
+        if (!document) continue;
+
+        // Check if video by mimeType or extension
+        const mimeType = document.mimeType || '';
+        let fileName = '';
+        let duration = 0;
+        let width = 0;
+        let height = 0;
+        let isVideo = mimeType.startsWith('video/');
+
+        if (document.attributes) {
+          for (const attr of document.attributes) {
+            if (attr.className === 'DocumentAttributeFilename') {
+              fileName = attr.fileName || '';
+            }
+            if (attr.className === 'DocumentAttributeVideo') {
+              isVideo = true;
+              duration = attr.duration || 0;
+              width = attr.w || 0;
+              height = attr.h || 0;
+            }
+          }
+        }
+
+        // Check file extension
+        const lowerName = fileName.toLowerCase();
+        if (!isVideo) {
+          if (
+            lowerName.endsWith('.mp4') ||
+            lowerName.endsWith('.mkv') ||
+            lowerName.endsWith('.webm') ||
+            lowerName.endsWith('.avi') ||
+            lowerName.endsWith('.ts') ||
+            lowerName.endsWith('.mov') ||
+            lowerName.endsWith('.m4v') ||
+            lowerName.endsWith('.flv') ||
+            lowerName.endsWith('.wmv') ||
+            lowerName.endsWith('.3gp')
+          ) {
+            isVideo = true;
+          }
+        }
+
+        if (!isVideo) continue;
+
+        // Use message caption or file name as movie title
+        let title = (msg.message || '').split('\n')[0].trim();
+        if (!title || title.length > 120 || title.startsWith('http')) {
+          title = fileName || 'Video';
+        }
+
+        const size = parseInt(document.size || 0, 10);
+        const hasThumb = !!(document.thumbs && document.thumbs.length > 0);
+
+        videos.push({
+          id: msg.id,
+          channelId,
+          title,
+          fileName,
+          caption: msg.message || '',
+          size,
+          formattedSize: formatBytes(size),
+          duration,
+          formattedDuration: formatDuration(duration),
+          width,
+          height,
+          mimeType: mimeType || 'video/mp4',
+          thumbnailUrl: hasThumb ? `/api/telegram/thumb/${encodeURIComponent(channelId)}/${msg.id}` : null,
+          date: msg.date ? msg.date * 1000 : Date.now(),
+        });
       }
-    } catch (_) {}
+
+      fullResult = {
+        channelId,
+        channelTitle,
+        videos,
+        total: videos.length,
+        timestamp: Date.now(),
+      };
+
+      channelCache.set(cacheKey, { time: Date.now(), data: fullResult });
+      saveDiskCache();
+
+      // Also sync source lastCount in config
+      try {
+        const cfg = loadConfig();
+        const src = (cfg.sources || []).find((s) => s.channelId === channelId);
+        if (src) {
+          src.lastCount = videos.length;
+          if (channelTitle && (!src.name || src.name === channelId)) {
+            src.name = channelTitle;
+          }
+          saveConfig(cfg);
+        }
+      } catch (_) {}
+    } catch (scanErr) {
+      console.error(`[TelegramService] Live scan failed for ${channelId}:`, scanErr.message);
+
+      if (scanErr.message && scanErr.message.includes('AUTH_KEY_UNREGISTERED')) {
+        try {
+          const cfg = loadConfig();
+          cfg.auth.connected = false;
+          saveConfig(cfg);
+        } catch (_) {}
+      }
+
+      // Resilient Fallback: If live scan failed (e.g. session expired, network error), serve existing cache!
+      if (channelCache.has(cacheKey)) {
+        const entry = channelCache.get(cacheKey);
+        if (entry && entry.data && Array.isArray(entry.data.videos) && entry.data.videos.length > 0) {
+          console.warn(`[TelegramService] Fallback to cached videos for ${channelId} (${entry.data.videos.length} videos)`);
+          fullResult = entry.data;
+        }
+      }
+
+      if (!fullResult) {
+        throw scanErr;
+      }
+    }
   }
 
   // Filter by search if provided
@@ -896,6 +936,18 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
     }
   } catch (err) {
     console.error(`[TelegramStream] Error streaming msg ${msgId} in ${channelId}:`, err.message);
+    if (err.message && err.message.includes('AUTH_KEY_UNREGISTERED')) {
+      try {
+        const cfg = loadConfig();
+        cfg.auth.connected = false;
+        saveConfig(cfg);
+      } catch (_) {}
+      if (!res.headersSent) {
+        return res.status(401).json({
+          error: 'Phiên đăng nhập Telegram đã hết hạn. Vui lòng vào trang quản trị https://stremio.laboon.vn/telegram để đăng nhập lại.'
+        });
+      }
+    }
     if (!res.headersSent) {
       res.status(500).json({ error: 'Lỗi phát video từ Telegram', details: err.message });
     } else {
