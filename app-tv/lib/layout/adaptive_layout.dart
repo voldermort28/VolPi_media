@@ -42,8 +42,10 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
     super.initState();
     PlayerSettingsService.instance.uiChangeNotifier.addListener(_onUiChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkOtaUpdate(silent: true);
-      SyncService.init(widget.apiService.baseUrl);
+      if (!PlayerSettingsService.instance.useNetflixUI) {
+        _checkOtaUpdate(silent: true);
+        SyncService.init(widget.apiService.baseUrl);
+      }
     });
   }
 
@@ -64,7 +66,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
       final updateInfo = await UpdateService.checkForUpdate();
       if (!mounted) return;
       if (updateInfo != null && updateInfo.hasUpdate) {
-        UpdateDialog.show(context, updateInfo);
+        UpdateDialog.show(context, updateInfo, isManual: !silent);
       } else if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

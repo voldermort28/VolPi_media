@@ -70,7 +70,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       final updateInfo = await UpdateService.checkForUpdate();
       if (!mounted) return;
       if (updateInfo != null && updateInfo.hasUpdate) {
-        UpdateDialog.show(context, updateInfo);
+        UpdateDialog.show(context, updateInfo, isManual: !silent);
       } else if (!silent) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

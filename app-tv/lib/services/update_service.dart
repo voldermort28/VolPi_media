@@ -11,6 +11,17 @@ import '../models/update_model.dart';
 class UpdateService {
   static const String _defaultApiHost = 'https://stremio.laboon.vn';
   static const String _fallbackGitHubApi = 'https://api.github.com/repos/voldermort28/VolPi_media/releases/latest';
+  static http.Client? _activeDownloadClient;
+  static bool _isDownloadCancelled = false;
+
+  /// Hủy tiến trình tải APK đang chạy (khi người dùng bấm Bỏ qua / Hủy)
+  static void cancelActiveDownload() {
+    _isDownloadCancelled = true;
+    try {
+      _activeDownloadClient?.close();
+    } catch (_) {}
+    _activeDownloadClient = null;
+  }
 
   /// Dọn dẹp file APK cài đặt còn sót lại trong cache để giải phóng bộ nhớ TV
   static Future<void> cleanupStaleApk() async {
@@ -70,6 +81,7 @@ class UpdateService {
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
   }) async {
+    _isDownloadCancelled = false;
     try {
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/VolPi-Media-Update.apk';
@@ -80,12 +92,14 @@ class UpdateService {
       }
 
       final client = http.Client();
+      _activeDownloadClient = client;
       final request = http.Request('GET', Uri.parse(downloadUrl));
       final response = await client.send(request);
 
       if (response.statusCode != 200) {
         debugPrint('Download APK HTTP status error: ${response.statusCode}');
         client.close();
+        _activeDownloadClient = null;
         return false;
       }
 
@@ -95,6 +109,9 @@ class UpdateService {
 
       try {
         await for (final chunk in response.stream) {
+          if (_isDownloadCancelled) {
+            break;
+          }
           sink.add(chunk);
           receivedBytes += chunk.length;
           if (totalBytes > 0) {
@@ -106,6 +123,18 @@ class UpdateService {
         await sink.flush();
         await sink.close();
         client.close();
+        if (_activeDownloadClient == client) {
+          _activeDownloadClient = null;
+        }
+      }
+
+      if (_isDownloadCancelled) {
+        if (await file.exists()) {
+          try {
+            await file.delete();
+          } catch (_) {}
+        }
+        return false;
       }
 
       if (totalBytes > 0 && receivedBytes < totalBytes) {

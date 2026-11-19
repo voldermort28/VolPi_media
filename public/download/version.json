@@ -1,10 +1,10 @@
 {
-  "version": "2.2.47",
-  "build": 113,
-  "tag_name": "v2.2.47",
-  "changelog": "• VolPi Media v2.2.47:\n- Bổ sung tab QMH (nguồn qmhphimsex.com) vào Kho Phim riêng tư với đầy đủ danh mục, tìm kiếm và phát HLS trực tiếp không quảng cáo.",
+  "version": "2.2.50",
+  "build": 116,
+  "tag_name": "v2.2.50",
+  "changelog": "• VolPi Media v2.2.50:\n- Nâng cấp Bảng Thông Báo Cập Nhật (OTA): Bổ sung nút 'Bỏ qua' (hoặc 'Hủy & Bỏ qua' khi đang tải) và nút đóng (✕) ở góc trên, tự động đóng bảng thông báo ngay khi trình cài đặt mở lên hoặc khi bấm Cancel/Back.\n- Khắc phục triệt để lỗi bảng cập nhật bị hiện chồng 2 lớp khiến bấm tắt 1 lần không biến mất.\n- Chuẩn điều khiển D-Pad kiểu YouTube TV và sửa lỗi nút Back trong trình phát video.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-16T07:05:00Z"
+  "published_at": "2026-11-19T05:51:00Z"
 }
