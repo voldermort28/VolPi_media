@@ -1,10 +1,10 @@
 {
-  "version": "2.2.51",
-  "build": 117,
-  "tag_name": "v2.2.51",
-  "changelog": "• VolPi Media v2.2.51:\n- Bổ sung tab HeoAV (heoav.com) và tab Phe69 (phe69.shop) vào Kho Phim riêng tư với đầy đủ danh mục, tìm kiếm, lịch sử xem gần đây, yêu thích và phát HLS trực tiếp không quảng cáo.",
+  "version": "2.2.52",
+  "build": 118,
+  "tag_name": "v2.2.52",
+  "changelog": "• VolPi Media v2.2.52:\n- Sửa triệt để lỗi văng ứng dụng (crash) sau 1-2 giây khi mở trên Android TV do AudioServiceActivity / ForegroundService và quá tải RAM lúc khởi tạo đồng thời 6 tab.\n- Nạp tab thông minh (Lazy Tab Mounting) giúp mở app trên Android TV nhẹ, mượt và không ngốn bộ nhớ.\n- Bổ sung tab HeoAV và Phe69 vào Kho Phim riêng tư.",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-19T06:16:00Z"
+  "published_at": "2026-11-22T00:30:00Z"
 }

@@ -27,7 +27,8 @@ class AdaptiveLayout extends StatefulWidget {
 }
 
 class _AdaptiveLayoutState extends State<AdaptiveLayout> {
-  int _currentTabIndex = 0; // 0: Football, 1: Anime
+  int _currentTabIndex = 0; // 0: Football, 1: Aggregate, 2: Anime, 3: IPTV, 4: Music
+  final Set<int> _loadedTabs = {0};
 
   final GlobalKey<FootballScreenState> _xoilacKey = GlobalKey<FootballScreenState>();
   final GlobalKey<FootballAggregateScreenState> _footballAggregateKey = GlobalKey<FootballAggregateScreenState>();
@@ -340,57 +341,70 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
 
             // Tab Content
             Expanded(
-              child: IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  ExcludeFocus(
-                    excluding: _currentTabIndex != 0,
-                    child: FootballScreen(
-                      key: _xoilacKey,
-                      apiService: widget.apiService,
-                      source: 'xoilac',
-                      title: 'Xôi Lạc TV',
-                      isActive: _currentTabIndex == 0,
-                    ),
-                  ),
-                  ExcludeFocus(
-                    excluding: _currentTabIndex != 1,
-                    child: FootballAggregateScreen(
-                      key: _footballAggregateKey,
-                      apiService: widget.apiService,
-                      title: 'Tổng Hợp Bóng Đá',
-                      isActive: _currentTabIndex == 1,
-                    ),
-                  ),
-                  ExcludeFocus(
-                    excluding: _currentTabIndex != 2,
-                    child: AnimeScreen(
-                      key: _animeKey,
-                      apiService: widget.apiService,
-                    ),
-                  ),
-                  ExcludeFocus(
-                    excluding: _currentTabIndex != 3,
-                    child: IptvScreen(
-                      key: _iptvKey,
-                      apiService: widget.apiService,
-                      isActive: _currentTabIndex == 3,
-                    ),
-                  ),
-                  ExcludeFocus(
-                    excluding: _currentTabIndex != 4,
-                    child: MusicScreen(
-                      key: _musicKey,
-                      apiService: widget.apiService,
-                      isActive: _currentTabIndex == 4,
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildLazyIndexedStack(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildLazyIndexedStack() {
+    _loadedTabs.add(_currentTabIndex);
+    return IndexedStack(
+      index: _currentTabIndex,
+      children: [
+        ExcludeFocus(
+          excluding: _currentTabIndex != 0,
+          child: FootballScreen(
+            key: _xoilacKey,
+            apiService: widget.apiService,
+            source: 'xoilac',
+            title: 'Xôi Lạc TV',
+            isActive: _currentTabIndex == 0,
+          ),
+        ),
+        ExcludeFocus(
+          excluding: _currentTabIndex != 1,
+          child: _loadedTabs.contains(1)
+              ? FootballAggregateScreen(
+                  key: _footballAggregateKey,
+                  apiService: widget.apiService,
+                  title: 'Tổng Hợp Bóng Đá',
+                  isActive: _currentTabIndex == 1,
+                )
+              : const SizedBox.shrink(),
+        ),
+        ExcludeFocus(
+          excluding: _currentTabIndex != 2,
+          child: _loadedTabs.contains(2)
+              ? AnimeScreen(
+                  key: _animeKey,
+                  apiService: widget.apiService,
+                )
+              : const SizedBox.shrink(),
+        ),
+        ExcludeFocus(
+          excluding: _currentTabIndex != 3,
+          child: _loadedTabs.contains(3)
+              ? IptvScreen(
+                  key: _iptvKey,
+                  apiService: widget.apiService,
+                  isActive: _currentTabIndex == 3,
+                )
+              : const SizedBox.shrink(),
+        ),
+        ExcludeFocus(
+          excluding: _currentTabIndex != 4,
+          child: _loadedTabs.contains(4)
+              ? MusicScreen(
+                  key: _musicKey,
+                  apiService: widget.apiService,
+                  isActive: _currentTabIndex == 4,
+                )
+              : const SizedBox.shrink(),
+        ),
+      ],
     );
   }
 
@@ -491,53 +505,7 @@ class _AdaptiveLayoutState extends State<AdaptiveLayout> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentTabIndex,
-        children: [
-          ExcludeFocus(
-            excluding: _currentTabIndex != 0,
-            child: FootballScreen(
-              key: _xoilacKey,
-              apiService: widget.apiService,
-              source: 'xoilac',
-              title: 'Xôi Lạc TV',
-              isActive: _currentTabIndex == 0,
-            ),
-          ),
-          ExcludeFocus(
-            excluding: _currentTabIndex != 1,
-            child: FootballAggregateScreen(
-              key: _footballAggregateKey,
-              apiService: widget.apiService,
-              title: 'Tổng Hợp Bóng Đá',
-              isActive: _currentTabIndex == 1,
-            ),
-          ),
-          ExcludeFocus(
-            excluding: _currentTabIndex != 2,
-            child: AnimeScreen(
-              key: _animeKey,
-              apiService: widget.apiService,
-            ),
-          ),
-          ExcludeFocus(
-            excluding: _currentTabIndex != 3,
-            child: IptvScreen(
-              key: _iptvKey,
-              apiService: widget.apiService,
-              isActive: _currentTabIndex == 3,
-            ),
-          ),
-          ExcludeFocus(
-            excluding: _currentTabIndex != 4,
-            child: MusicScreen(
-              key: _musicKey,
-              apiService: widget.apiService,
-              isActive: _currentTabIndex == 4,
-            ),
-          ),
-        ],
-      ),
+      body: _buildLazyIndexedStack(),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 1.5)),

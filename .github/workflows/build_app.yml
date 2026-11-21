@@ -79,9 +79,9 @@ jobs:
           cat << 'EOF' > android/app/src/main/kotlin/com/volpi/volpi_media/MainActivity.kt
           package com.volpi.volpi_media
 
-          import com.ryanheise.audioservice.AudioServiceActivity
+          import io.flutter.embedding.android.FlutterActivity
 
-          class MainActivity: AudioServiceActivity()
+          class MainActivity: FlutterActivity()
           EOF
           mkdir -p android/app/src/main/res
           cp -r /tmp/android_res_backup/* android/app/src/main/res/ 2>/dev/null || true

@@ -44,9 +44,23 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   String? _errorMessage;
 
   final ScrollController _scrollController = ScrollController();
-  final FocusNode _firstHomeCardFocusNode = FocusNode();
-  FocusNode get firstCardFocusNode => _firstHomeCardFocusNode;
-  FocusNode get billboardPlayFocusNode => _firstHomeCardFocusNode;
+  final FocusNode _firstContinueFocusNode = FocusNode();
+  final FocusNode _firstFavoritesFocusNode = FocusNode();
+  final FocusNode _firstLiveFocusNode = FocusNode();
+  final FocusNode _firstVietnamFocusNode = FocusNode();
+  final FocusNode _firstMajorFocusNode = FocusNode();
+  final FocusNode _firstOtherMatchFocusNode = FocusNode();
+
+  FocusNode get firstCardFocusNode {
+    if (_continueWatching.isNotEmpty) return _firstContinueFocusNode;
+    if (_favorites.isNotEmpty) return _firstFavoritesFocusNode;
+    if (_liveMatches.isNotEmpty) return _firstLiveFocusNode;
+    if (_vietnamMatches.isNotEmpty) return _firstVietnamFocusNode;
+    if (_majorMatches.isNotEmpty) return _firstMajorFocusNode;
+    return _firstOtherMatchFocusNode;
+  }
+
+  FocusNode get billboardPlayFocusNode => firstCardFocusNode;
 
   @override
   void initState() {
@@ -61,7 +75,12 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryChanged);
     FavoritesService.instance.changeNotifier.removeListener(_onFavoritesChanged);
     _scrollController.dispose();
-    _firstHomeCardFocusNode.dispose();
+    _firstContinueFocusNode.dispose();
+    _firstFavoritesFocusNode.dispose();
+    _firstLiveFocusNode.dispose();
+    _firstVietnamFocusNode.dispose();
+    _firstMajorFocusNode.dispose();
+    _firstOtherMatchFocusNode.dispose();
     super.dispose();
   }
 
@@ -172,8 +191,8 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
 
       // Tự động focus thẻ nội dung đầu tiên trên Android TV khi tải xong dữ liệu
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _firstHomeCardFocusNode.canRequestFocus) {
-          _firstHomeCardFocusNode.requestFocus();
+        if (mounted && firstCardFocusNode.canRequestFocus) {
+          firstCardFocusNode.requestFocus();
         }
       });
     } catch (e) {
@@ -571,28 +590,28 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           // 1. CONTINUE WATCHING (🍿 TIẾP TỤC XEM)
           if (hasContinue) ...[
             _buildSectionTitle('🍿 TIẾP TỤC XEM CHO BẠN'),
-            _buildContinueWatchingRow(isFirstSection: true),
+            _buildContinueWatchingRow(),
             const SizedBox(height: 20),
           ],
 
           // 2. FAVORITES (❤️ DANH SÁCH YÊU THÍCH)
           if (hasFavorites) ...[
             _buildSectionTitle('❤️ DANH SÁCH YÊU THÍCH', onSeeAll: () => widget.onNavigateTab?.call(3)),
-            _buildFavoritesRow(isFirstSection: !hasContinue),
+            _buildFavoritesRow(),
             const SizedBox(height: 20),
           ],
 
           // 3. LIVE NOW MATCHES (🔴 ĐANG THI ĐẤU TRỰC TIẾP)
           if (hasLive) ...[
             _buildSectionTitle('🔴 ĐANG THI ĐẤU TRỰC TIẾP', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_liveMatches, isFirstSection: !hasContinue && !hasFavorites),
+            _buildMatchesRow(_liveMatches, firstNode: _firstLiveFocusNode),
             const SizedBox(height: 20),
           ],
 
           // 4. VIETNAM FOOTBALL (🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE)
           if (hasVietnam) ...[
             _buildSectionTitle('🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_vietnamMatches, isFirstSection: !hasContinue && !hasFavorites && !hasLive),
+            _buildMatchesRow(_vietnamMatches, firstNode: _firstVietnamFocusNode),
             const SizedBox(height: 20),
           ] else ...[
             _buildSectionTitle('🇻🇳 BÓNG ĐÁ VIỆT NAM & V-LEAGUE', onSeeAll: () => widget.onNavigateTab?.call(1)),
@@ -603,14 +622,14 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           // 5. SPOTLIGHT MATCHES (⭐ TRẬN CẦU TÂM ĐIỂM & GIẢI ĐẤU HÀNG ĐẦU)
           if (hasMajor) ...[
             _buildSectionTitle('⭐ TRẬN CẦU TÂM ĐIỂM & GIẢI HÀNG ĐẦU', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_majorMatches, isFirstSection: !hasContinue && !hasFavorites && !hasLive && !hasVietnam),
+            _buildMatchesRow(_majorMatches, firstNode: _firstMajorFocusNode),
             const SizedBox(height: 20),
           ],
 
           // 6. ALL MATCHES (⚽ CÁC TRẬN ĐẤU KHÁC)
           if (_matches.isNotEmpty) ...[
             _buildSectionTitle('⚽ CÁC TRẬN ĐẤU KHÁC HÔM NAY', onSeeAll: () => widget.onNavigateTab?.call(1)),
-            _buildMatchesRow(_matches.skip(3).take(10).toList(), isFirstSection: !hasContinue && !hasFavorites && !hasLive && !hasVietnam && !hasMajor),
+            _buildMatchesRow(_matches.skip(3).take(10).toList(), firstNode: _firstOtherMatchFocusNode),
             const SizedBox(height: 32),
           ],
         ],
@@ -716,7 +735,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // CONTINUE WATCHING HORIZONTAL ROW (16:9 ratio + Netflix Red Progress Bar)
   // =========================================================================
-  Widget _buildContinueWatchingRow({bool isFirstSection = false}) {
+  Widget _buildContinueWatchingRow() {
     return NetflixScrollableRow(
       height: 140,
       itemCount: _continueWatching.length,
@@ -724,7 +743,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           final item = _continueWatching[idx];
           return RepaintBoundary(
             child: TvFocusableCard(
-              focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
+              focusNode: idx == 0 ? _firstContinueFocusNode : null,
               onTap: () => _playContinueWatchingAtIndex(idx),
               onLongPress: () => _openContinueWatchingMenu(item),
               onSecondaryTap: () => _openContinueWatchingMenu(item),
@@ -840,7 +859,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // FAVORITES HORIZONTAL ROW (Poster Ratio)
   // =========================================================================
-  Widget _buildFavoritesRow({bool isFirstSection = false}) {
+  Widget _buildFavoritesRow() {
     return NetflixScrollableRow(
       height: 180,
       itemCount: _favorites.length,
@@ -848,7 +867,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         final item = _favorites[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
-            focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
+            focusNode: idx == 0 ? _firstFavoritesFocusNode : null,
             onTap: () => _onFavoriteItemTap(item),
             onLongPress: () => _openFavoritesMenu(item),
             onSecondaryTap: () => _openFavoritesMenu(item),
@@ -941,7 +960,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   // =========================================================================
   // MATCHES HORIZONTAL ROW (Netflix Card Style)
   // =========================================================================
-  Widget _buildMatchesRow(List<MatchModel> matches, {bool isFirstSection = false}) {
+  Widget _buildMatchesRow(List<MatchModel> matches, {FocusNode? firstNode}) {
     final bool isMobile = MediaQuery.of(context).size.width < 700;
     final double cardWidth = isMobile ? 195 : 250;
     final double rowHeight = isMobile ? 112 : 155;
@@ -953,7 +972,7 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
         final match = matches[idx];
         return RepaintBoundary(
           child: TvFocusableCard(
-            focusNode: (isFirstSection && idx == 0) ? _firstHomeCardFocusNode : null,
+            focusNode: idx == 0 ? firstNode : null,
             onTap: () => _onMatchSelected(match),
             borderRadius: BorderRadius.circular(6),
             scale: 1.05,

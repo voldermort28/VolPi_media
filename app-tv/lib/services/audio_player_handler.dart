@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,12 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   static Future<VolPiAudioHandler> _doInit() async {
     final handler = instance;
+    // Trên Android / Android TV: dùng trực tiếp just_audio + BaseAudioHandler trong RAM,
+    // không gọi AudioService.init để tránh crash ForegroundService / AudioServiceActivity trên Android TV.
+    if (!kIsWeb && Platform.isAndroid) {
+      _isInitialized = true;
+      return handler;
+    }
     try {
       await AudioService.init<VolPiAudioHandler>(
         builder: () => handler,
@@ -36,23 +43,30 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     return handler;
   }
 
-  final AudioPlayer _player = AudioPlayer();
+  AudioPlayer? _playerInstance;
   int _currentIndex = -1;
+
+  AudioPlayer get _player {
+    if (_playerInstance == null) {
+      final p = AudioPlayer();
+      _playerInstance = p;
+      _initStreams(p);
+    }
+    return _playerInstance!;
+  }
 
   AudioPlayer get player => _player;
   int get currentIndex => _currentIndex;
   Stream<double> get volumeStream => _player.volumeStream;
-  double get volume => _player.volume;
+  double get volume => _playerInstance?.volume ?? 1.0;
   Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0.0, 1.0));
 
-  VolPiAudioHandler._internal() {
-    _initStreams();
-  }
+  VolPiAudioHandler._internal();
 
-  void _initStreams() {
+  void _initStreams(AudioPlayer audioPlayer) {
     // 1. Broadcast playback state to OS (Lockscreen, Notification, Dynamic Island)
-    _player.playbackEventStream.listen((PlaybackEvent event) {
-      final playing = _player.playing;
+    audioPlayer.playbackEventStream.listen((PlaybackEvent event) {
+      final playing = audioPlayer.playing;
       playbackState.add(
         playbackState.value.copyWith(
           controls: [
@@ -73,25 +87,25 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
             ProcessingState.buffering: AudioProcessingState.buffering,
             ProcessingState.ready: AudioProcessingState.ready,
             ProcessingState.completed: AudioProcessingState.completed,
-          }[_player.processingState]!,
+          }[audioPlayer.processingState]!,
           playing: playing,
-          updatePosition: _player.position,
-          bufferedPosition: _player.bufferedPosition,
-          speed: _player.speed,
+          updatePosition: audioPlayer.position,
+          bufferedPosition: audioPlayer.bufferedPosition,
+          speed: audioPlayer.speed,
           queueIndex: _currentIndex,
         ),
       );
     });
 
     // 2. Broadcast duration updates
-    _player.durationStream.listen((duration) {
+    audioPlayer.durationStream.listen((duration) {
       if (duration != null && mediaItem.value != null) {
         mediaItem.add(mediaItem.value!.copyWith(duration: duration));
       }
     });
 
     // 2b. Broadcast live buffered position updates
-    _player.bufferedPositionStream.listen((buffered) {
+    audioPlayer.bufferedPositionStream.listen((buffered) {
       playbackState.add(
         playbackState.value.copyWith(
           bufferedPosition: buffered,
@@ -100,7 +114,7 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     });
 
     // 3. Auto-play next track when track completes
-    _player.playerStateStream.listen((state) {
+    audioPlayer.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         skipToNext();
       }
@@ -191,11 +205,11 @@ class VolPiAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> stop() async {
-    await _player.stop();
+    await _playerInstance?.stop();
     await super.stop();
   }
 
   void dispose() {
-    _player.dispose();
+    _playerInstance?.dispose();
   }
 }

@@ -31,6 +31,7 @@ class NetflixLayout extends StatefulWidget {
 class _NetflixLayoutState extends State<NetflixLayout> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _currentTabIndex = 0; // 0: Home, 1: Xoilac, 2: Tổng Hợp Bóng Đá, 3: Anime, 4: IPTV, 5: Nghe Nhạc
+  final Set<int> _loadedTabs = {0}; // Chỉ nạp trước Tab 0 lúc khởi động để tránh tràn RAM / CPU spike trên Android TV
 
   // Tab GlobalKeys to trigger reloads from Header bar
   final GlobalKey<NetflixHomeScreenState> _homeKey = GlobalKey<NetflixHomeScreenState>();
@@ -433,9 +434,10 @@ class _NetflixLayoutState extends State<NetflixLayout> {
   }
 
   // =========================================================================
-  // SHARED INDEXED TAB CONTENT
+  // SHARED INDEXED TAB CONTENT (LAZY MOUNTED TO PREVENT COLD-BOOT RAM SPIKE)
   // =========================================================================
   Widget _buildIndexedTabContent() {
+    _loadedTabs.add(_currentTabIndex);
     return IndexedStack(
       index: _currentTabIndex,
       children: [
@@ -447,6 +449,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
             apiService: widget.apiService,
             onNavigateTab: (tabIdx) {
               setState(() {
+                _loadedTabs.add(tabIdx);
                 _currentTabIndex = tabIdx;
               });
             },
@@ -456,58 +459,69 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         // Tab 1: Xôi Lạc TV
         ExcludeFocus(
           excluding: _currentTabIndex != 1,
-          child: FootballScreen(
-            key: _xoilacKey,
-            apiService: widget.apiService,
-            source: 'xoilac',
-            title: 'Xôi Lạc TV',
-            isActive: _currentTabIndex == 1,
-          ),
+          child: _loadedTabs.contains(1)
+              ? FootballScreen(
+                  key: _xoilacKey,
+                  apiService: widget.apiService,
+                  source: 'xoilac',
+                  title: 'Xôi Lạc TV',
+                  isActive: _currentTabIndex == 1,
+                )
+              : const SizedBox.shrink(),
         ),
 
         // Tab 2: Tổng Hợp Bóng Đá
         ExcludeFocus(
           excluding: _currentTabIndex != 2,
-          child: FootballAggregateScreen(
-            key: _footballAggregateKey,
-            apiService: widget.apiService,
-            title: 'Tổng Hợp Bóng Đá',
-            isActive: _currentTabIndex == 2,
-          ),
+          child: _loadedTabs.contains(2)
+              ? FootballAggregateScreen(
+                  key: _footballAggregateKey,
+                  apiService: widget.apiService,
+                  title: 'Tổng Hợp Bóng Đá',
+                  isActive: _currentTabIndex == 2,
+                )
+              : const SizedBox.shrink(),
         ),
 
         // Tab 3: Anime & Phim
         ExcludeFocus(
           excluding: _currentTabIndex != 3,
-          child: NetflixAnimeScreen(
-            key: _animeKey,
-            apiService: widget.apiService,
-            onNavigateTab: (tabIdx) {
-              setState(() {
-                _currentTabIndex = tabIdx;
-              });
-            },
-          ),
+          child: _loadedTabs.contains(3)
+              ? NetflixAnimeScreen(
+                  key: _animeKey,
+                  apiService: widget.apiService,
+                  onNavigateTab: (tabIdx) {
+                    setState(() {
+                      _loadedTabs.add(tabIdx);
+                      _currentTabIndex = tabIdx;
+                    });
+                  },
+                )
+              : const SizedBox.shrink(),
         ),
 
         // Tab 4: Truyền Hình (IPTV)
         ExcludeFocus(
           excluding: _currentTabIndex != 4,
-          child: IptvScreen(
-            key: _iptvKey,
-            apiService: widget.apiService,
-            isActive: _currentTabIndex == 4,
-          ),
+          child: _loadedTabs.contains(4)
+              ? IptvScreen(
+                  key: _iptvKey,
+                  apiService: widget.apiService,
+                  isActive: _currentTabIndex == 4,
+                )
+              : const SizedBox.shrink(),
         ),
 
         // Tab 5: Nghe Nhạc
         ExcludeFocus(
           excluding: _currentTabIndex != 5,
-          child: MusicScreen(
-            key: _musicKey,
-            apiService: widget.apiService,
-            isActive: _currentTabIndex == 5,
-          ),
+          child: _loadedTabs.contains(5)
+              ? MusicScreen(
+                  key: _musicKey,
+                  apiService: widget.apiService,
+                  isActive: _currentTabIndex == 5,
+                )
+              : const SizedBox.shrink(),
         ),
       ],
     );
