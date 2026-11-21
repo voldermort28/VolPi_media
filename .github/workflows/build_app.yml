@@ -67,11 +67,11 @@ jobs:
 
       - name: Scaffold Platform Wrapper
         working-directory: app-tv
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           cp pubspec.yaml /tmp/pubspec.yaml || true
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest.xml || true
-          cp android/volpi_release.keystore /tmp/volpi_release.keystore || true
-          cp android/key.properties /tmp/key.properties || true
           mkdir -p /tmp/android_res_backup
           cp -r android/app/src/main/res/* /tmp/android_res_backup/ 2>/dev/null || true
           flutter create . --platforms=android --org=com.volpi --project-name=volpi_media
@@ -87,29 +87,33 @@ jobs:
           cp -r /tmp/android_res_backup/* android/app/src/main/res/ 2>/dev/null || true
           cp /tmp/AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
           cp /tmp/pubspec.yaml pubspec.yaml || true
-          cp /tmp/volpi_release.keystore android/volpi_release.keystore || true
-          cp /tmp/volpi_release.keystore android/app/volpi_release.keystore || true
-          cp /tmp/key.properties android/key.properties || true
-          cp /tmp/key.properties android/app/key.properties || true
+
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/volpi_release.keystore
+            cp android/volpi_release.keystore android/app/volpi_release.keystore
+          else
+            echo "::error::Missing ANDROID_KEYSTORE_BASE64 secret!"
+            exit 1
+          fi
 
           sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/build.gradle || true
           sed -i 's|mavenCentral()|mavenCentral()\n        maven { url "https://repo1.maven.org/maven2/" }\n        maven { url "https://plugins.gradle.org/m2/" }|g' android/settings.gradle || true
 
-          # Apply permanent release signing configuration for consistent APK signatures across CI runs
+          # Apply permanent release signing configuration from GitHub Encrypted Secrets
           cat << 'EOF' > android/app/signing.gradle
           android {
               signingConfigs {
                   release {
                       storeFile file("${project.rootDir}/volpi_release.keystore")
-                      storePassword "volpimedia2026"
-                      keyAlias "volpi_key"
-                      keyPassword "volpimedia2026"
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "volpi_key"
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
                   }
                   debug {
                       storeFile file("${project.rootDir}/volpi_release.keystore")
-                      storePassword "volpimedia2026"
-                      keyAlias "volpi_key"
-                      keyPassword "volpimedia2026"
+                      storePassword System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias System.getenv("ANDROID_KEY_ALIAS") ?: "volpi_key"
+                      keyPassword System.getenv("ANDROID_KEY_PASSWORD")
                   }
               }
               buildTypes {
@@ -130,6 +134,10 @@ jobs:
 
       - name: Build Release APK
         working-directory: app-tv
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
         run: flutter build apk --release || (echo "Retrying flutter build apk with verbose logs..." && flutter build apk --release -v)
 
       - name: Prepare Release APK with Version
@@ -167,7 +175,7 @@ jobs:
             - 📺 **Giao diện Android TV (10-foot UI)**: Điều hướng 100% bằng remote D-pad, hiệu ứng phóng to 1.06x và viền phát quang xanh neon.
             - ⚽ **Bóng Đá Trực Tiếp (Xôi Lạc)**: Tự động refresh khi vào tab, hỗ trợ chọn BLV trực tiếp trong player.
             - 🍿 **Anime & Phim lẻ**: Tốc độ phát nhanh, phụ đề và lồng tiếng đầy đủ.
-            - 🔒 **Profile Bí Mật (Zero-Trace)**: Nút Profile góc trên, mã PIN bí mật `3105` mở kho phim riêng tư, tự động xóa sạch dữ liệu khỏi RAM khi thoát.
+            - 🔒 **Profile Riêng Tư**: Bảo vệ bằng mã PIN bảo mật cục bộ.
 
             ### 📥 Hướng dẫn cài đặt trên Android TV / Google TV / Android Phone:
             1. Tải file **`VolPi-Media-${{ env.RELEASE_TAG }}.apk`** bên dưới.
@@ -181,11 +189,15 @@ jobs:
 
       - name: Deploy APK to VPS OTA Server
         continue-on-error: true
+        env:
+          VPS_OTA_TOKEN: ${{ secrets.VPS_OTA_TOKEN }}
         run: |
           echo "Deploying APK to VPS OTA server..."
-          curl -f --retry 3 --max-time 180 -X POST -H "Content-Type: application/octet-stream" \
+          curl -f --retry 3 --max-time 180 -X POST \
+            -H "Content-Type: application/octet-stream" \
+            -H "X-Deploy-Token: ${VPS_OTA_TOKEN}" \
             --data-binary "@app-tv/build/app/outputs/flutter-apk/VolPi-Media-AndroidTV.apk" \
-            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-AndroidTV.apk&version=${{ env.CLEAN_VERSION }}&token=volpi_ota_deploy_secret_9988" || true
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-AndroidTV.apk&version=${{ env.CLEAN_VERSION }}" || true
 
   build-ios:
     name: Build iOS No-Codesign Payload
@@ -279,11 +291,15 @@ jobs:
 
       - name: Deploy IPA to VPS OTA Server
         continue-on-error: true
+        env:
+          VPS_OTA_TOKEN: ${{ secrets.VPS_OTA_TOKEN }}
         run: |
           echo "Deploying IPA to VPS OTA server..."
-          curl -f --retry 3 --max-time 180 -X POST -H "Content-Type: application/octet-stream" \
+          curl -f --retry 3 --max-time 180 -X POST \
+            -H "Content-Type: application/octet-stream" \
+            -H "X-Deploy-Token: ${VPS_OTA_TOKEN}" \
             --data-binary "@app-tv/VolPi-Media-iOS.ipa" \
-            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.CLEAN_VERSION }}&token=volpi_ota_deploy_secret_9988" || true
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-iOS.ipa&version=${{ env.CLEAN_VERSION }}" || true
 
   build-macos:
     name: Build macOS Desktop App (.app / .zip)
@@ -388,8 +404,12 @@ jobs:
 
       - name: Deploy macOS Zip to VPS OTA Server
         continue-on-error: true
+        env:
+          VPS_OTA_TOKEN: ${{ secrets.VPS_OTA_TOKEN }}
         run: |
           echo "Deploying macOS Zip to VPS OTA server..."
-          curl -f --retry 3 --max-time 180 -X POST -H "Content-Type: application/octet-stream" \
+          curl -f --retry 3 --max-time 180 -X POST \
+            -H "Content-Type: application/octet-stream" \
+            -H "X-Deploy-Token: ${VPS_OTA_TOKEN}" \
             --data-binary "@app-tv/VolPi-Media-macOS.zip" \
-            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-macOS.zip&version=${{ env.RELEASE_TAG }}&token=volpi_ota_deploy_secret_9988" || true
+            "https://stremio.laboon.vn/api/upload-release?filename=VolPi-Media-macOS.zip&version=${{ env.RELEASE_TAG }}" || true

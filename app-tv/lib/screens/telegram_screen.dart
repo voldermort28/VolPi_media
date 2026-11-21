@@ -38,6 +38,7 @@ class TelegramScreenState extends State<TelegramScreen> {
   static const int _pageSize = 40;
   int _displayLimit = _pageSize;
   bool _isLoadingMore = false;
+  int _loadRequestId = 0;
 
   FocusNode get firstCardFocusNode => _firstCardFocusNode;
 
@@ -147,6 +148,7 @@ class TelegramScreenState extends State<TelegramScreen> {
 
   Future<void> _loadVideos(String channelId, {bool forceRefresh = false}) async {
     if (!mounted) return;
+    final int reqId = ++_loadRequestId;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -155,7 +157,7 @@ class TelegramScreenState extends State<TelegramScreen> {
 
     try {
       final result = await widget.apiService.getTelegramVideos(channelId, forceRefresh: forceRefresh);
-      if (!mounted) return;
+      if (!mounted || reqId != _loadRequestId) return;
 
       if (result != null) {
         setState(() {
@@ -170,7 +172,7 @@ class TelegramScreenState extends State<TelegramScreen> {
         });
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || reqId != _loadRequestId) return;
       setState(() {
         _isLoading = false;
         _errorMessage = 'Lỗi truy cập kênh Telegram: $e';
@@ -178,37 +180,46 @@ class TelegramScreenState extends State<TelegramScreen> {
     }
   }
 
-  void _playVideo(TelegramVideoModel video) {
-    final streamUrl = widget.apiService.getTelegramStreamUrl(video.channelId, video.id);
-    final posterUrl = video.thumbnailUrl != null
-        ? '${widget.apiService.baseUrl}${video.thumbnailUrl}'
-        : '';
-    final currentIndex = _videos.indexWhere((v) => v.id == video.id);
+  String _resolveThumbUrl(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    return '${widget.apiService.baseUrl}$raw';
+  }
 
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => VideoPlayerScreen(
-          streamUrl: streamUrl,
-          title: video.title,
-          subtitle: _selectedSource?.name ?? 'Telegram Phim',
-          mediaId: 'telegram_${video.channelId}_${video.id}',
-          mediaCategory: 'secret',
-          mediaPoster: posterUrl,
-          onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex + 1]);
-                }
-              : null,
-          onPrevious: (currentIndex > 0)
-              ? () {
-                  Navigator.of(context).pop();
-                  _playVideo(_videos[currentIndex - 1]);
-                }
-              : null,
-        ),
+  void _playVideo(
+    TelegramVideoModel video, {
+    List<TelegramVideoModel>? playlist,
+    BuildContext? replaceContext,
+  }) {
+    final streamUrl = widget.apiService.getTelegramStreamUrl(video.channelId, video.id);
+    final posterUrl = _resolveThumbUrl(video.thumbnailUrl);
+    final list = playlist ?? _getFilteredVideos();
+    final currentIndex = list.indexWhere((v) => v.id == video.id);
+
+    final playerRoute = MaterialPageRoute(
+      builder: (playerCtx) => VideoPlayerScreen(
+        streamUrl: streamUrl,
+        title: video.title,
+        subtitle: _selectedSource?.name ?? 'Telegram Phim',
+        mediaId: 'telegram_${video.channelId}_${video.id}',
+        mediaCategory: 'secret',
+        mediaPoster: posterUrl,
+        onNext: (currentIndex != -1 && currentIndex < list.length - 1)
+            ? () => _playVideo(list[currentIndex + 1], playlist: list, replaceContext: playerCtx)
+            : null,
+        onPrevious: (currentIndex > 0)
+            ? () => _playVideo(list[currentIndex - 1], playlist: list, replaceContext: playerCtx)
+            : null,
       ),
     );
+
+    if (replaceContext != null) {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
+      Navigator.of(context).push(playerRoute);
+    }
   }
 
   void _showSourceSelectionDialog() {
@@ -559,11 +570,13 @@ class TelegramScreenState extends State<TelegramScreen> {
               (ctx, index) {
                 final video = displayedVideos[index];
                 final isFirst = index == 0;
-                // Proactively trigger next page as user nears the bottom of the current batch
-                if (index >= displayedCount - 6) {
-                  _loadMoreVideos();
+                // Proactively trigger next page AFTER current build frame (fixes setState-during-build crash)
+                if (index >= displayedCount - 6 && !_isLoadingMore && _displayLimit < filteredVideos.length) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _loadMoreVideos();
+                  });
                 }
-                return _buildMovieCard(video, isFirst: isFirst);
+                return _buildMovieCard(video, filteredVideos, isFirst: isFirst);
               },
               childCount: displayedCount,
             ),
@@ -615,14 +628,12 @@ class TelegramScreenState extends State<TelegramScreen> {
     return const SizedBox(height: 16);
   }
 
-  Widget _buildMovieCard(TelegramVideoModel video, {bool isFirst = false}) {
-    final posterUrl = video.thumbnailUrl != null
-        ? '${widget.apiService.baseUrl}${video.thumbnailUrl}'
-        : null;
+  Widget _buildMovieCard(TelegramVideoModel video, List<TelegramVideoModel> playlist, {bool isFirst = false}) {
+    final posterUrl = _resolveThumbUrl(video.thumbnailUrl);
 
     return TvFocusableCard(
       focusNode: isFirst ? _firstCardFocusNode : null,
-      onTap: () => _playVideo(video),
+      onTap: () => _playVideo(video, playlist: playlist),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -642,9 +653,11 @@ class TelegramScreenState extends State<TelegramScreen> {
                   child: Container(
                     color: const Color(0xFF0A0A0A),
                     width: double.infinity,
-                    child: posterUrl != null
+                    child: posterUrl.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: posterUrl,
+                            memCacheWidth: 320,
+                            memCacheHeight: 190,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => const Center(
                               child: Icon(Icons.play_circle_fill_rounded, color: Color(0xFF38BDF8), size: 38),

@@ -7,6 +7,7 @@ class NetflixSidebar extends StatefulWidget {
   final ValueChanged<int> onTabSelected;
   final VoidCallback onSwitchToOldUI;
   final VoidCallback onProfilePressed;
+  final VoidCallback? onSearchPressed;
   final VoidCallback? onRefresh;
   final VoidCallback? onCheckUpdate;
   final bool isRefreshing;
@@ -19,6 +20,7 @@ class NetflixSidebar extends StatefulWidget {
     required this.onTabSelected,
     required this.onSwitchToOldUI,
     required this.onProfilePressed,
+    this.onSearchPressed,
     this.onRefresh,
     this.onCheckUpdate,
     this.isRefreshing = false,
@@ -32,6 +34,7 @@ class NetflixSidebar extends StatefulWidget {
 
 class _NetflixSidebarState extends State<NetflixSidebar> {
   bool _isExpanded = false;
+  bool _hasKeyboardFocus = false;
 
   final List<Map<String, dynamic>> _menuItems = [
     {
@@ -61,14 +64,18 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
   ];
 
   KeyEventResult _handleSidebarItemKey(int index, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) return KeyEventResult.ignored;
 
     if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
       if (index < _menuItems.length - 1) {
         widget.focusNodes?[index + 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == _menuItems.length - 1) {
-        // Move from last menu item to Làm mới (7)
+        // Move from last menu item (5) to Tìm kiếm (6)
+        widget.focusNodes?[6].requestFocus();
+        return KeyEventResult.handled;
+      } else if (index == 6) {
+        // Move from Tìm kiếm (6) to Làm mới (7)
         widget.focusNodes?[7].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 7) {
@@ -80,7 +87,6 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         widget.focusNodes?[10].requestFocus();
         return KeyEventResult.handled;
       } else if (index >= 10) {
-        // Reached bottom of sidebar
         return KeyEventResult.handled;
       }
     } else if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
@@ -88,18 +94,17 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         widget.focusNodes?[index - 1].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 0) {
-        // Reached top of sidebar
         return KeyEventResult.handled;
-      } else if (index == 7) {
-        // Move from Làm mới (7) up to last menu item
+      } else if (index == 6) {
         widget.focusNodes?[_menuItems.length - 1].requestFocus();
         return KeyEventResult.handled;
+      } else if (index == 7) {
+        widget.focusNodes?[6].requestFocus();
+        return KeyEventResult.handled;
       } else if (index == 8) {
-        // Move from Cập nhật (8) up to Làm mới (7)
         widget.focusNodes?[7].requestFocus();
         return KeyEventResult.handled;
       } else if (index == 10) {
-        // Move from Profile (10) up to Cập nhật (8)
         widget.focusNodes?[8].requestFocus();
         return KeyEventResult.handled;
       }
@@ -107,10 +112,11 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
       if (index < _menuItems.length && index != widget.selectedIndex) {
         widget.onTabSelected(index);
       }
-      widget.onMoveToContent?.call();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onMoveToContent?.call();
+      });
       return KeyEventResult.handled;
     } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-      // Keep focus inside sidebar
       return KeyEventResult.handled;
     }
 
@@ -148,13 +154,16 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         skipTraversal: true,
         onFocusChange: (hasFocus) {
           setState(() {
+            _hasKeyboardFocus = hasFocus;
             _isExpanded = hasFocus;
           });
         },
         onKeyEvent: (node, event) {
           if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowRight) {
             if (widget.onMoveToContent != null) {
-              widget.onMoveToContent!();
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) widget.onMoveToContent?.call();
+              });
               return KeyEventResult.handled;
             }
           }
@@ -162,7 +171,11 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
         },
         child: MouseRegion(
           onEnter: (_) => setState(() => _isExpanded = true),
-          onExit: (_) => setState(() => _isExpanded = false),
+          onExit: (_) {
+            if (!_hasKeyboardFocus) {
+              setState(() => _isExpanded = false);
+            }
+          },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 240),
             curve: Curves.easeOutCubic,
@@ -251,7 +264,9 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                                 : null,
                             onTap: () {
                               widget.onTabSelected(idx);
-                              widget.onMoveToContent?.call();
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                if (mounted) widget.onMoveToContent?.call();
+                              });
                             },
                             borderRadius: BorderRadius.circular(8),
                             focusBorderColor: Colors.white,
@@ -305,6 +320,45 @@ class _NetflixSidebarState extends State<NetflixSidebar> {
                           ),
                         ),
                       ],
+                      // Global Search Button (Index 6)
+                      const SizedBox(height: 10),
+                      const Divider(color: Color(0xFF262626), height: 1, thickness: 1),
+                      const SizedBox(height: 10),
+                      Focus(
+                        onKeyEvent: (node, event) => _handleSidebarItemKey(6, event),
+                        child: TvFocusableCard(
+                          focusNode: (widget.focusNodes != null && 6 < widget.focusNodes!.length)
+                              ? widget.focusNodes![6]
+                              : null,
+                          onTap: () => widget.onSearchPressed?.call(),
+                          borderRadius: BorderRadius.circular(8),
+                          focusBorderColor: const Color(0xFFE50914),
+                          scale: 1.02,
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE50914).withOpacity(0.14),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFE50914).withOpacity(0.35), width: 0.8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.search_rounded, size: 22, color: Color(0xFFE50914)),
+                                _buildExpandingLabel(
+                                  width: 146,
+                                  leftPadding: 14,
+                                  child: const Text(
+                                    'Tìm kiếm',
+                                    softWrap: false,
+                                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),

@@ -32,6 +32,7 @@ class MusicScreenState extends State<MusicScreen> {
   bool _isLoading = true;
   bool _isSyncing = false;
   String? _errorMessage;
+  int _folderRequestId = 0;
 
   // Breadcrumbs: each item is {'id': folderId, 'name': folderName}
   final List<Map<String, String>> _breadcrumbs = [];
@@ -145,21 +146,21 @@ class MusicScreenState extends State<MusicScreen> {
 
   Future<void> _loadFolder(String folderId, {bool forceRefresh = false}) async {
     if (!mounted) return;
+    final int reqId = ++_folderRequestId;
 
     // 1. Check local cache (memory / disk) for 0ms instant display
     final cached = GDriveCacheManager().get(folderId) ?? await GDriveCacheManager().loadFromDisk(folderId);
+    if (!mounted || reqId != _folderRequestId) return;
 
     if (cached != null && !forceRefresh) {
-      if (mounted) {
-        setState(() {
-          _folders = cached.folders;
-          _tracks = cached.audios;
-          _videos = cached.videos;
-          _isLoading = false;
-          _isSyncing = true;
-          _errorMessage = null;
-        });
-      }
+      setState(() {
+        _folders = cached.folders;
+        _tracks = cached.audios;
+        _videos = cached.videos;
+        _isLoading = false;
+        _isSyncing = true;
+        _errorMessage = null;
+      });
     } else {
       setState(() {
         _isLoading = true;
@@ -169,10 +170,11 @@ class MusicScreenState extends State<MusicScreen> {
 
     try {
       final result = await widget.apiService.getGDriveFolderContents(folderId, forceRefresh: forceRefresh);
-      if (!mounted) return;
+      if (!mounted || reqId != _folderRequestId) return;
 
       if (result != null) {
         await GDriveCacheManager().set(folderId, result);
+        if (!mounted || reqId != _folderRequestId) return;
         setState(() {
           _folders = result.folders;
           _tracks = result.audios;
@@ -196,7 +198,7 @@ class MusicScreenState extends State<MusicScreen> {
         });
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || reqId != _folderRequestId) return;
       setState(() {
         _isLoading = false;
         _isSyncing = false;
@@ -244,7 +246,7 @@ class MusicScreenState extends State<MusicScreen> {
         title: t.name,
         album: currentAlbum,
         artist: t.folderName ?? _selectedSource?.name ?? 'VolPi Music',
-        artUri: (t.thumbnailUrl != null && t.thumbnailUrl!.isNotEmpty) ? Uri.parse(t.thumbnailUrl!) : null,
+        artUri: (t.thumbnailUrl != null && t.thumbnailUrl!.isNotEmpty) ? Uri.tryParse(t.thumbnailUrl!) : null,
       );
     }).toList();
 
@@ -279,8 +281,10 @@ class MusicScreenState extends State<MusicScreen> {
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -396,163 +400,182 @@ class MusicScreenState extends State<MusicScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0B132B),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            _buildBreadcrumbBar(),
-            Expanded(child: _buildBody()),
-            _buildMiniPlayer(),
-          ],
-        ),
+    return Container(
+      color: const Color(0xFF0F0F0F),
+      child: Column(
+        children: [
+          _buildTopBar(),
+          _buildBreadcrumbBar(),
+          Expanded(child: _buildBody()),
+          _buildMiniPlayer(),
+        ],
       ),
     );
   }
 
   Widget _buildTopBar() {
     final activeThemeColor = _mediaSubTab == 0 ? const Color(0xFF38BDF8) : const Color(0xFFF59E0B);
+    final bool isNarrow = MediaQuery.of(context).size.width < 680;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0F172A),
-        border: Border(bottom: BorderSide(color: Color(0xFF1E293B))),
+    final segmented = Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white12),
       ),
+      padding: const EdgeInsets.all(2.5),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 1. Segmented Switcher: [ 🎵 Nghe Nhạc | 🎬 Video & Phim ]
-          Container(
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white12),
-            ),
-            padding: const EdgeInsets.all(2.5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildSegmentButton(
-                  index: 0,
-                  label: 'Nghe Nhạc',
-                  icon: Icons.music_note_rounded,
-                  activeColor: const Color(0xFF0284C7),
-                ),
-                const SizedBox(width: 3),
-                _buildSegmentButton(
-                  index: 1,
-                  label: 'Video & Phim',
-                  icon: Icons.video_library_rounded,
-                  activeColor: const Color(0xFFD97706),
-                ),
-              ],
-            ),
+          _buildSegmentButton(
+            index: 0,
+            label: 'Nghe Nhạc',
+            icon: Icons.music_note_rounded,
+            activeColor: const Color(0xFF0284C7),
           ),
-
-          const SizedBox(width: 12),
-
-          // 2. Nguồn Dropdown Button
-          TvFocusableCard(
-            onTap: _showSourceSelectionDialog,
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: activeThemeColor.withOpacity(0.5), width: 1.2),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _mediaSubTab == 0 ? Icons.library_music_rounded : Icons.video_collection_rounded,
-                    size: 18,
-                    color: activeThemeColor,
-                  ),
-                  const SizedBox(width: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 160),
-                    child: Text(
-                      _selectedSource?.name ?? 'Chọn Nguồn',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 20),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 10),
-
-          // 3. Search Field
-          Expanded(
-            child: Container(
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E293B),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF334155)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: Colors.white54, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(color: Colors.white, fontSize: 12),
-                      decoration: InputDecoration(
-                        hintText: _mediaSubTab == 0 ? 'Tìm bài hát hoặc album...' : 'Tìm video hoặc phim...',
-                        hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (val) {
-                        setState(() {
-                          _searchQuery = val.trim().toLowerCase();
-                        });
-                      },
-                    ),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _searchQuery = '';
-                          _searchController.clear();
-                        });
-                      },
-                      child: const Icon(Icons.close_rounded, color: Colors.white54, size: 16),
-                    ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // 4. Refresh Button
-          IconButton(
-            icon: Icon(Icons.refresh_rounded, color: activeThemeColor, size: 20),
-            tooltip: 'Làm mới',
-            onPressed: () {
-              if (_breadcrumbs.isNotEmpty) {
-                _loadFolder(_breadcrumbs.last['id']!, forceRefresh: true);
-              } else {
-                _loadSources(forceRefresh: true);
-              }
-            },
+          const SizedBox(width: 3),
+          _buildSegmentButton(
+            index: 1,
+            label: 'Video & Phim',
+            icon: Icons.video_library_rounded,
+            activeColor: const Color(0xFFD97706),
           ),
         ],
       ),
+    );
+
+    final sourceButton = TvFocusableCard(
+      onTap: _showSourceSelectionDialog,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: activeThemeColor.withOpacity(0.5), width: 1.2),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _mediaSubTab == 0 ? Icons.library_music_rounded : Icons.video_collection_rounded,
+              size: 18,
+              color: activeThemeColor,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: isNarrow ? 110 : 160),
+              child: Text(
+                _selectedSource?.name ?? 'Chọn Nguồn',
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70, size: 20),
+          ],
+        ),
+      ),
+    );
+
+    final searchBox = Container(
+      height: 38,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF334155)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search_rounded, color: Colors.white54, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white, fontSize: 12),
+              decoration: InputDecoration(
+                hintText: _mediaSubTab == 0 ? 'Tìm bài hát hoặc album...' : 'Tìm video hoặc phim...',
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+              onChanged: (val) {
+                setState(() {
+                  _searchQuery = val.trim().toLowerCase();
+                });
+              },
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              },
+              child: const Icon(Icons.close_rounded, color: Colors.white54, size: 16),
+            ),
+        ],
+      ),
+    );
+
+    final refreshButton = IconButton(
+      icon: Icon(Icons.refresh_rounded, color: activeThemeColor, size: 20),
+      tooltip: 'Làm mới',
+      onPressed: () {
+        if (_breadcrumbs.isNotEmpty) {
+          _loadFolder(_breadcrumbs.last['id']!, forceRefresh: true);
+        } else {
+          _loadSources(forceRefresh: true);
+        }
+      },
+    );
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: isNarrow ? 12 : 16, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Color(0xFF141414),
+        border: Border(bottom: BorderSide(color: Color(0xFF262626))),
+      ),
+      child: isNarrow
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      segmented,
+                      const SizedBox(width: 8),
+                      sourceButton,
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: searchBox),
+                    const SizedBox(width: 6),
+                    refreshButton,
+                  ],
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                segmented,
+                const SizedBox(width: 12),
+                sourceButton,
+                const SizedBox(width: 10),
+                Expanded(child: searchBox),
+                const SizedBox(width: 8),
+                refreshButton,
+              ],
+            ),
     );
   }
 
@@ -599,7 +622,7 @@ class MusicScreenState extends State<MusicScreen> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: const Color(0xFF0F172A),
+      color: const Color(0xFF141414),
       child: Row(
         children: [
           if (_breadcrumbs.length > 1)
@@ -817,7 +840,12 @@ class MusicScreenState extends State<MusicScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, idx) {
                     final track = filteredTracks[idx];
-                    return _buildTrackListItem(track, idx, filteredTracks);
+                    return _buildTrackListItem(
+                      track,
+                      idx,
+                      filteredTracks,
+                      isFirst: filteredFolders.isEmpty && idx == 0,
+                    );
                   },
                   childCount: filteredTracks.length,
                 ),
@@ -851,7 +879,10 @@ class MusicScreenState extends State<MusicScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, idx) {
                     final video = filteredVideos[idx];
-                    return _buildVideoCard(video);
+                    return _buildVideoCard(
+                      video,
+                      isFirst: filteredFolders.isEmpty && filteredTracks.isEmpty && idx == 0,
+                    );
                   },
                   childCount: filteredVideos.length,
                 ),
@@ -937,7 +968,10 @@ class MusicScreenState extends State<MusicScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, idx) {
                     final video = filteredVideos[idx];
-                    return _buildVideoCard(video);
+                    return _buildVideoCard(
+                      video,
+                      isFirst: filteredFolders.isEmpty && idx == 0,
+                    );
                   },
                   childCount: filteredVideos.length,
                 ),
@@ -997,8 +1031,9 @@ class MusicScreenState extends State<MusicScreen> {
     );
   }
 
-  Widget _buildVideoCard(GDriveItemModel video) {
+  Widget _buildVideoCard(GDriveItemModel video, {bool isFirst = false}) {
     return TvFocusableCard(
+      focusNode: isFirst ? _firstCardFocusNode : null,
       onTap: () => _playVideo(video),
       borderRadius: BorderRadius.circular(12),
       focusBorderColor: const Color(0xFFF59E0B),
@@ -1020,6 +1055,8 @@ class MusicScreenState extends State<MusicScreen> {
                   video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: video.thumbnailUrl!,
+                          memCacheWidth: 320,
+                          memCacheHeight: 190,
                           fit: BoxFit.cover,
                           placeholder: (_, __) => Container(color: const Color(0xFF0F172A)),
                           errorWidget: (_, __, ___) => Container(
@@ -1081,9 +1118,24 @@ class MusicScreenState extends State<MusicScreen> {
     );
   }
 
-  Widget _buildTrackListItem(GDriveItemModel track, int index, List<GDriveItemModel> currentList) {
+  String _parseAudioExt(String fileName) {
+    const validExts = {'FLAC', 'MP3', 'M4A', 'WAV', 'AAC', 'OGG', 'OPUS', 'WMA', 'ALAC', 'AIFF'};
+    final dotIdx = fileName.lastIndexOf('.');
+    if (dotIdx > 0 && dotIdx < fileName.length - 1) {
+      final candidate = fileName.substring(dotIdx + 1).trim().toUpperCase();
+      if (validExts.contains(candidate)) return candidate;
+    }
+    return 'AUDIO';
+  }
+
+  Widget _buildTrackListItem(
+    GDriveItemModel track,
+    int index,
+    List<GDriveItemModel> currentList, {
+    bool isFirst = false,
+  }) {
     final name = track.name;
-    final ext = name.contains('.') ? name.split('.').last.toUpperCase() : 'AUDIO';
+    final ext = _parseAudioExt(name);
     final streamUrl = widget.apiService.getGDriveStreamUrl(track.id, fileName: track.name);
     final handler = VolPiAudioHandler.instance;
 
@@ -1105,6 +1157,7 @@ class MusicScreenState extends State<MusicScreen> {
             return Container(
               margin: const EdgeInsets.only(bottom: 6),
               child: TvFocusableCard(
+                focusNode: isFirst ? _firstCardFocusNode : null,
                 onTap: () {
                   if (isCurrent) {
                     if (isPlaying) {
@@ -1242,116 +1295,138 @@ class MusicScreenState extends State<MusicScreen> {
           builder: (context, stateSnapshot) {
             final state = stateSnapshot.data;
             final playing = state?.playing ?? false;
-            final pos = state?.position ?? Duration.zero;
             final buffered = state?.bufferedPosition ?? Duration.zero;
             final dur = item.duration ?? Duration.zero;
             final isBuffering = state?.processingState == AudioProcessingState.buffering ||
                 state?.processingState == AudioProcessingState.loading;
 
-            return GestureDetector(
-              onTap: () => MusicPlayerBottomSheet.show(context),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0F172A),
-                  border: Border(top: BorderSide(color: Color(0xFF0284C7), width: 1.5)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, -2)),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Dual-Layer Thin Buffer & Progress Bar at Top
-                    if (dur.inMilliseconds > 0)
-                      SizedBox(
-                        height: 2.5,
-                        width: double.infinity,
-                        child: Stack(
-                          children: [
-                            Container(color: const Color(0xFF1E293B)),
-                            // Buffer Bar
-                            FractionallySizedBox(
-                              widthFactor: (buffered.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
-                              child: Container(color: const Color(0xFF38BDF8).withOpacity(0.35)),
-                            ),
-                            // Position Bar
-                            FractionallySizedBox(
-                              widthFactor: (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
-                              child: Container(color: const Color(0xFF38BDF8)),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Row(
-                        children: [
-                          // Mini Thumbnail
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1E293B),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: item.artUri != null
-                                ? CachedNetworkImage(imageUrl: item.artUri.toString(), fit: BoxFit.cover)
-                                : const Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 24),
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF141414),
+                border: Border(top: BorderSide(color: Color(0xFF0284C7), width: 1.5)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, -2)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dual-Layer Thin Buffer & Live Position Bar at Top
+                  if (dur.inMilliseconds > 0)
+                    StreamBuilder<Duration>(
+                      stream: handler.player.positionStream,
+                      initialData: handler.player.position,
+                      builder: (context, posSnap) {
+                        final pos = posSnap.data ?? state?.position ?? Duration.zero;
+                        return SizedBox(
+                          height: 2.5,
+                          width: double.infinity,
+                          child: Stack(
+                            children: [
+                              Container(color: const Color(0xFF262626)),
+                              FractionallySizedBox(
+                                widthFactor: (buffered.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
+                                child: Container(color: const Color(0xFF38BDF8).withOpacity(0.35)),
+                              ),
+                              FractionallySizedBox(
+                                widthFactor: (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0),
+                                child: Container(color: const Color(0xFF38BDF8)),
+                              ),
+                            ],
                           ),
+                        );
+                      },
+                    ),
 
-                          const SizedBox(width: 12),
-
-                          // Title & Artist
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  item.title,
-                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        item.artist ?? item.album ?? 'VolPi Music',
-                                        style: const TextStyle(color: Colors.white60, fontSize: 11),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    child: Row(
+                      children: [
+                        // Focusable Track Info Area (opens full player sheet on TV & Mobile)
+                        Expanded(
+                          child: TvFocusableCard(
+                            onTap: () => MusicPlayerBottomSheet.show(context),
+                            borderRadius: BorderRadius.circular(8),
+                            focusBorderColor: const Color(0xFF38BDF8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF222222),
+                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    if (dur.inMilliseconds > 0 && buffered.inMilliseconds > 0) ...[
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        'Buffer: ${((buffered.inMilliseconds / dur.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
-                                        style: TextStyle(
-                                          color: const Color(0xFF38BDF8).withOpacity(0.75),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
+                                    clipBehavior: Clip.antiAlias,
+                                    child: item.artUri != null
+                                        ? CachedNetworkImage(imageUrl: item.artUri.toString(), fit: BoxFit.cover)
+                                        : const Icon(Icons.music_note_rounded, color: Color(0xFF38BDF8), size: 24),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          item.title,
+                                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ],
+                                        Row(
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                item.artist ?? item.album ?? 'VolPi Music',
+                                                style: const TextStyle(color: Colors.white60, fontSize: 11),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            if (dur.inMilliseconds > 0 && buffered.inMilliseconds > 0) ...[
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                'Buffer: ${((buffered.inMilliseconds / dur.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
+                                                style: TextStyle(
+                                                  color: const Color(0xFF38BDF8).withOpacity(0.75),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
+                        ),
 
-                          // Mini Controls
-                          IconButton(
-                            icon: const Icon(Icons.skip_previous_rounded, color: Colors.white70, size: 24),
-                            onPressed: () => handler.skipToPrevious(),
+                        // Mini Controls (TV-focusable & touch-friendly)
+                        TvFocusableCard(
+                          onTap: () => handler.skipToPrevious(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.skip_previous_rounded, color: Colors.white70, size: 24),
                           ),
-                          IconButton(
-                            icon: isBuffering
+                        ),
+                        const SizedBox(width: 2),
+                        TvFocusableCard(
+                          onTap: () => playing ? handler.pause() : handler.play(),
+                          borderRadius: BorderRadius.circular(24),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: isBuffering
                                 ? const SizedBox(
-                                    width: 22,
-                                    height: 22,
+                                    width: 24,
+                                    height: 24,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
                                       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
@@ -1362,64 +1437,77 @@ class MusicScreenState extends State<MusicScreen> {
                                     color: const Color(0xFF38BDF8),
                                     size: 32,
                                   ),
-                            onPressed: () => playing ? handler.pause() : handler.play(),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
-                            onPressed: () => handler.skipToNext(),
+                        ),
+                        const SizedBox(width: 2),
+                        TvFocusableCard(
+                          onTap: () => handler.skipToNext(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.skip_next_rounded, color: Colors.white70, size: 24),
                           ),
+                        ),
+                        const SizedBox(width: 2),
+                        TvFocusableCard(
+                          onTap: () => handler.stopAndClear(),
+                          borderRadius: BorderRadius.circular(20),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                          ),
+                        ),
 
-                          // Volume Slider on Desktop / Wide screens
-                          if (MediaQuery.of(context).size.width >= 700) ...[
-                            const SizedBox(width: 8),
-                            StreamBuilder<double>(
-                              stream: handler.volumeStream,
-                              initialData: handler.volume,
-                              builder: (context, volSnap) {
-                                final vol = volSnap.data ?? 1.0;
-                                return Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      icon: Icon(
-                                        vol == 0
-                                            ? Icons.volume_off_rounded
-                                            : (vol < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
-                                        color: Colors.white70,
-                                        size: 20,
-                                      ),
-                                      splashRadius: 18,
-                                      onPressed: () => handler.setVolume(vol == 0 ? 1.0 : 0.0),
+                        // Volume Slider on Desktop / Wide screens
+                        if (MediaQuery.of(context).size.width >= 700) ...[
+                          const SizedBox(width: 8),
+                          StreamBuilder<double>(
+                            stream: handler.volumeStream,
+                            initialData: handler.volume,
+                            builder: (context, volSnap) {
+                              final vol = volSnap.data ?? 1.0;
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      vol == 0
+                                          ? Icons.volume_off_rounded
+                                          : (vol < 0.5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+                                      color: Colors.white70,
+                                      size: 20,
                                     ),
-                                    SizedBox(
-                                      width: 85,
-                                      child: SliderTheme(
-                                        data: SliderTheme.of(context).copyWith(
-                                          trackHeight: 3,
-                                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                                          activeTrackColor: const Color(0xFF38BDF8),
-                                          inactiveTrackColor: Colors.white12,
-                                          thumbColor: Colors.white,
-                                        ),
-                                        child: Slider(
-                                          value: vol.clamp(0.0, 1.0),
-                                          min: 0.0,
-                                          max: 1.0,
-                                          onChanged: (newVol) => handler.setVolume(newVol),
-                                        ),
+                                    splashRadius: 18,
+                                    onPressed: () => handler.setVolume(vol == 0 ? 1.0 : 0.0),
+                                  ),
+                                  SizedBox(
+                                    width: 85,
+                                    child: SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        trackHeight: 3,
+                                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                                        activeTrackColor: const Color(0xFF38BDF8),
+                                        inactiveTrackColor: Colors.white12,
+                                        thumbColor: Colors.white,
+                                      ),
+                                      child: Slider(
+                                        value: vol.clamp(0.0, 1.0),
+                                        min: 0.0,
+                                        max: 1.0,
+                                        onChanged: (newVol) => handler.setVolume(newVol),
                                       ),
                                     ),
-                                  ],
-                                );
-                              },
-                            ),
-                          ],
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },

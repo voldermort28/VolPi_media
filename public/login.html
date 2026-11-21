@@ -169,17 +169,20 @@
 
         const data = await res.json();
 
-        if (data.success && data.token) {
-          // Store token in localStorage as backup
-          localStorage.setItem('volpi_token', data.token);
-          localStorage.setItem('volpi_user', data.username || 'admin');
+        if (data.success) {
+          // Rely exclusively on HttpOnly cookie; remove any legacy localStorage token
+          try {
+            localStorage.removeItem('volpi_token');
+            localStorage.setItem('volpi_user', data.username || 'admin');
+          } catch (_) {}
 
           btnText.textContent = 'Đăng nhập thành công!';
           btn.className = btn.className.replace('from-sky-500 to-indigo-600', 'from-emerald-500 to-teal-600');
 
-          // Check redirect URL
+          // Validate redirect URL to allow only safe local paths
           const urlParams = new URLSearchParams(window.location.search);
-          const redirect = urlParams.get('redirect') || '/';
+          const rawRedirect = (urlParams.get('redirect') || '/').trim();
+          const redirect = /^\/(?!\/)/.test(rawRedirect) ? rawRedirect : '/';
           setTimeout(() => {
             window.location.href = redirect;
           }, 400);

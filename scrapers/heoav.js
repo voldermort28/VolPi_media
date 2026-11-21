@@ -69,10 +69,11 @@ const CATEGORY_MAP = {
   'thuoc-kich-duc': '/search/thuoc-kich-duc/',
 };
 
-const videoInfoCache = new Map();
-const manifestUrlCache = new Map();
-const videoDetailsCache = new Map();
-const searchPathCache = new Map();
+const { LruTtlCache } = require("../lib/lruCache");
+const videoInfoCache = new LruTtlCache({ maxEntries: 300 });
+const manifestUrlCache = new LruTtlCache({ maxEntries: 200 });
+const videoDetailsCache = new LruTtlCache({ maxEntries: 300 });
+const searchPathCache = new LruTtlCache({ maxEntries: 100 });
 
 function resolveAbsoluteUrl(src) {
   if (!src) return '';

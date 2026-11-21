@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/match_model.dart';
+import '../widgets/loading_dialog_helper.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -257,20 +258,12 @@ class FootballScreenState extends State<FootballScreen> {
   }
 
   void _onMatchSelected(MatchModel match) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF38BDF8)),
-      ),
+    final streams = await LoadingDialogHelper.runWithLoading(
+      context,
+      () => widget.apiService.getMatchStreams(match.id, source: widget.source),
+      indicatorColor: const Color(0xFF38BDF8),
     );
-
-    final streams = await widget.apiService.getMatchStreams(
-      match.id,
-      source: widget.source,
-    );
-    if (!mounted) return;
-    Navigator.of(context).pop(); // dismiss loading dialog
+    if (!mounted || streams == null) return;
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -635,6 +628,37 @@ class FootballScreenState extends State<FootballScreen> {
                                   ),
                                 ),
                                 _buildMatchGrid(finished, crossAxisCount, isFirstSection: false, isMobile: isMobile),
+                              ],
+
+                              // Trạng thái rỗng hoàn toàn (mất mạng hoặc chưa có lịch) -> hiện nút Thử lại
+                              if (_matches.isEmpty) ...[
+                                SliverFillRemaining(
+                                  hasScrollBody: false,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.sports_soccer_outlined, color: Colors.white24, size: 52),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'Chưa lấy được lịch thi đấu hoặc hôm nay không có trận.',
+                                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        TvFocusableCard(
+                                          autoFocus: true,
+                                          onTap: () => _loadMatches(forceRefresh: true),
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                                            color: const Color(0xFF0284C7),
+                                            child: const Text('Thử lại', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
 
                               // Fallback nếu không chia được mục nào hoặc lọc không có trận

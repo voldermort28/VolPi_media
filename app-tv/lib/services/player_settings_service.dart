@@ -14,8 +14,10 @@ class PlayerSettingsService {
   double _preMuteVolume = 1.0;
   bool _useNetflixUI = true;
   bool _isInitialized = false;
+  Timer? _writeDebounce;
+  Future<void> _writeQueue = Future.value();
 
-  final ChangeNotifier uiChangeNotifier = ChangeNotifier();
+  final ValueNotifier<bool> uiChangeNotifier = ValueNotifier<bool>(true);
 
   double get volume => _volume;
   bool get isMuted => _isMuted;
@@ -42,11 +44,9 @@ class PlayerSettingsService {
             if (data['preMuteVolume'] is num) {
               _preMuteVolume = (data['preMuteVolume'] as num).toDouble().clamp(0.0, 1.0);
             }
-            if (data['useNetflixUI'] is bool) {
-              _useNetflixUI = data['useNetflixUI'] as bool;
-            } else {
-              _useNetflixUI = true;
-            }
+            // Mặc định thống nhất sử dụng giao diện Netflix
+            _useNetflixUI = true;
+            uiChangeNotifier.value = _useNetflixUI;
           }
         }
       }
@@ -57,36 +57,49 @@ class PlayerSettingsService {
     }
   }
 
-  /// Cập nhật và lưu cài đặt giao diện (Netflix UI Beta vs Giao diện cũ V1)
+  /// Cập nhật và lưu cài đặt giao diện
   void setUseNetflixUI(bool value) {
     if (_useNetflixUI != value) {
       _useNetflixUI = value;
-      _writeToDisk();
-      uiChangeNotifier.notifyListeners();
+      uiChangeNotifier.value = value;
+      _scheduleWrite();
     }
   }
 
-  /// Cập nhật và lưu mức âm lượng bền vững xuyên suốt các video và luồng phát
+  /// Cập nhật và lưu mức âm lượng bền vững (có debounce 300ms chống ghi đĩa liên tục khi kéo slider)
   void saveVolume({required double volume, required bool isMuted, double? preMuteVolume}) {
     _volume = volume.clamp(0.0, 1.0);
     _isMuted = isMuted;
     if (preMuteVolume != null) {
       _preMuteVolume = preMuteVolume.clamp(0.0, 1.0);
     }
-    _writeToDisk();
+    _scheduleWrite();
+  }
+
+  void _scheduleWrite() {
+    _writeDebounce?.cancel();
+    _writeDebounce = Timer(const Duration(milliseconds: 300), () {
+      _enqueueWrite();
+    });
+  }
+
+  void _enqueueWrite() {
+    _writeQueue = _writeQueue.then((_) => _writeToDisk()).catchError((_) {});
   }
 
   Future<void> _writeToDisk() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/volpi_player_settings.json');
+      final tmpFile = File('${dir.path}/volpi_player_settings.json.tmp');
       final data = {
         'volume': _volume,
         'isMuted': _isMuted,
         'preMuteVolume': _preMuteVolume,
         'useNetflixUI': _useNetflixUI,
       };
-      await file.writeAsString(jsonEncode(data), flush: true);
+      await tmpFile.writeAsString(jsonEncode(data), flush: true);
+      await tmpFile.rename(file.path);
     } catch (e) {
       debugPrint('PlayerSettingsService._writeToDisk error: $e');
     }

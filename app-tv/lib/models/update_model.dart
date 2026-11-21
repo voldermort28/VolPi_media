@@ -21,7 +21,11 @@ class UpdateInfo {
     required this.currentVersion,
   });
 
-  factory UpdateInfo.fromJson(Map<String, dynamic> json, String currentVer) {
+  factory UpdateInfo.fromJson(
+    Map<String, dynamic> json,
+    String currentVer, {
+    int currentBuild = 0,
+  }) {
     final latestVer = (json['version'] ?? json['tag_name'] ?? '').toString().replaceFirst(RegExp(r'^[vV]'), '');
     final build = json['build'] is int ? json['build'] as int : int.tryParse(json['build']?.toString() ?? '0') ?? 0;
     final notes = (json['changelog'] ?? json['body'] ?? '').toString();
@@ -46,7 +50,7 @@ class UpdateInfo {
       }
     }
 
-    final hasNew = _isVersionNewer(latestVer, currentVer);
+    final hasNew = _isVersionNewer(latestVer, currentVer, remoteBuild: build, currentBuild: currentBuild);
 
     return UpdateInfo(
       latestVersion: latestVer,
@@ -61,7 +65,12 @@ class UpdateInfo {
     );
   }
 
-  static bool _isVersionNewer(String remote, String current) {
+  static bool _isVersionNewer(
+    String remote,
+    String current, {
+    int remoteBuild = 0,
+    int currentBuild = 0,
+  }) {
     if (remote.isEmpty) return false;
     final cleanRemote = remote.replaceFirst(RegExp(r'^[vV]'), '').split('+')[0];
     final cleanCurrent = current.replaceFirst(RegExp(r'^[vV]'), '').split('+')[0];
@@ -79,6 +88,9 @@ class UpdateInfo {
     for (int i = 0; i < 3; i++) {
       if (remoteParts[i] > currentParts[i]) return true;
       if (remoteParts[i] < currentParts[i]) return false;
+    }
+    if (remoteBuild > 0 && currentBuild > 0 && remoteBuild > currentBuild) {
+      return true;
     }
     return false;
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../tv_focusable_card.dart';
 
 class NetflixScrollableRow extends StatefulWidget {
   final double height;
@@ -46,6 +47,7 @@ class NetflixScrollableRowState extends State<NetflixScrollableRow> {
 
   @override
   void dispose() {
+    TvFocusableCard.clearLastFocusedRow(this);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -114,7 +116,7 @@ class NetflixScrollableRowState extends State<NetflixScrollableRow> {
                 controller: _scrollController,
                 padding: widget.padding,
                 scrollDirection: Axis.horizontal,
-                cacheExtent: 3500,
+                cacheExtent: 700,
                 itemCount: widget.itemCount,
                 separatorBuilder: (_, __) => SizedBox(width: widget.itemSpacing),
                 itemBuilder: (context, idx) {

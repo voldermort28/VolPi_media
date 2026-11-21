@@ -10,11 +10,13 @@ import '../player/video_player_screen.dart';
 class GDriveScreen extends StatefulWidget {
   final ApiService apiService;
   final bool isActive;
+  final bool isPrivate;
 
   const GDriveScreen({
     super.key,
     required this.apiService,
     this.isActive = false,
+    this.isPrivate = false,
   });
 
   @override
@@ -27,6 +29,7 @@ class GDriveScreenState extends State<GDriveScreen> {
   bool _isLoading = true;
   bool _isSyncing = false;
   String? _errorMessage;
+  int _folderRequestId = 0;
 
   // Breadcrumb navigation stack: each entry is {'id': folderId, 'name': folderName}
   final List<Map<String, String>> _breadcrumbs = [];
@@ -113,20 +116,20 @@ class GDriveScreenState extends State<GDriveScreen> {
 
   Future<void> _loadFolder(String folderId, {bool forceRefresh = false}) async {
     if (!mounted) return;
+    final int reqId = ++_folderRequestId;
 
     // 1. Check local cache (memory / disk) for 0ms instant display
     final cached = GDriveCacheManager().get(folderId) ?? await GDriveCacheManager().loadFromDisk(folderId);
+    if (!mounted || reqId != _folderRequestId) return;
 
     if (cached != null && !forceRefresh) {
-      if (mounted) {
-        setState(() {
-          _folders = cached.folders;
-          _videos = cached.videos;
-          _isLoading = false;
-          _isSyncing = true;
-          _errorMessage = null;
-        });
-      }
+      setState(() {
+        _folders = cached.folders;
+        _videos = cached.videos;
+        _isLoading = false;
+        _isSyncing = true;
+        _errorMessage = null;
+      });
     } else {
       setState(() {
         _isLoading = true;
@@ -136,10 +139,11 @@ class GDriveScreenState extends State<GDriveScreen> {
 
     try {
       final result = await widget.apiService.getGDriveFolderContents(folderId, forceRefresh: forceRefresh);
-      if (!mounted) return;
+      if (!mounted || reqId != _folderRequestId) return;
 
       if (result != null) {
         await GDriveCacheManager().set(folderId, result);
+        if (!mounted || reqId != _folderRequestId) return;
         setState(() {
           _folders = result.folders;
           _videos = result.videos;
@@ -161,7 +165,7 @@ class GDriveScreenState extends State<GDriveScreen> {
         });
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || reqId != _folderRequestId) return;
       setState(() {
         _isLoading = false;
         _isSyncing = false;
@@ -195,10 +199,11 @@ class GDriveScreenState extends State<GDriveScreen> {
     return false; // Reached root
   }
 
-  void _playVideo(GDriveItemModel video, {BuildContext? replaceContext}) {
+  void _playVideo(GDriveItemModel video, {List<GDriveItemModel>? playlist, BuildContext? replaceContext}) {
     final streamUrl = widget.apiService.getGDriveStreamUrl(video.id, fileName: video.name);
-    final isPrivate = _selectedSource?.isPrivate ?? true;
-    final currentIndex = _videos.indexWhere((v) => v.id == video.id);
+    final bool saveAsSecret = widget.isPrivate || (_selectedSource?.isPrivate ?? true);
+    final list = playlist ?? _videos;
+    final currentIndex = list.indexWhere((v) => v.id == video.id);
 
     final playerRoute = MaterialPageRoute(
       builder: (playerCtx) => VideoPlayerScreen(
@@ -206,20 +211,22 @@ class GDriveScreenState extends State<GDriveScreen> {
         title: video.name,
         subtitle: _selectedSource?.name ?? 'Google Drive',
         mediaId: 'gdrive_${video.id}',
-        mediaCategory: isPrivate ? 'secret' : 'gdrive',
+        mediaCategory: saveAsSecret ? 'secret' : 'gdrive',
         mediaPoster: video.thumbnailUrl ?? '',
-        onNext: (currentIndex != -1 && currentIndex < _videos.length - 1)
-            ? () => _playVideo(_videos[currentIndex + 1], replaceContext: playerCtx)
+        onNext: (currentIndex != -1 && currentIndex < list.length - 1)
+            ? () => _playVideo(list[currentIndex + 1], playlist: list, replaceContext: playerCtx)
             : null,
         onPrevious: (currentIndex > 0)
-            ? () => _playVideo(_videos[currentIndex - 1], replaceContext: playerCtx)
+            ? () => _playVideo(list[currentIndex - 1], playlist: list, replaceContext: playerCtx)
             : null,
       ),
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -677,7 +684,7 @@ class GDriveScreenState extends State<GDriveScreen> {
         } else {
           final videoIndex = index - filteredFolders.length;
           final video = filteredVideos[videoIndex];
-          return _buildVideoCard(video, isFirst: isFirst && filteredFolders.isEmpty);
+          return _buildVideoCard(video, filteredVideos, isFirst: isFirst && filteredFolders.isEmpty);
         }
       },
     );
@@ -737,10 +744,10 @@ class GDriveScreenState extends State<GDriveScreen> {
     );
   }
 
-  Widget _buildVideoCard(GDriveItemModel video, {bool isFirst = false}) {
+  Widget _buildVideoCard(GDriveItemModel video, List<GDriveItemModel> playlist, {bool isFirst = false}) {
     return TvFocusableCard(
       focusNode: isFirst ? _firstCardFocusNode : null,
-      onTap: () => _playVideo(video),
+      onTap: () => _playVideo(video, playlist: playlist),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         decoration: BoxDecoration(
@@ -763,6 +770,8 @@ class GDriveScreenState extends State<GDriveScreen> {
                     child: video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: video.thumbnailUrl!,
+                            memCacheWidth: 320,
+                            memCacheHeight: 190,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => const Center(
                               child: Icon(Icons.play_circle_fill_rounded, color: Color(0xFF38BDF8), size: 38),

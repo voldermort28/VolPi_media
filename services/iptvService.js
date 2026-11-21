@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const axios = require('axios');
+const { assertSafeUrl } = require('../lib/ssrfGuard');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'iptv_config.json');
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
@@ -1332,7 +1333,7 @@ async function handleStreamProxy(req, res) {
   }
 
   const rawTarget = req.query.url;
-  if (!rawTarget || (!rawTarget.startsWith('http://') && !rawTarget.startsWith('https://'))) {
+  if (typeof rawTarget !== 'string' || (!rawTarget.startsWith('http://') && !rawTarget.startsWith('https://'))) {
     return res.status(400).send('Invalid or missing stream URL parameter');
   }
 
@@ -1341,8 +1342,16 @@ async function handleStreamProxy(req, res) {
   if (targetUrl.includes('live.inplyr.com')) {
     targetUrl = targetUrl.replace('https://live.inplyr.com', 'http://live.inplyr.com');
   }
-  const referer = req.query.ref || '';
-  const userAgent = req.query.ua || '';
+
+  // SSRF Guard: block private/loopback/cloud-metadata IPs
+  try {
+    await assertSafeUrl(targetUrl);
+  } catch (ssrfErr) {
+    return res.status(ssrfErr.statusCode || 403).send(ssrfErr.message || 'Blocked URL');
+  }
+
+  const referer = typeof req.query.ref === 'string' ? req.query.ref : '';
+  const userAgent = typeof req.query.ua === 'string' ? req.query.ua : '';
 
   const upstreamHeaders = {
     'User-Agent': userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -1374,10 +1383,26 @@ async function handleStreamProxy(req, res) {
 
     if (upstreamRes.status >= 400) {
       res.status(upstreamRes.status);
+      upstreamRes.data.on('error', () => {
+        if (!res.headersSent) res.status(502).end();
+        else res.end();
+      });
+      req.on('close', () => {
+        try { upstreamRes.data.destroy(); } catch (_) {}
+      });
       return upstreamRes.data.pipe(res);
     }
 
     const finalUrl = upstreamRes.request?.res?.responseUrl || targetUrl;
+    if (finalUrl !== targetUrl) {
+      try {
+        await assertSafeUrl(finalUrl);
+      } catch (ssrfErr) {
+        try { upstreamRes.data.destroy(); } catch (_) {}
+        return res.status(ssrfErr.statusCode || 403).send('Blocked redirect target');
+      }
+    }
+
     const contentType = (upstreamRes.headers['content-type'] || '').toLowerCase();
     const contentEncoding = (upstreamRes.headers['content-encoding'] || '').toLowerCase();
     const isM3u8 = targetUrl.toLowerCase().includes('.m3u8') ||
@@ -1390,8 +1415,15 @@ async function handleStreamProxy(req, res) {
                    contentType.includes('application/vnd.apple.mpegurl');
 
     if (isM3u8 && req.method !== 'HEAD') {
+      const MAX_PLAYLIST_BYTES = 2 * 1024 * 1024; // 2 MB cap prevents OOM
       const chunks = [];
+      let totalBytes = 0;
       for await (const chunk of upstreamRes.data) {
+        totalBytes += chunk.length;
+        if (totalBytes > MAX_PLAYLIST_BYTES) {
+          try { upstreamRes.data.destroy(); } catch (_) {}
+          return res.status(413).send('Playlist too large');
+        }
         chunks.push(chunk);
       }
       const buffer = Buffer.concat(chunks);
@@ -1484,6 +1516,10 @@ async function handleStreamProxy(req, res) {
     upstreamRes.data.on('error', (err) => {
       console.error('[Stream Proxy Stream Error]:', err.message);
       if (!res.headersSent) res.status(502).end();
+      else res.end();
+    });
+    req.on('close', () => {
+      try { upstreamRes.data.destroy(); } catch (_) {}
     });
 
     upstreamRes.data.pipe(res);

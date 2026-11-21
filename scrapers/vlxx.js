@@ -71,7 +71,8 @@ function removeAccents(str) {
     .replace(/\s+/g, '-');
 }
 
-const videoInfoCache = new Map();
+const { LruTtlCache } = require("../lib/lruCache");
+const videoInfoCache = new LruTtlCache({ maxEntries: 300 });
 
 const CATEGORY_MAP = {
   'tat-ca': '',
@@ -328,7 +329,7 @@ async function extractHlsFromEmbed(embedUrl) {
   return null;
 }
 
-const manifestUrlCache = new Map();
+const manifestUrlCache = new LruTtlCache({ maxEntries: 200 });
 
 async function getRawManifestUrl(rawId, serverNum = 1) {
   const cacheKey = `${rawId}_${serverNum}`;

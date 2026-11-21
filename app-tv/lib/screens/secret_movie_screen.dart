@@ -8,9 +8,11 @@ import '../models/match_model.dart';
 import '../models/movie_model.dart';
 import '../models/watch_history_model.dart';
 import '../services/favorites_service.dart';
+import '../services/gdrive_cache_manager.dart';
 import '../services/watch_history_service.dart';
 import '../services/sync_service.dart';
 import '../widgets/movie_action_dialog.dart';
+import '../widgets/passcode_dialog.dart';
 import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
@@ -33,6 +35,7 @@ class SecretMovieScreen extends StatefulWidget {
 
 class _SecretMovieScreenState extends State<SecretMovieScreen> {
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _favoritesScrollController = ScrollController();
   final ScrollController _genreScrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -40,6 +43,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   // Tab 0: VLFilm, Tab 1: Viet69, Tab 2: xNhau, Tab 3: QMH, Tab 4: HeoAV, Tab 5: Phe69, Tab 6: Google Drive, Tab 7: Telegram Phim, Tab 8: Yêu thích
   int _selectedSourceIndex = 0;
   String _selectedGenre = 'Tất cả';
+  final Set<int> _loadedSecretTabs = {0};
+  int _loadRequestId = 0;
 
   final GlobalKey<GDriveScreenState> _gdriveKey = GlobalKey<GDriveScreenState>();
   final GlobalKey<TelegramScreenState> _telegramKey = GlobalKey<TelegramScreenState>();
@@ -120,7 +125,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     'Xem nhiều',
     'Thích nhiều',
     'Điểm cao',
-    'Decen/LTX',
+    'Decen - LTX',
     'Không che',
     'Vietsub',
     'Nữ sinh',
@@ -208,10 +213,12 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     WatchHistoryService.instance.changeNotifier.removeListener(_onSecretDataChanged);
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _favoritesScrollController.dispose();
     _genreScrollController.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _movies.clear();
+    GDriveCacheManager().clear();
     widget.onExit();
     super.dispose();
   }
@@ -235,6 +242,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       return;
     }
 
+    final int reqId = ++_loadRequestId;
+    final int targetSource = _selectedSourceIndex;
+    final String targetGenre = _selectedGenre;
+
     setState(() {
       _isLoading = true;
       _isLoadingMore = false;
@@ -244,51 +255,51 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     });
 
     List<MovieModel> results = [];
-    if (_selectedSourceIndex == 0) {
+    if (targetSource == 0) {
       // VLFilm
       results = await widget.apiService.getVlxxCatalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 1) {
+    } else if (targetSource == 1) {
       // Viet69
       results = await widget.apiService.getViet69Catalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 2) {
+    } else if (targetSource == 2) {
       // xNhau
       results = await widget.apiService.getXnhauCatalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 3) {
+    } else if (targetSource == 3) {
       // QMH
       results = await widget.apiService.getQmhCatalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 4) {
+    } else if (targetSource == 4) {
       // HeoAV
       results = await widget.apiService.getHeoavCatalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 5) {
+    } else if (targetSource == 5) {
       // Phe69
       results = await widget.apiService.getPhe69Catalog(
         searchQuery: search,
         skip: 0,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
     }
 
-    if (mounted) {
+    if (mounted && reqId == _loadRequestId) {
       setState(() {
         _movies = results;
         _isLoading = false;
@@ -303,62 +314,72 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     if (_selectedSourceIndex >= 6) return;
     if (_isLoadingMore || !_hasMore) return;
 
+    final int reqId = _loadRequestId;
+    final int targetSource = _selectedSourceIndex;
+    final String targetGenre = _selectedGenre;
+    final String? targetSearch = _searchQuery;
+
     setState(() {
       _isLoadingMore = true;
     });
 
     final nextPage = _currentPage + 1;
-    final currentSkip = (nextPage - 1) * 30;
+    // xNhau addon chia 28 phim/trang, các nguồn khác chia 30 phim/trang
+    final int pageSize = targetSource == 2 ? 28 : 30;
+    final currentSkip = (nextPage - 1) * pageSize;
     List<MovieModel> nextResults = [];
 
-    if (_selectedSourceIndex == 0) {
+    if (targetSource == 0) {
       nextResults = await widget.apiService.getVlxxCatalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 1) {
+    } else if (targetSource == 1) {
       nextResults = await widget.apiService.getViet69Catalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 2) {
+    } else if (targetSource == 2) {
       nextResults = await widget.apiService.getXnhauCatalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 3) {
+    } else if (targetSource == 3) {
       nextResults = await widget.apiService.getQmhCatalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 4) {
+    } else if (targetSource == 4) {
       nextResults = await widget.apiService.getHeoavCatalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
-    } else if (_selectedSourceIndex == 5) {
+    } else if (targetSource == 5) {
       nextResults = await widget.apiService.getPhe69Catalog(
-        searchQuery: _searchQuery,
+        searchQuery: targetSearch,
         skip: currentSkip,
-        genre: _selectedGenre,
+        genre: targetGenre,
       );
     }
 
-    if (mounted) {
+    if (mounted && reqId == _loadRequestId) {
       setState(() {
         _isLoadingMore = false;
         if (nextResults.isEmpty) {
           _hasMore = false;
         } else {
-          _currentPage = nextPage;
           final existingIds = _movies.map((m) => m.id).toSet();
           final uniqueNew = nextResults.where((m) => !existingIds.contains(m.id)).toList();
-          if (uniqueNew.isNotEmpty) {
+          if (uniqueNew.isEmpty) {
+            // Hết trang mới (server lặp lại trang cuối) -> ngưng loop
+            _hasMore = false;
+          } else {
+            _currentPage = nextPage;
             _movies.addAll(uniqueNew);
             if (_movies.length > 300) {
               _movies.removeRange(0, _movies.length - 300);
@@ -373,16 +394,41 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     if (_selectedSourceIndex == index) return;
     setState(() {
       _selectedSourceIndex = index;
+      _loadedSecretTabs.add(index);
       _selectedGenre = 'Tất cả';
       _isSearching = false;
       _searchController.clear();
       _searchQuery = null;
     });
     if (index < 6) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
       _loadMovies();
     } else if (index == 8) {
       _loadSecretData();
     }
+  }
+
+  String? _resolveDirectCloudStreamUrl(String id, String title, String? fallbackUrl) {
+    if (fallbackUrl != null && fallbackUrl.isNotEmpty) return fallbackUrl;
+    if (id.startsWith('gdrive_')) {
+      final fileId = id.substring('gdrive_'.length);
+      if (fileId.isNotEmpty) {
+        return widget.apiService.getGDriveStreamUrl(fileId, fileName: title);
+      }
+    } else if (id.startsWith('telegram_')) {
+      final rest = id.substring('telegram_'.length);
+      final lastUnderscore = rest.lastIndexOf('_');
+      if (lastUnderscore > 0 && lastUnderscore < rest.length - 1) {
+        final channelId = rest.substring(0, lastUnderscore);
+        final msgId = int.tryParse(rest.substring(lastUnderscore + 1));
+        if (msgId != null) {
+          return widget.apiService.getTelegramStreamUrl(channelId, msgId);
+        }
+      }
+    }
+    return null;
   }
 
   void _playSecretItem({
@@ -392,7 +438,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     int? positionMs,
     String? streamUrl,
   }) async {
-    final historyId = id.startsWith('movie:') ? id : 'movie:$id';
+    final bool isDirectCloudId = id.startsWith('telegram_') || id.startsWith('gdrive_');
+    final historyId = isDirectCloudId ? id : (id.startsWith('movie:') ? id : 'movie:$id');
     final saved = WatchHistoryService.instance.getProgress(historyId);
     final posMs = positionMs ?? saved?.positionMs;
 
@@ -418,25 +465,46 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       }
     }
 
-    final String cleanId = id.replaceFirst('movie:', '');
-    final bool isPhe69 = cleanId.startsWith('phe69:');
-    final bool isHeoav = cleanId.startsWith('heoav:');
-    final bool isQmh = cleanId.startsWith('qmh:');
-    final bool isXnhau = cleanId.startsWith('xnhau:');
-    final bool isViet69 = cleanId.startsWith('viet69:');
-    final String rawId = cleanId.replaceFirst('phe69:', '').replaceFirst('heoav:', '').replaceFirst('qmh:', '').replaceFirst('xnhau:', '').replaceFirst('viet69:', '').replaceFirst('vlxx:', '');
+    final List<StreamChannel> servers;
+    if (isDirectCloudId) {
+      final directUrl = _resolveDirectCloudStreamUrl(id, title, streamUrl ?? saved?.streamUrl);
+      servers = (directUrl != null && directUrl.isNotEmpty)
+          ? [
+              StreamChannel(
+                name: id.startsWith('telegram_') ? 'Telegram' : 'Google Drive',
+                title: id.startsWith('telegram_') ? 'Telegram Cloud Stream' : 'Google Drive Stream',
+                url: directUrl,
+                headers: const {},
+              ),
+            ]
+          : [];
+    } else {
+      final String cleanId = id.replaceFirst('movie:', '');
+      final bool isPhe69 = cleanId.startsWith('phe69:');
+      final bool isHeoav = cleanId.startsWith('heoav:');
+      final bool isQmh = cleanId.startsWith('qmh:');
+      final bool isXnhau = cleanId.startsWith('xnhau:');
+      final bool isViet69 = cleanId.startsWith('viet69:');
+      final String rawId = cleanId
+          .replaceFirst('phe69:', '')
+          .replaceFirst('heoav:', '')
+          .replaceFirst('qmh:', '')
+          .replaceFirst('xnhau:', '')
+          .replaceFirst('viet69:', '')
+          .replaceFirst('vlxx:', '');
 
-    final List<StreamChannel> servers = isPhe69
-        ? widget.apiService.getPhe69Streams(rawId)
-        : (isHeoav
-            ? widget.apiService.getHeoavStreams(rawId)
-            : (isQmh
-                ? widget.apiService.getQmhStreams(rawId)
-                : (isXnhau
-                    ? widget.apiService.getXnhauStreams(rawId)
-                    : (isViet69
-                        ? widget.apiService.getViet69Streams(rawId)
-                        : widget.apiService.getVlxxStreams(rawId)))));
+      servers = isPhe69
+          ? widget.apiService.getPhe69Streams(rawId)
+          : (isHeoav
+              ? widget.apiService.getHeoavStreams(rawId)
+              : (isQmh
+                  ? widget.apiService.getQmhStreams(rawId)
+                  : (isXnhau
+                      ? widget.apiService.getXnhauStreams(rawId)
+                      : (isViet69
+                          ? widget.apiService.getViet69Streams(rawId)
+                          : widget.apiService.getVlxxStreams(rawId)))));
+    }
 
     if (servers.isEmpty) {
       if (streamUrl != null && streamUrl.isNotEmpty) {
@@ -477,7 +545,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     int? positionMs,
     String? streamUrl,
   }) async {
-    final historyId = id.startsWith('movie:') ? id : 'movie:$id';
+    final bool isDirectCloudId = id.startsWith('telegram_') || id.startsWith('gdrive_');
+    final historyId = isDirectCloudId ? id : (id.startsWith('movie:') ? id : 'movie:$id');
     final isFav = FavoritesService.instance.isFavorite(historyId);
     final hasHist = WatchHistoryService.instance.getProgress(historyId) != null;
 
@@ -489,7 +558,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       hasHistory: hasHist,
     );
 
-    if (action == null || action == MovieAction.cancel) return;
+    if (action == null || action == MovieAction.cancel || !mounted) return;
 
     if (action == MovieAction.toggleFavorite) {
       final nowFav = FavoritesService.instance.toggleFavorite(
@@ -544,6 +613,9 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       _searchController.clear();
       _searchQuery = null;
     });
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
     _loadMovies();
   }
 
@@ -581,11 +653,12 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       }
     }
 
-    final bool isPhe69 = _selectedSourceIndex == 5 || movie.id.startsWith('phe69:');
-    final bool isHeoav = _selectedSourceIndex == 4 || movie.id.startsWith('heoav:');
-    final bool isQmh = _selectedSourceIndex == 3 || movie.id.startsWith('qmh:');
-    final bool isXnhau = _selectedSourceIndex == 2 || movie.id.startsWith('xnhau:');
-    final bool isViet69 = _selectedSourceIndex == 1 || movie.id.startsWith('viet69:');
+    final bool hasPrefix = movie.id.contains(':');
+    final bool isPhe69 = movie.id.startsWith('phe69:') || (!hasPrefix && _selectedSourceIndex == 5);
+    final bool isHeoav = movie.id.startsWith('heoav:') || (!hasPrefix && _selectedSourceIndex == 4);
+    final bool isQmh = movie.id.startsWith('qmh:') || (!hasPrefix && _selectedSourceIndex == 3);
+    final bool isXnhau = movie.id.startsWith('xnhau:') || (!hasPrefix && _selectedSourceIndex == 2);
+    final bool isViet69 = movie.id.startsWith('viet69:') || (!hasPrefix && _selectedSourceIndex == 1);
     final List<StreamChannel> servers = isPhe69
         ? widget.apiService.getPhe69Streams(movie.rawId)
         : (isHeoav
@@ -634,8 +707,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -679,7 +754,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF0F0F0F),
         body: SafeArea(
           child: Column(
             children: [
@@ -739,6 +814,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                     isDense: true,
                                     contentPadding: EdgeInsets.zero,
                                   ),
+                                  onChanged: (_) => setState(() {}),
                                   onSubmitted: (_) => _submitSearch(),
                                 ),
                               ),
@@ -806,7 +882,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                               _isSearching = true;
                             });
                             Future.delayed(const Duration(milliseconds: 100), () {
-                              _searchFocusNode.requestFocus();
+                              if (mounted) _searchFocusNode.requestFocus();
                             });
                           },
                           borderRadius: BorderRadius.circular(10),
@@ -828,6 +904,21 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         ),
                         const SizedBox(width: 6),
                       ],
+                      // Change PIN Button
+                      TvFocusableCard(
+                        onTap: () => PasscodeDialog.showChangePinDialog(context),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white12),
+                          ),
+                          child: const Icon(Icons.pin_rounded, color: Color(0xFF38BDF8), size: 16),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       // Exit & Lock Button
                       TvFocusableCard(
                         onTap: () => Navigator.of(context).pop(),
@@ -967,7 +1058,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                               _isSearching = true;
                             });
                             Future.delayed(const Duration(milliseconds: 100), () {
-                              _searchFocusNode.requestFocus();
+                              if (mounted) _searchFocusNode.requestFocus();
                             });
                           },
                           borderRadius: BorderRadius.circular(10),
@@ -985,6 +1076,24 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                         ),
                       const SizedBox(width: 10),
                     ],
+
+                    // Change PIN button
+                    TvFocusableCard(
+                      onTap: () => PasscodeDialog.showChangePinDialog(context),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        color: const Color(0xFF1E293B),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.pin_rounded, color: Color(0xFF38BDF8), size: 16),
+                            SizedBox(width: 6),
+                            Text('Đổi PIN', style: TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
 
                     // Exit & Lock button
                     TvFocusableCard(
@@ -1183,12 +1292,10 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                 builder: (context, constraints) {
                                   int crossAxisCount = 2;
                                   if (constraints.maxWidth > 1200) {
-                                    crossAxisCount = 6;
-                                  } else if (constraints.maxWidth > 900) {
                                     crossAxisCount = 5;
-                                  } else if (constraints.maxWidth > 650) {
+                                  } else if (constraints.maxWidth > 900) {
                                     crossAxisCount = 4;
-                                  } else if (constraints.maxWidth > 450) {
+                                  } else if (constraints.maxWidth > 600) {
                                     crossAxisCount = 3;
                                   }
 
@@ -1269,15 +1376,15 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                           ),
                                         ),
 
-                                      // 4. Main Catalog Grid
+                                      // 4. Main Catalog Grid (Landscape 16:9 framing for adult video thumbs)
                                       SliverPadding(
                                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                                         sliver: SliverGrid(
                                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                             crossAxisCount: crossAxisCount,
                                             crossAxisSpacing: 12,
-                                            mainAxisSpacing: 16,
-                                            childAspectRatio: 0.68,
+                                            mainAxisSpacing: 14,
+                                            childAspectRatio: 1.22,
                                           ),
                                           delegate: SliverChildBuilderDelegate(
                                             (context, idx) {
@@ -1353,27 +1460,32 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                               ),
                   ),
 
-                  // 1: Google Drive (tab 3)
+                  // 1: Google Drive (tab 6 - lazy mounted on first visit)
                   ExcludeFocus(
                     excluding: _contentStackIndex != 1,
-                    child: GDriveScreen(
-                      key: _gdriveKey,
-                      apiService: widget.apiService,
-                      isActive: _contentStackIndex == 1,
-                    ),
+                    child: _loadedSecretTabs.contains(6)
+                        ? GDriveScreen(
+                            key: _gdriveKey,
+                            apiService: widget.apiService,
+                            isActive: _contentStackIndex == 1,
+                            isPrivate: true,
+                          )
+                        : const SizedBox.shrink(),
                   ),
 
-                  // 2: Telegram Phim (tab 4)
+                  // 2: Telegram Phim (tab 7 - lazy mounted on first visit)
                   ExcludeFocus(
                     excluding: _contentStackIndex != 2,
-                    child: TelegramScreen(
-                      key: _telegramKey,
-                      apiService: widget.apiService,
-                      isActive: _contentStackIndex == 2,
-                    ),
+                    child: _loadedSecretTabs.contains(7)
+                        ? TelegramScreen(
+                            key: _telegramKey,
+                            apiService: widget.apiService,
+                            isActive: _contentStackIndex == 2,
+                          )
+                        : const SizedBox.shrink(),
                   ),
 
-                  // 3: Secret Yêu thích (tab 5)
+                  // 3: Secret Yêu thích (tab 8)
                   ExcludeFocus(
                     excluding: _contentStackIndex != 3,
                     child: _secretFavorites.isEmpty
@@ -1400,17 +1512,15 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                             builder: (context, constraints) {
                               int crossAxisCount = 2;
                               if (constraints.maxWidth > 1200) {
-                                crossAxisCount = 6;
-                              } else if (constraints.maxWidth > 900) {
                                 crossAxisCount = 5;
-                              } else if (constraints.maxWidth > 650) {
+                              } else if (constraints.maxWidth > 900) {
                                 crossAxisCount = 4;
-                              } else if (constraints.maxWidth > 450) {
+                              } else if (constraints.maxWidth > 600) {
                                 crossAxisCount = 3;
                               }
 
                               return CustomScrollView(
-                                controller: _scrollController,
+                                controller: _favoritesScrollController,
                                 cacheExtent: 350,
                                 slivers: [
                                   SliverPadding(
@@ -1419,8 +1529,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                         crossAxisCount: crossAxisCount,
                                         crossAxisSpacing: 12,
-                                        mainAxisSpacing: 16,
-                                        childAspectRatio: 0.68,
+                                        mainAxisSpacing: 14,
+                                        childAspectRatio: 1.22,
                                       ),
                                       delegate: SliverChildBuilderDelegate(
                                         (context, idx) {
@@ -1700,7 +1810,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
   }
 
   Widget _buildSecretFavoriteGridCard(FavoriteItem fav, int index, Color themeColor) {
-    final historyId = fav.id.startsWith('movie:') ? fav.id : 'movie:${fav.id}';
+    final bool isDirectCloudId = fav.id.startsWith('telegram_') || fav.id.startsWith('gdrive_');
+    final historyId = isDirectCloudId ? fav.id : (fav.id.startsWith('movie:') ? fav.id : 'movie:${fav.id}');
     final saved = WatchHistoryService.instance.getProgress(historyId);
 
     return RepaintBoundary(
@@ -1727,8 +1838,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                           ? CachedNetworkImage(
                               imageUrl: fav.poster,
                               fit: BoxFit.cover,
-                              memCacheWidth: 240,
-                              memCacheHeight: 160,
+                              memCacheWidth: 320,
+                              memCacheHeight: 190,
                               errorWidget: (_, __, ___) => Container(
                                 color: const Color(0xFF334155),
                                 child: const Icon(Icons.movie_outlined, color: Colors.white30, size: 36),
@@ -1935,7 +2046,7 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
       hasHistory: hasHist,
     );
 
-    if (action == null || action == MovieAction.cancel) return;
+    if (action == null || action == MovieAction.cancel || !mounted) return;
 
     if (action == MovieAction.toggleFavorite) {
       final nowFav = FavoritesService.instance.toggleFavorite(
@@ -1998,8 +2109,8 @@ class _SecretMovieScreenState extends State<SecretMovieScreen> {
                 children: [
                   CachedNetworkImage(
                     imageUrl: movie.poster,
-                    memCacheWidth: 240,
-                    memCacheHeight: 160,
+                    memCacheWidth: 320,
+                    memCacheHeight: 190,
                     fit: BoxFit.cover,
                     errorWidget: (_, __, ___) => Container(
                       color: const Color(0xFF334155),

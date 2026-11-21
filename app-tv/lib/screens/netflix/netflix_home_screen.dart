@@ -11,6 +11,7 @@ import '../../player/video_player_screen.dart';
 import '../../services/favorites_service.dart';
 import '../../services/sync_service.dart';
 import '../../services/watch_history_service.dart';
+import '../../widgets/loading_dialog_helper.dart';
 import '../../widgets/resume_playback_dialog.dart';
 import '../../widgets/movie_action_dialog.dart';
 import '../../widgets/tv_focusable_card.dart';
@@ -206,17 +207,11 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
   }
 
   void _onMatchSelected(MatchModel match) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFE50914)),
-      ),
+    final streams = await LoadingDialogHelper.runWithLoading(
+      context,
+      () => widget.apiService.getMatchStreams(match.id, source: 'xoilac'),
     );
-
-    final streams = await widget.apiService.getMatchStreams(match.id, source: 'xoilac');
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    if (!mounted || streams == null) return;
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -438,8 +433,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -454,23 +451,14 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     BuildContext? replaceContext,
   }) async {
     final targetContext = replaceContext ?? context;
+    if (!targetContext.mounted) return;
 
-    showDialog(
-      context: targetContext,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFFE50914)),
-      ),
+    final streams = await LoadingDialogHelper.runWithLoading(
+      targetContext,
+      () => widget.apiService.getAnimeEpisodeStreams(animeId, season, episode),
     );
 
-    final streams = await widget.apiService.getAnimeEpisodeStreams(
-      animeId,
-      season,
-      episode,
-    );
-
-    if (!mounted) return;
-    Navigator.of(targetContext).pop();
+    if (!mounted || !targetContext.mounted || streams == null) return;
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -526,8 +514,10 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -579,10 +569,13 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
     final bool hasVietnam = _vietnamMatches.isNotEmpty;
     final bool hasMajor = _majorMatches.isNotEmpty;
 
-    return SingleChildScrollView(
-      controller: _scrollController,
-      physics: const AlwaysScrollableScrollPhysics(),
-      child: Column(
+    return RefreshIndicator(
+      onRefresh: () => _loadData(forceRefresh: true),
+      color: const Color(0xFFE50914),
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 18),
@@ -627,12 +620,13 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
           ],
 
           // 6. ALL MATCHES (⚽ CÁC TRẬN ĐẤU KHÁC)
-          if (_matches.isNotEmpty) ...[
+          if (_matches.length > 3) ...[
             _buildSectionTitle('⚽ CÁC TRẬN ĐẤU KHÁC HÔM NAY', onSeeAll: () => widget.onNavigateTab?.call(1)),
             _buildMatchesRow(_matches.skip(3).take(10).toList(), firstNode: _firstOtherMatchFocusNode),
             const SizedBox(height: 32),
           ],
         ],
+      ),
       ),
     );
   }
@@ -779,22 +773,23 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                           else
                             Container(color: const Color(0xFF262626)),
 
-                          // Episode Badge
-                          Positioned(
-                            top: 6,
-                            left: 6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                'TẬP ${item.episode}',
-                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                          // Episode Badge (Chỉ hiển thị nếu episode > 0)
+                          if (item.episode > 0)
+                            Positioned(
+                              top: 6,
+                              left: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'TẬP ${item.episode}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                          ),
 
                           // Center Play Icon
                           Center(
@@ -1034,7 +1029,11 @@ class NetflixHomeScreenState extends State<NetflixHomeScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          match.isOngoingNow ? 'LIVE ${match.liveMinuteLabel}' : match.time,
+                          match.isOngoingNow
+                              ? (match.score.isNotEmpty && match.score != 'VS' && match.score != '-'
+                                  ? 'LIVE ${match.score}'
+                                  : 'LIVE ${match.liveMinuteLabel}')
+                              : match.time,
                           style: TextStyle(
                             color: match.isOngoingNow ? const Color(0xFFE50914) : const Color(0xFF38BDF8),
                             fontSize: isMobile ? 9.5 : 10,

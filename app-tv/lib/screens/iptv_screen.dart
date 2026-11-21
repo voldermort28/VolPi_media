@@ -1,8 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:path_provider/path_provider.dart';
 import '../api/api_service.dart';
 import '../models/iptv_channel_model.dart';
-import '../models/match_model.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
 
@@ -45,6 +47,9 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
   List<IptvChannelModel> _allChannels = [];
   List<IptvSourceModel> _serverSources = [];
+  Set<String> _localPinnedIds = {};
+  int _dataVersion = 0;
+  DateTime? _lastFetchTime;
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _errorMessage;
@@ -91,14 +96,82 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       }
     });
 
+    _loadLocalPins();
     _loadChannels(forceRefresh: false);
+  }
+
+  Future<File> _getLocalPinsFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/iptv_local_pins.json');
+  }
+
+  Future<void> _loadLocalPins() async {
+    try {
+      final file = await _getLocalPinsFile();
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        final decoded = json.decode(content);
+        if (decoded is List) {
+          final pins = decoded.whereType<String>().toSet();
+          if (mounted) {
+            setState(() {
+              _localPinnedIds = pins;
+              _dataVersion++;
+            });
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveLocalPins() async {
+    try {
+      final file = await _getLocalPinsFile();
+      final tmp = File('${file.path}.tmp');
+      await tmp.writeAsString(json.encode(_localPinnedIds.toList()), flush: true);
+      await tmp.rename(file.path);
+    } catch (_) {}
+  }
+
+  bool _isChannelPinned(IptvChannelModel c) {
+    return c.isPinned || _localPinnedIds.contains(c.id);
+  }
+
+  void _toggleLocalPin(IptvChannelModel channel) {
+    if (channel.isPinned && !_localPinnedIds.contains(channel.id)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kênh này được ghim mặc định từ máy chủ.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    final bool nowPinned = !_localPinnedIds.contains(channel.id);
+    setState(() {
+      if (nowPinned) {
+        _localPinnedIds.add(channel.id);
+      } else {
+        _localPinnedIds.remove(channel.id);
+      }
+      _dataVersion++;
+    });
+    _saveLocalPins();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(nowPinned ? 'Đã ghim kênh "${channel.displayTitle}" ⭐' : 'Đã bỏ ghim "${channel.displayTitle}"'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: nowPinned ? const Color(0xFFD97706) : const Color(0xFF334155),
+      ),
+    );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && widget.isActive) {
-      // Khi người dùng chuyển từ app khác (ví dụ: trình duyệt vừa thêm source) quay lại app
-      _loadChannels(forceRefresh: true);
+      if (_lastFetchTime == null || DateTime.now().difference(_lastFetchTime!).inSeconds > 60) {
+        _loadChannels(forceRefresh: true);
+      }
     }
   }
 
@@ -106,8 +179,9 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   void didUpdateWidget(covariant IptvScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive && !oldWidget.isActive) {
-      // Tự động làm mới danh sách kênh khi người dùng chuyển sang tab Truyền Hình (IPTV)
-      _loadChannels(forceRefresh: true);
+      if (_lastFetchTime == null || DateTime.now().difference(_lastFetchTime!).inSeconds > 60) {
+        _loadChannels(forceRefresh: true);
+      }
     }
   }
 
@@ -144,9 +218,12 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       final sources = results[1] as List<IptvSourceModel>;
 
       if (mounted) {
+        final bool wasEmpty = _allChannels.isEmpty;
         setState(() {
           _allChannels = channels;
           _serverSources = sources;
+          _dataVersion++;
+          _lastFetchTime = DateTime.now();
           _isLoading = false;
           _isRefreshing = false;
           final hasFootball = _allChannels.any((c) => c.category == 'FOOTBALL');
@@ -155,12 +232,14 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
           }
         });
 
-        // Tự động focus vào kênh trận đấu đang diễn ra đầu tiên
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _allChannels.isNotEmpty && !_searchCardFocusNode.hasFocus && !_searchTextFieldFocusNode.hasFocus) {
-            _firstChannelCardFocusNode.requestFocus();
-          }
-        });
+        // Chỉ tự động focus vào kênh đầu tiên ở lần tải đầu khi tab đang active (không cướp focus từ tab khác)
+        if (wasEmpty && widget.isActive) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && widget.isActive && _allChannels.isNotEmpty && !_searchCardFocusNode.hasFocus && !_searchTextFieldFocusNode.hasFocus) {
+              _firstChannelCardFocusNode.requestFocus();
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -174,7 +253,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   List<IptvSourceModel> _getAvailableSources() {
-    if (_lastSourceChannelsCount == _allChannels.length && _cachedSources != null) {
+    if (_lastSourceChannelsCount == _dataVersion && _cachedSources != null) {
       return _cachedSources!;
     }
 
@@ -214,7 +293,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       ));
     });
 
-    _lastSourceChannelsCount = _allChannels.length;
+    _lastSourceChannelsCount = _dataVersion;
     _cachedSources = sources;
     return sources;
   }
@@ -222,7 +301,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   int _getCategoryCount(String categoryId) {
     return _allChannels.where((c) {
       if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) return false;
-      if (categoryId == 'PINNED') return c.isPinned;
+      if (categoryId == 'PINNED') return _isChannelPinned(c);
       if (categoryId == 'ALL') return true;
       return c.category == categoryId;
     }).length;
@@ -236,7 +315,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   List<String> _getAvailableGroups() {
-    final currentKey = '$_selectedSourceId|$_selectedCategory|${_allChannels.length}';
+    final currentKey = '$_selectedSourceId|$_selectedCategory|$_dataVersion';
     if (_lastGroupsKey == currentKey && _cachedGroups != null) {
       return _cachedGroups!;
     }
@@ -246,7 +325,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       if (_selectedSourceId != 'ALL' && c.sourceId != _selectedSourceId) continue;
 
       if (_selectedCategory == 'PINNED') {
-        if (!c.isPinned) continue;
+        if (!_isChannelPinned(c)) continue;
       } else if (_selectedCategory != 'ALL') {
         if (c.category != _selectedCategory) continue;
       }
@@ -263,7 +342,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   List<IptvChannelModel> _getFilteredChannels() {
-    final currentKey = '$_selectedSourceId|$_selectedCategory|$_selectedGroup|$_searchQuery|${_allChannels.length}';
+    final currentKey = '$_selectedSourceId|$_selectedCategory|$_selectedGroup|$_searchQuery|$_dataVersion';
     if (_lastFilterKey == currentKey && _cachedFilteredChannels != null) {
       return _cachedFilteredChannels!;
     }
@@ -276,14 +355,14 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
 
       // 2. Category filter
       if (_selectedCategory == 'PINNED') {
-        if (!c.isPinned) return false;
+        if (!_isChannelPinned(c)) return false;
       } else if (_selectedCategory != 'ALL') {
         if (c.category != _selectedCategory) return false;
       }
 
       // 3. Group filter
       if (_selectedGroup == '⭐ Yêu Thích') {
-        if (!c.isPinned) return false;
+        if (!_isChannelPinned(c)) return false;
       } else if (_selectedGroup != 'ALL') {
         if (c.group != _selectedGroup) return false;
       }
@@ -303,8 +382,10 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
     // 5. Smart chronological & status sorting
     list.sort((a, b) {
       // 1. Pinned channels first
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
+      final aPinned = _isChannelPinned(a);
+      final bPinned = _isChannelPinned(b);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
 
       // 2. In ALL tab, FOOTBALL (1) ALWAYS first, then OTHER_SPORTS (2), then FIXED_TV (3)
       if (_selectedCategory == 'ALL') {
@@ -408,7 +489,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                         final sourceChannels = _allChannels.where((c) => c.sourceId == source.id).toList();
                         if (sourceChannels.isNotEmpty) {
                           final countInCurrent = sourceChannels.where((c) {
-                            if (_selectedCategory == 'PINNED') return c.isPinned;
+                            if (_selectedCategory == 'PINNED') return _isChannelPinned(c);
                             if (_selectedCategory == 'ALL') return true;
                             return c.category == _selectedCategory;
                           }).length;
@@ -536,15 +617,16 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       return;
     }
 
+    final primary = channel.toStreamChannel(baseUrl: widget.apiService.baseUrl);
     final availableChannels = currentList.map((c) => c.toStreamChannel(baseUrl: widget.apiService.baseUrl)).toList();
 
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => VideoPlayerScreen(
-          streamUrl: channel.getPlaybackUrl(baseUrl: widget.apiService.baseUrl),
+          streamUrl: primary.url,
           title: channel.name,
           subtitle: channel.group,
-          headers: channel.headers,
+          headers: primary.headers,
           availableChannels: availableChannels,
           isLive: true,
         ),
@@ -631,9 +713,9 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
           crossAxisCount = 3;
         }
 
-        return Scaffold(
-          backgroundColor: const Color(0xFF0F172A),
-          body: showSidebar
+        return Container(
+          color: const Color(0xFF0F0F0F),
+          child: showSidebar
               ? Row(
                   children: [
                     // LEFT SIDEBAR (Category, Source, Groups)
@@ -1054,17 +1136,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              if (_searchQuery.isNotEmpty)
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _searchController.clear();
-                                      _searchQuery = '';
-                                    });
-                                  },
-                                  child: const Icon(Icons.clear_rounded, color: Colors.white54, size: 14),
-                                )
-                              else if (_isSearchCardFocused)
+                              if (_searchQuery.isEmpty && _isSearchCardFocused)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                                   decoration: BoxDecoration(
@@ -1081,6 +1153,35 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                         ),
                       ),
               ),
+              if (_searchQuery.isNotEmpty && !_isSearchActive) ...[
+                const SizedBox(width: 6),
+                TvFocusableCard(
+                  onTap: () {
+                    setState(() {
+                      _searchController.clear();
+                      _searchQuery = '';
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    height: 38,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.clear_rounded, color: Colors.redAccent, size: 16),
+                        SizedBox(width: 4),
+                        Text('Xóa lọc', style: TextStyle(color: Colors.redAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 10),
 
               // Refresh Button
@@ -1229,6 +1330,47 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
                 ),
               ),
             ],
+          ),
+        ),
+
+        // Mobile Search Bar (để tìm kênh dễ dàng trên iPhone / Android Phone)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Container(
+            height: 38,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search_rounded, color: Color(0xFF38BDF8), size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: const InputDecoration(
+                      hintText: 'Tìm kênh VTV, K+, bóng đá...',
+                      hintStyle: TextStyle(color: Colors.white38, fontSize: 12),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
+                  ),
+              ],
+            ),
           ),
         ),
 
@@ -1492,6 +1634,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
     final otherOngoing = channels.where((c) => c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot && !c.isPremierLeagueOrC1).toList();
     final otherUpcoming = channels.where((c) => !c.isOngoingNow && !c.isFinishedMatch && c.priorityLevel > 2 && !c.isFamous && !c.isVietnam && !c.isHot && !c.isPremierLeagueOrC1).toList();
     final finished = channels.where((c) => c.isFinishedMatch).toList();
+    final visualOrdered = <IptvChannelModel>[...major, ...otherOngoing, ...otherUpcoming, ...finished];
 
     return CustomScrollView(
       cacheExtent: 350,
@@ -1542,7 +1685,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
                   major[index],
-                  channels,
+                  visualOrdered,
                   focusNode: index == 0 ? _firstChannelCardFocusNode : null,
                 ),
                 childCount: major.length,
@@ -1606,7 +1749,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
                   otherOngoing[index],
-                  channels,
+                  visualOrdered,
                   focusNode: (major.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
                 ),
                 childCount: otherOngoing.length,
@@ -1662,7 +1805,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
                   otherUpcoming[index],
-                  channels,
+                  visualOrdered,
                   focusNode: (major.isEmpty && otherOngoing.isEmpty && index == 0) ? _firstChannelCardFocusNode : null,
                 ),
                 childCount: otherUpcoming.length,
@@ -1718,7 +1861,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
               delegate: SliverChildBuilderDelegate(
                 (context, index) => _buildChannelCard(
                   finished[index],
-                  channels,
+                  visualOrdered,
                 ),
                 childCount: finished.length,
                 addAutomaticKeepAlives: true,
@@ -1735,6 +1878,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildChannelCard(IptvChannelModel channel, List<IptvChannelModel> currentList, {FocusNode? focusNode}) {
+    final bool pinned = _isChannelPinned(channel);
     Color focusBorder = const Color(0xFF38BDF8);
     Color cardBg = const Color(0xFF161E2E);
     Color borderColor = const Color(0xFF1E293B);
@@ -1747,7 +1891,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
       focusBorder = const Color(0xFFFDE047);
       cardBg = const Color(0xFF500724).withOpacity(0.7);
       borderColor = const Color(0xFFDC2626);
-    } else if (channel.isPinned) {
+    } else if (pinned) {
       focusBorder = const Color(0xFFF59E0B);
       cardBg = const Color(0xFF1E293B).withOpacity(0.9);
       borderColor = const Color(0xFFF59E0B).withOpacity(0.5);
@@ -1764,6 +1908,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
     return TvFocusableCard(
       focusNode: focusNode,
       onTap: () => _playChannel(channel, currentList),
+      onLongPress: () => _toggleLocalPin(channel),
       focusBorderColor: focusBorder,
       borderRadius: BorderRadius.circular(14),
       child: Container(
@@ -1784,7 +1929,7 @@ class IptvScreenState extends State<IptvScreen> with WidgetsBindingObserver {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (channel.isPinned)
+                if (pinned)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                     decoration: BoxDecoration(

@@ -5,11 +5,12 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/anime_model.dart';
 import '../models/match_model.dart';
 import '../models/watch_history_model.dart';
+import '../services/audio_player_handler.dart';
 import '../services/player_settings_service.dart';
-import '../services/sync_service.dart';
 import '../services/watch_history_service.dart';
 import '../widgets/tv_focusable_card.dart';
 
@@ -63,10 +64,11 @@ class VideoPlayerScreen extends StatefulWidget {
   }
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
+class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindingObserver {
   Timer? _saveProgressTimer;
   DateTime? _lastBackHandledTime;
-  late VideoPlayerController _controller;
+  VideoPlayerController? _controller;
+  int _initGeneration = 0;
   bool _isInitialized = false;
   bool _hasError = false;
   String _errorMessage = '';
@@ -75,6 +77,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   late String _currentStreamUrl;
   late String _currentTitle;
   late Map<String, String> _currentHeaders;
+
+  // Live auto-reconnect & mid-playback buffering state
+  int _reconnectAttempts = 0;
+  static const int _maxLiveReconnects = 3;
+  Timer? _reconnectTimer;
+  bool _isReconnecting = false;
+  bool _lastIsBuffering = false;
+  bool _lastIsPlaying = false;
+  bool _isSwitchingEpisode = false;
+
+  // Playback Speed & Aspect Ratio (Zoom) + Mobile Software Brightness
+  static const List<double> _speedOptions = [0.75, 1.0, 1.25, 1.5, 2.0];
+  double _playbackSpeed = 1.0;
+  int _aspectModeIndex = 0; // 0: Vừa (Fit), 1: Lấp đầy (Fill/Cover), 2: 16:9, 3: 4:3
+  static const List<String> _aspectModeLabels = ['Vừa', 'Lấp đầy', '16:9', '4:3'];
+  double _softwareBrightness = 1.0; // 0.25 .. 1.0 (Mobile left-side vertical swipe)
+  bool _isVerticalDragging = false;
+  bool _verticalDragIsLeft = false;
 
   // Swipe Gesture Seeking (Vuốt ngang để tua)
   bool _isDragging = false;
@@ -117,7 +137,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _showStreamSelector = false;
   bool _showEpisodeSelector = false;
 
-  // TV Remote Focus Nodes
+  // TV Remote Focus Nodes (all reusable State fields — never created inside build)
+  final FocusNode _rootFocusNode = FocusNode();
   final FocusNode _playPauseFocusNode = FocusNode();
   final FocusNode _seekBarFocusNode = FocusNode();
   final FocusNode _prevFocusNode = FocusNode();
@@ -125,11 +146,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   final FocusNode _replay10FocusNode = FocusNode();
   final FocusNode _forward10FocusNode = FocusNode();
   final FocusNode _skipIntroFocusNode = FocusNode();
+  final FocusNode _speedButtonFocusNode = FocusNode();
+  final FocusNode _aspectButtonFocusNode = FocusNode();
   final FocusNode _episodesButtonFocusNode = FocusNode();
   final FocusNode _channelsButtonFocusNode = FocusNode();
   final FocusNode _backButtonFocusNode = FocusNode();
   final FocusNode _rotateFocusNode = FocusNode();
   final FocusNode _lockFocusNode = FocusNode();
+  final FocusNode _volumeSliderFocusNode = FocusNode(canRequestFocus: false);
+  final FocusNode _progressSliderFocusNode = FocusNode(canRequestFocus: false);
+  final FocusNode _errorRetryFocusNode = FocusNode();
+  final FocusNode _countdownPlayFocusNode = FocusNode();
+  final FocusNode _countdownCancelFocusNode = FocusNode();
   final List<FocusNode> _channelFocusNodes = [];
   final List<FocusNode> _episodeFocusNodes = [];
   bool _lastFocusedOnSeekBar = true;
@@ -154,7 +182,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         name: 'Server 1',
         title: widget.subtitle.isNotEmpty ? widget.subtitle : 'Full HD (Mặc định)',
         url: _currentStreamUrl.isNotEmpty ? _currentStreamUrl : widget.streamUrl,
-        headers: widget.headers ?? {},
+        headers: widget.headers,
       ),
     ];
   }
@@ -166,7 +194,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     list.add(_playPauseFocusNode);
     if (!widget.isLive) {
       list.add(_forward10FocusNode);
+      list.add(_skipIntroFocusNode);
+      list.add(_speedButtonFocusNode);
     }
+    list.add(_aspectButtonFocusNode);
     if (widget.onNext != null) list.add(_nextFocusNode);
     if (widget.episodes != null && widget.episodes!.isNotEmpty && widget.onSelectEpisode != null) {
       list.add(_episodesButtonFocusNode);
@@ -263,11 +294,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _startHideControlsTimer();
       return;
     }
+    if (_nextCountdownSeconds > 0 && !_showControls) {
+      _cancelNextCountdown();
+      _rootFocusNode.requestFocus();
+      return;
+    }
     if (_showControls) {
       setState(() {
         _showControls = false;
       });
       _hideControlsTimer?.cancel();
+      _rootFocusNode.requestFocus();
       return;
     }
     _exitPlayer();
@@ -275,10 +312,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   bool get _isMacOrDesktop => !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
   bool get _isIOS => !kIsWeb && Platform.isIOS;
+  bool get _isTouchMobile {
+    if (_isIOS) return true;
+    if (!kIsWeb && Platform.isAndroid) {
+      final mq = MediaQuery.maybeOf(context);
+      if (mq != null && (mq.orientation == Orientation.portrait || mq.size.shortestSide < 460)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _setWakelock(bool enable) {
+    try {
+      final fut = enable ? WakelockPlus.enable() : WakelockPlus.disable();
+      unawaited(fut.catchError((_) {}));
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Tạm dừng nhạc nền nếu đang phát trước khi mở video
+    VolPiAudioHandler.instance.pauseIfPlaying();
+
     _currentStreamUrl = widget.streamUrl;
     _currentTitle = widget.title;
     _currentHeaders = widget.headers;
@@ -307,6 +365,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _replay10FocusNode,
       _forward10FocusNode,
       _skipIntroFocusNode,
+      _speedButtonFocusNode,
+      _aspectButtonFocusNode,
       _episodesButtonFocusNode,
       _channelsButtonFocusNode,
     ]) {
@@ -318,51 +378,120 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    _setWakelock(true);
     _initPlayer();
   }
 
-  Future<void> _initPlayer({Duration? resumePosition}) async {
-    setState(() {
-      _isInitialized = false;
-      _hasError = false;
-    });
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _saveCurrentProgress(triggerSync: true);
+      WatchHistoryService.instance.flush();
+      _setWakelock(false);
+    } else if (state == AppLifecycleState.resumed) {
+      if (_isInitialized && (_controller?.value.isPlaying ?? false)) {
+        _setWakelock(true);
+      }
+    }
+  }
 
+  Future<void> _initPlayer({Duration? resumePosition, bool isReconnect = false}) async {
+    final int gen = ++_initGeneration;
+    _reconnectTimer?.cancel();
+    if (!isReconnect) {
+      _reconnectAttempts = 0;
+    }
+
+    final oldController = _controller;
+    _controller = null;
+    if (oldController != null) {
+      try {
+        oldController.removeListener(_videoListener);
+        oldController.dispose();
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() {
+        _isInitialized = false;
+        _hasError = false;
+        _isReconnecting = isReconnect;
+        _lastIsBuffering = false;
+      });
+    }
+
+    VideoPlayerController? newController;
     try {
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(_currentStreamUrl),
+      final parsedUri = Uri.parse(_currentStreamUrl.trim());
+      newController = VideoPlayerController.networkUrl(
+        parsedUri,
         httpHeaders: _currentHeaders,
       );
 
-      await _controller.initialize();
-      final double targetVol = _isMuted ? 0.0 : _volume;
-      await _controller.setVolume(targetVol);
-      final Duration? targetPos = resumePosition ?? widget.initialPosition;
-      if (targetPos != null && targetPos > Duration.zero) {
-        await _controller.seekTo(targetPos);
+      await newController.initialize();
+      if (!mounted || gen != _initGeneration) {
+        try {
+          await newController.dispose();
+        } catch (_) {}
+        return;
       }
-      await _controller.play();
 
-      // Cố định mức âm lượng đã lưu sau khi luồng phát bắt đầu để ngăn native AVPlayer/ExoPlayer tự ý bật lại 100%
-      await _controller.setVolume(targetVol);
+      final double targetVol = _isMuted ? 0.0 : _volume;
+      await newController.setVolume(targetVol);
+      if (!widget.isLive && _playbackSpeed != 1.0) {
+        try {
+          await newController.setPlaybackSpeed(_playbackSpeed);
+        } catch (_) {}
+      }
+
+      final Duration? targetPos = resumePosition ?? widget.initialPosition;
+      if (!widget.isLive && targetPos != null && targetPos > Duration.zero) {
+        await newController.seekTo(targetPos);
+      }
+      if (!mounted || gen != _initGeneration) {
+        try {
+          await newController.dispose();
+        } catch (_) {}
+        return;
+      }
+
+      await newController.play();
+      if (!mounted || gen != _initGeneration) {
+        try {
+          await newController.dispose();
+        } catch (_) {}
+        return;
+      }
+
+      await newController.setVolume(targetVol);
+      _controller = newController;
+      _reconnectAttempts = 0;
+      _isReconnecting = false;
+      _lastIsPlaying = true;
+      _setWakelock(true);
+
       Future.delayed(const Duration(milliseconds: 250), () {
-        if (mounted && _isInitialized) {
-          _controller.setVolume(_isMuted ? 0.0 : _volume);
+        if (mounted && gen == _initGeneration && _controller != null && _isInitialized) {
+          _controller!.setVolume(_isMuted ? 0.0 : _volume);
         }
       });
       Future.delayed(const Duration(milliseconds: 600), () {
-        if (mounted && _isInitialized) {
-          _controller.setVolume(_isMuted ? 0.0 : _volume);
+        if (mounted && gen == _initGeneration && _controller != null && _isInitialized) {
+          _controller!.setVolume(_isMuted ? 0.0 : _volume);
         }
       });
 
-      _controller.addListener(_videoListener);
+      newController.addListener(_videoListener);
 
-      if (mounted) {
+      if (mounted && gen == _initGeneration) {
         setState(() {
           _isInitialized = true;
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || !_showControls) return;
+          if (!mounted || gen != _initGeneration || !_showControls) return;
+          if (_showStreamSelector || _showEpisodeSelector) return;
           if (!widget.isLive) {
             _lastFocusedOnSeekBar = true;
             _seekBarFocusNode.requestFocus();
@@ -374,48 +503,125 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _startHideControlsTimer();
         _saveProgressTimer?.cancel();
         _saveProgressTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-          _saveCurrentProgress();
+          // Chỉ lưu cục bộ RAM + đĩa mỗi 5s, KHÔNG đẩy HTTP Sync mỗi 5s
+          _saveCurrentProgress(triggerSync: false);
         });
       }
     } catch (e) {
-      if (mounted) {
-        final errStr = e.toString();
-        String friendlyError = 'Không thể phát luồng này: $errStr';
-
-        if (errStr.contains('12939') ||
-            (errStr.contains('length') && errStr.contains('2040')) ||
-            errStr.contains('429') ||
-            errStr.contains('QUOTA_EXCEEDED') ||
-            errStr.contains('Quota exceeded')) {
-          friendlyError =
-              'File này đã bị Google Drive giới hạn lượt tải công khai trong 24 giờ (Quota Exceeded).\n\n'
-              '💡 Cách khắc phục: Vui lòng mở trang web quản trị https://stremio.laboon.vn/gdrive '
-              'và kết nối Tài Khoản Google của bạn để phát không giới hạn!';
-        }
-
-        setState(() {
-          _hasError = true;
-          _errorMessage = friendlyError;
-        });
+      if (newController != null && newController != _controller) {
+        try {
+          await newController.dispose();
+        } catch (_) {}
       }
+      if (!mounted || gen != _initGeneration) return;
+
+      // Tự động kết nối lại tối đa 3 lần đối với luồng Live/IPTV
+      if (widget.isLive && _reconnectAttempts < _maxLiveReconnects) {
+        _scheduleLiveReconnect();
+        return;
+      }
+
+      _setWakelock(false);
+      final errStr = e.toString();
+      String friendlyError = 'Không thể phát luồng này: $errStr';
+
+      if (errStr.contains('12939') ||
+          (errStr.contains('length') && errStr.contains('2040')) ||
+          errStr.contains('429') ||
+          errStr.contains('QUOTA_EXCEEDED') ||
+          errStr.contains('Quota exceeded')) {
+        friendlyError =
+            'File này đã bị Google Drive giới hạn lượt tải công khai trong 24 giờ (Quota Exceeded).\n\n'
+            '💡 Cách khắc phục: Vui lòng mở trang web quản trị https://stremio.laboon.vn/gdrive '
+            'và kết nối Tài Khoản Google của bạn để phát không giới hạn!';
+      }
+
+      setState(() {
+        _hasError = true;
+        _isReconnecting = false;
+        _errorMessage = friendlyError;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _hasError && _errorRetryFocusNode.canRequestFocus) {
+          _errorRetryFocusNode.requestFocus();
+        }
+      });
     }
   }
 
-  void _videoListener() {
-    if (!mounted || !_isInitialized) return;
+  void _scheduleLiveReconnect() {
+    _reconnectAttempts++;
+    final int delaySec = _reconnectAttempts * 2;
+    if (mounted) {
+      setState(() {
+        _isInitialized = false;
+        _hasError = false;
+        _isReconnecting = true;
+      });
+    }
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: delaySec), () {
+      if (mounted) {
+        _initPlayer(isReconnect: true);
+      }
+    });
+  }
 
-    // Check auto-play next episode when near end (last 15 seconds) or ended
-    if (widget.onNext != null && !widget.isLive && !_hasTriggeredNextCountdown) {
-      final pos = _controller.value.position;
-      final dur = _controller.value.duration;
-      if (dur > const Duration(seconds: 30) && (pos >= dur - const Duration(seconds: 15) || (!dur.isNegative && pos >= dur && dur > Duration.zero))) {
+  void _videoListener() {
+    final ctrl = _controller;
+    if (!mounted || !_isInitialized || ctrl == null) return;
+    final val = ctrl.value;
+
+    // 1. Bắt lỗi phát sinh giữa chừng (rớt mạng / hết hạn token HLS / đứt luồng IPTV)
+    if (val.hasError) {
+      final errDesc = val.errorDescription ?? 'Kết nối luồng phát bị gián đoạn';
+      if (widget.isLive && _reconnectAttempts < _maxLiveReconnects) {
+        _scheduleLiveReconnect();
+        return;
+      }
+      _setWakelock(false);
+      setState(() {
+        _isInitialized = false;
+        _hasError = true;
+        _isReconnecting = false;
+        _errorMessage = 'Luồng phát bị ngắt giữa chừng: $errDesc';
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _hasError && _errorRetryFocusNode.canRequestFocus) {
+          _errorRetryFocusNode.requestFocus();
+        }
+      });
+      return;
+    }
+
+    // 2. Đồng bộ Wakelock theo trạng thái Play/Pause
+    if (val.isPlaying != _lastIsPlaying) {
+      _lastIsPlaying = val.isPlaying;
+      _setWakelock(val.isPlaying);
+    }
+
+    // 3. Cập nhật UI ngay lập tức khi chuyển trạng thái Buffering (ngay cả khi OSD đang ẩn!)
+    final bool bufferingChanged = val.isBuffering != _lastIsBuffering;
+    if (bufferingChanged) {
+      _lastIsBuffering = val.isBuffering;
+    }
+
+    // 4. Tự động đếm ngược Tập tiếp theo (và hủy nếu người dùng tua ngược lại)
+    if (widget.onNext != null && !widget.isLive) {
+      final pos = val.position;
+      final dur = val.duration;
+      if (_nextCountdownSeconds > 0 && dur > const Duration(seconds: 30) && pos < dur - const Duration(seconds: 20)) {
+        _cancelNextCountdown();
+        _hasTriggeredNextCountdown = false;
+      } else if (!_hasTriggeredNextCountdown &&
+          dur > const Duration(seconds: 30) &&
+          (pos >= dur - const Duration(seconds: 15) || (!dur.isNegative && pos >= dur && dur > Duration.zero))) {
         _startNextEpisodeCountdown();
       }
     }
 
-    // Performance optimization for low-end hardware:
-    // Only rebuild UI if controls or countdown are currently visible.
-    if (_showControls || _nextCountdownSeconds > 0) {
+    // Chỉ rebuild UI khi OSD mở, đang đếm ngược hoặc trạng thái buffering vừa đổi
+    if (_showControls || _nextCountdownSeconds > 0 || bufferingChanged) {
       setState(() {});
     }
   }
@@ -440,15 +646,36 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     });
     setState(() {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _nextCountdownSeconds > 0 && !_showControls && _countdownPlayFocusNode.canRequestFocus) {
+        _countdownPlayFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _triggerEpisodeCallback(VoidCallback? callback) {
+    if (callback == null || _isSwitchingEpisode) return;
+    _isSwitchingEpisode = true;
+    _nextCountdownTimer?.cancel();
+    _nextCountdownTimer = null;
+    if (mounted) {
+      setState(() {
+        _nextCountdownSeconds = 0;
+      });
+    }
+    _saveCurrentProgress(triggerSync: true);
+    WatchHistoryService.instance.flush();
+    try {
+      _controller?.pause();
+    } catch (_) {}
+    callback();
+    Future.delayed(const Duration(seconds: 3), () {
+      _isSwitchingEpisode = false;
+    });
   }
 
   void _playNextEpisodeImmediately() {
-    _nextCountdownTimer?.cancel();
-    _nextCountdownTimer = null;
-    setState(() {
-      _nextCountdownSeconds = 0;
-    });
-    widget.onNext?.call();
+    _triggerEpisodeCallback(widget.onNext);
   }
 
   void _cancelNextCountdown() {
@@ -459,13 +686,35 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  void _cyclePlaybackSpeed() {
+    if (widget.isLive || !_isInitialized || _controller == null) return;
+    final idx = _speedOptions.indexOf(_playbackSpeed);
+    final nextSpeed = _speedOptions[(idx + 1) % _speedOptions.length];
+    setState(() {
+      _playbackSpeed = nextSpeed;
+    });
+    try {
+      _controller!.setPlaybackSpeed(nextSpeed);
+    } catch (_) {}
+    _showBriefPlaybackHud('SPEED', 'Tốc độ ${nextSpeed}x');
+  }
+
+  void _cycleAspectMode() {
+    setState(() {
+      _aspectModeIndex = (_aspectModeIndex + 1) % _aspectModeLabels.length;
+    });
+    _showBriefPlaybackHud('ASPECT', 'Khung hình: ${_aspectModeLabels[_aspectModeIndex]}');
+  }
+
   void _seekDirectOffset(int seconds, {String? customHudText}) {
-    if (!_isInitialized || widget.isLive) return;
-    final currentPos = _controller.value.position;
-    final totalDuration = _controller.value.duration;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive) return;
+    final currentPos = ctrl.value.position;
+    final totalDuration = ctrl.value.duration;
+    if (totalDuration <= Duration.zero) return;
     final targetSeconds = (currentPos.inSeconds + seconds).clamp(0, totalDuration.inSeconds);
     final target = Duration(seconds: targetSeconds);
-    _controller.seekTo(target);
+    ctrl.seekTo(target);
     _hudFadeTimer?.cancel();
     setState(() {
       _hudIcon = seconds >= 0 ? 'FORWARD' : 'REWIND';
@@ -495,8 +744,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       isMuted: _isMuted,
       preMuteVolume: _preMuteVolume,
     );
-    if (_isInitialized) {
-      _controller.setVolume(_isMuted ? 0.0 : _volume);
+    if (_isInitialized && _controller != null) {
+      _controller!.setVolume(_isMuted ? 0.0 : _volume);
     }
     _showVolumeHud(clamped);
     _showControlsBriefly();
@@ -596,18 +845,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _switchChannel(StreamChannel channel) {
     if (_currentStreamUrl == channel.url && !_hasError) return;
     Duration? lastPos;
-    if (_isInitialized && !widget.isLive) {
+    if (_isInitialized && !widget.isLive && _controller != null) {
       try {
-        lastPos = _controller.value.position;
+        lastPos = _controller!.value.position;
       } catch (_) {}
     }
-    try {
-      _controller.removeListener(_videoListener);
-      _controller.dispose();
-    } catch (_) {}
     setState(() {
       _currentStreamUrl = channel.url;
-      _currentTitle = channel.title;
+      // Chỉ cập nhật tiêu đề theo tên kênh khi xem Live TV / Bóng đá; không ghi đè tên phim VOD bằng "Server #2"
+      if (widget.isLive) {
+        _currentTitle = channel.title;
+      }
       _currentHeaders = channel.headers;
     });
     _initPlayer(resumePosition: lastPos);
@@ -653,20 +901,25 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _hideControlsTimer?.cancel();
     final duration = (_showStreamSelector || _showEpisodeSelector)
         ? const Duration(seconds: 15)
-        : const Duration(seconds: 5);
+        : const Duration(seconds: 6);
     _hideControlsTimer = Timer(duration, () {
-      if (mounted && _controller.value.isPlaying && !_isDragging && !_isHoldingSeek && !_isHoveringControls) {
+      if (mounted &&
+          (_controller?.value.isPlaying ?? false) &&
+          !_isDragging &&
+          !_isHoldingSeek &&
+          !_isHoveringControls) {
         setState(() {
           _showControls = false;
           _showStreamSelector = false;
           _showEpisodeSelector = false;
         });
+        _rootFocusNode.requestFocus();
       }
     });
   }
 
   void _toggleScreenOrientation() {
-    if (!_isIOS) return;
+    if (!_isTouchMobile) return;
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     if (isLandscape) {
       SystemChrome.setPreferredOrientations([
@@ -674,8 +927,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       ]);
       _showBriefPlaybackHud('ROTATE', 'Màn hình dọc');
     } else {
+      // Ép duy nhất landscapeRight để xoay đúng chiều ngược lại so với mặc định cũ (landscapeLeft)
       SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
       _showBriefPlaybackHud('ROTATE', 'Màn hình ngang');
@@ -683,7 +936,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _toggleLockScreen() {
-    if (!_isIOS) return;
+    if (!_isTouchMobile) return;
     setState(() {
       _isScreenLocked = !_isScreenLocked;
       if (_isScreenLocked) {
@@ -757,12 +1010,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _toggleControls() {
     if (_isScreenLocked) return;
-    if (_showStreamSelector) {
+    if (_showStreamSelector || _showEpisodeSelector) {
       setState(() {
         _showStreamSelector = false;
+        _showEpisodeSelector = false;
         _showControls = false;
       });
       _hideControlsTimer?.cancel();
+      _rootFocusNode.requestFocus();
       return;
     }
     setState(() {
@@ -785,14 +1040,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       });
     } else {
       _hideControlsTimer?.cancel();
+      _rootFocusNode.requestFocus();
     }
   }
 
   void _playVideo() {
-    if (!_isInitialized) return;
-    if (!_controller.value.isPlaying) {
-      _controller.play();
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null) return;
+    if (!ctrl.value.isPlaying) {
+      ctrl.play();
     }
+    _setWakelock(true);
     _showBriefPlaybackHud('PLAY', 'Đang phát');
     setState(() {
       _showControls = true;
@@ -801,10 +1059,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _pauseVideo() {
-    if (!_isInitialized) return;
-    if (_controller.value.isPlaying) {
-      _controller.pause();
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null) return;
+    if (ctrl.value.isPlaying) {
+      ctrl.pause();
     }
+    _setWakelock(false);
+    _saveCurrentProgress(triggerSync: true);
+    WatchHistoryService.instance.flush();
     _showBriefPlaybackHud('PAUSE', 'Tạm dừng');
     setState(() {
       _showControls = true;
@@ -813,8 +1075,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _togglePlayPause() {
-    if (!_isInitialized) return;
-    if (_controller.value.isPlaying) {
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null) return;
+    if (ctrl.value.isPlaying) {
       _pauseVideo();
     } else {
       _playVideo();
@@ -851,10 +1114,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Duration get _videoBufferedPosition {
-    if (!_isInitialized) return Duration.zero;
-    final buffered = _controller.value.buffered;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null) return Duration.zero;
+    final buffered = ctrl.value.buffered;
     if (buffered.isEmpty) return Duration.zero;
-    final pos = _controller.value.position;
+    final pos = ctrl.value.position;
     for (final range in buffered) {
       if (pos >= range.start && pos <= range.end) {
         return range.end;
@@ -884,7 +1148,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _handleRemoteSeekStart(int direction) {
-    if (!_isInitialized || widget.isLive) return;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive) return;
     _lastFocusedOnSeekBar = true;
 
     final now = DateTime.now();
@@ -894,7 +1159,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       _holdSeekDirection = direction;
       _holdStartTime = now;
       _holdRepeatCount = 0;
-      _pendingSeekPosition = _controller.value.position;
+      _pendingSeekPosition = ctrl.value.position;
       _seekAccumulatedDelta = Duration.zero;
     }
 
@@ -938,14 +1203,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _applySeekStep(int direction, int stepSeconds, String speedBadge) {
-    final duration = _controller.value.duration;
+    final ctrl = _controller;
+    if (ctrl == null) return;
+    final duration = ctrl.value.duration;
     final step = Duration(seconds: stepSeconds * direction);
 
     _seekAccumulatedDelta += step;
     final newPos = _pendingSeekPosition + step;
     _pendingSeekPosition = newPos < Duration.zero
         ? Duration.zero
-        : (newPos > duration ? duration : newPos);
+        : (duration > Duration.zero && newPos > duration ? duration : newPos);
 
     _hudFadeTimer?.cancel();
     setState(() {
@@ -972,7 +1239,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   void _commitPendingSeek() {
     _commitSeekTimer?.cancel();
-    if (!_isHoldingSeek || !_isInitialized || widget.isLive) {
+    final ctrl = _controller;
+    if (!_isHoldingSeek || !_isInitialized || ctrl == null || widget.isLive) {
       _isHoldingSeek = false;
       return;
     }
@@ -982,7 +1250,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _holdRepeatCount = 0;
     _holdStartTime = null;
 
-    _controller.seekTo(target);
+    ctrl.seekTo(target);
 
     _hudFadeTimer?.cancel();
     _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
@@ -998,22 +1266,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _showControlsBriefly();
   }
 
-  // --- Touch Gestures Handling ---
+  // --- Touch Gestures Handling (iOS & Android Phone) ---
   void _onHorizontalDragStart(DragStartDetails details) {
-    if (!_isInitialized || widget.isLive) return;
-    _dragStartPosition = _controller.value.position;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive) return;
+    _dragStartPosition = ctrl.value.position;
+    _dragTargetPosition = _dragStartPosition;
     _dragTotalDeltaX = 0.0;
     _isDragging = true;
     _hudFadeTimer?.cancel();
   }
 
   void _onHorizontalDragUpdate(DragUpdateDetails details) {
-    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive || !_isDragging) return;
+    final duration = ctrl.value.duration;
+    if (duration <= Duration.zero) return;
     _dragTotalDeltaX += details.primaryDelta ?? 0.0;
 
     // 1px drag = ~0.4s seek
     final deltaSeconds = (_dragTotalDeltaX * 0.4).toInt();
-    final duration = _controller.value.duration;
     final targetSeconds = (_dragStartPosition.inSeconds + deltaSeconds).clamp(0, duration.inSeconds);
     final target = Duration(seconds: targetSeconds);
 
@@ -1026,9 +1298,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _onHorizontalDragEnd(DragEndDetails details) {
-    if (!_isInitialized || widget.isLive || !_isDragging) return;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive || !_isDragging) return;
     _isDragging = false;
-    _controller.seekTo(_dragTargetPosition);
+    ctrl.seekTo(_dragTargetPosition);
 
     _hudFadeTimer?.cancel();
     _hudFadeTimer = Timer(const Duration(milliseconds: 800), () {
@@ -1042,18 +1315,60 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _showControlsBriefly();
   }
 
+  // --- Mobile Vertical Drag: Left Half = Software Brightness, Right Half = Volume ---
+  void _onVerticalDragStart(DragStartDetails details) {
+    if (!_isTouchMobile || _isScreenLocked) return;
+    final width = MediaQuery.of(context).size.width;
+    _isVerticalDragging = true;
+    _verticalDragIsLeft = details.localPosition.dx < width * 0.5;
+    _hudFadeTimer?.cancel();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (!_isVerticalDragging || _isScreenLocked) return;
+    final dy = details.primaryDelta ?? 0.0;
+    final delta = -dy / 240.0; // Drag up increases, drag down decreases
+    if (_verticalDragIsLeft) {
+      setState(() {
+        _softwareBrightness = (_softwareBrightness + delta).clamp(0.25, 1.0);
+        _hudIcon = 'BRIGHTNESS';
+        _hudText = '${(_softwareBrightness * 100).round()}%';
+        _hudSpeedBadge = 'Độ sáng';
+      });
+    } else {
+      final target = ((_isMuted ? 0.0 : _volume) + delta).clamp(0.0, 1.0);
+      _setVolume(target);
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if (!_isVerticalDragging) return;
+    _isVerticalDragging = false;
+    _hudFadeTimer?.cancel();
+    _hudFadeTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted && (_hudIcon == 'BRIGHTNESS' || (_hudIcon?.startsWith('VOLUME') ?? false))) {
+        setState(() {
+          _hudIcon = null;
+          _hudText = null;
+          _hudSpeedBadge = null;
+        });
+      }
+    });
+  }
+
   // --- Telegram-Style Hold & Swipe Fast Forward (2x -> 3x) ---
   void _onLongPressStart(LongPressStartDetails details) {
-    if (!_isIOS || !_isInitialized || widget.isLive || _isScreenLocked) return;
+    final ctrl = _controller;
+    if (!_isTouchMobile || !_isInitialized || ctrl == null || widget.isLive || _isScreenLocked) return;
     _holdStartOffset = details.localPosition;
     _isHoldSpeeding = true;
-    _wasPlayingBeforeHold = _controller.value.isPlaying;
+    _wasPlayingBeforeHold = ctrl.value.isPlaying;
     _currentHoldSpeed = 2.0;
 
-    if (!_controller.value.isPlaying) {
-      _controller.play();
+    if (!ctrl.value.isPlaying) {
+      ctrl.play();
     }
-    _controller.setPlaybackSpeed(2.0);
+    ctrl.setPlaybackSpeed(2.0);
 
     _hideControlsTimer?.cancel();
     setState(() {
@@ -1062,18 +1377,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _onLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
-    if (!_isHoldSpeeding || !_isInitialized || widget.isLive || _isScreenLocked) return;
+    final ctrl = _controller;
+    if (!_isHoldSpeeding || !_isInitialized || ctrl == null || widget.isLive || _isScreenLocked) return;
     if (_holdStartOffset == null) return;
 
-    // Calculate horizontal distance from initial press position
     final deltaX = details.localPosition.dx - _holdStartOffset!.dx;
-
-    // Swiping right by > 40px bumps speed to 3x, otherwise remains at 2x
     final double targetSpeed = deltaX > 40 ? 3.0 : 2.0;
 
     if (targetSpeed != _currentHoldSpeed) {
       _currentHoldSpeed = targetSpeed;
-      _controller.setPlaybackSpeed(_currentHoldSpeed);
+      ctrl.setPlaybackSpeed(_currentHoldSpeed);
       setState(() {});
     }
   }
@@ -1084,10 +1397,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _holdStartOffset = null;
     _currentHoldSpeed = 1.0;
 
-    if (_isInitialized) {
-      _controller.setPlaybackSpeed(1.0);
+    final ctrl = _controller;
+    if (_isInitialized && ctrl != null) {
+      ctrl.setPlaybackSpeed(_playbackSpeed);
       if (!_wasPlayingBeforeHold) {
-        _controller.pause();
+        ctrl.pause();
       }
     }
     setState(() {});
@@ -1098,14 +1412,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _onDoubleTapSide(bool isRight) {
-    if (!_isInitialized || widget.isLive) return;
+    final ctrl = _controller;
+    if (!_isInitialized || ctrl == null || widget.isLive) return;
+    final dur = ctrl.value.duration;
+    if (dur <= Duration.zero) return;
 
     // Reset accumulation if switching sides
     if ((isRight && _showDoubleTapLeft) || (!isRight && _showDoubleTapRight)) {
       _doubleTapAccumulatedSeconds = 0;
     }
     _doubleTapAccumulatedSeconds += 10;
-    _seekRelative(isRight ? 10 : -10);
+
+    // Tua trực tiếp tức thì không bung OSD (chuẩn YouTube Mobile)
+    final targetSec = (ctrl.value.position.inSeconds + (isRight ? 10 : -10)).clamp(0, dur.inSeconds);
+    ctrl.seekTo(Duration(seconds: targetSec));
     _doubleTapTimer?.cancel();
 
     setState(() {
@@ -1129,11 +1449,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  void _saveCurrentProgress() {
-    if (!mounted || !_isInitialized || widget.isLive || widget.mediaId == null || widget.mediaId!.isEmpty) return;
+  void _saveCurrentProgress({bool triggerSync = true}) {
+    final ctrl = _controller;
+    if (!mounted || !_isInitialized || ctrl == null || widget.isLive || widget.mediaId == null || widget.mediaId!.isEmpty) return;
     try {
-      final pos = _controller.value.position;
-      final dur = _controller.value.duration;
+      final pos = ctrl.value.position;
+      final dur = ctrl.value.duration;
       if (pos.inMilliseconds < 1000 || dur.inMilliseconds < 1000) return;
 
       WatchHistoryService.instance.saveProgress(
@@ -1149,31 +1470,43 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           category: widget.mediaCategory ?? 'anime',
           episode: widget.episode,
           season: widget.season,
-          updatedAt: DateTime.now().toIso8601String(),
+          updatedAt: DateTime.now().toUtc().toIso8601String(),
         ),
+        triggerSync: triggerSync,
       );
     } catch (_) {}
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _initGeneration++;
+    _reconnectTimer?.cancel();
     _saveProgressTimer?.cancel();
-    _saveCurrentProgress();
+    _saveCurrentProgress(triggerSync: true);
     WatchHistoryService.instance.flush();
-    SyncService.pushToServer(null);
+    _setWakelock(false);
     _hideControlsTimer?.cancel();
     _lockOverlayTimer?.cancel();
     _nextCountdownTimer?.cancel();
     _hudFadeTimer?.cancel();
     _doubleTapTimer?.cancel();
     _commitSeekTimer?.cancel();
-    if (_isHoldSpeeding) {
-      _controller.setPlaybackSpeed(1.0);
+    final ctrl = _controller;
+    _controller = null;
+    if (ctrl != null) {
+      if (_isHoldSpeeding) {
+        try {
+          ctrl.setPlaybackSpeed(1.0);
+        } catch (_) {}
+      }
+      try {
+        ctrl.removeListener(_videoListener);
+        ctrl.dispose();
+      } catch (_) {}
     }
-    _controller.removeListener(_videoListener);
-    _controller.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    if (_isIOS) {
+    if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
@@ -1181,6 +1514,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         DeviceOrientation.portraitDown,
       ]);
     }
+    _rootFocusNode.dispose();
     _playPauseFocusNode.dispose();
     _seekBarFocusNode.dispose();
     _prevFocusNode.dispose();
@@ -1188,11 +1522,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     _replay10FocusNode.dispose();
     _forward10FocusNode.dispose();
     _skipIntroFocusNode.dispose();
+    _speedButtonFocusNode.dispose();
+    _aspectButtonFocusNode.dispose();
     _episodesButtonFocusNode.dispose();
     _channelsButtonFocusNode.dispose();
     _backButtonFocusNode.dispose();
     _rotateFocusNode.dispose();
     _lockFocusNode.dispose();
+    _volumeSliderFocusNode.dispose();
+    _progressSliderFocusNode.dispose();
+    _errorRetryFocusNode.dispose();
+    _countdownPlayFocusNode.dispose();
+    _countdownCancelFocusNode.dispose();
     for (final n in _channelFocusNodes) {
       n.dispose();
     }
@@ -1215,28 +1556,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         _handleBackAction();
       },
       child: Focus(
+        focusNode: _rootFocusNode,
         autofocus: true,
         onKeyEvent: (node, event) {
+          // Khi đang hiển thị thẻ Lỗi hoặc đếm ngược Tập tiếp theo (OSD đang ẩn),
+          // nhường D-pad & OK cho các nút TvFocusableCard trên overlay đó nhận sự kiện!
+          if (_hasError || (_nextCountdownSeconds > 0 && !_showControls)) {
+            if (event is KeyDownEvent &&
+                (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                    event.logicalKey == LogicalKeyboardKey.arrowRight ||
+                    event.logicalKey == LogicalKeyboardKey.arrowUp ||
+                    event.logicalKey == LogicalKeyboardKey.arrowDown ||
+                    event.logicalKey == LogicalKeyboardKey.select ||
+                    event.logicalKey == LogicalKeyboardKey.enter ||
+                    event.logicalKey == LogicalKeyboardKey.gameButtonA)) {
+              return KeyEventResult.ignored;
+            }
+          }
+
           final key = event.logicalKey;
-          final int code = key.keyId & 0xFFFF;
           final String debugName = key.debugName?.toLowerCase() ?? '';
 
           // 1. Physical Play key on remote
           final bool isPlayKey = key == LogicalKeyboardKey.mediaPlay ||
-              code == 126 ||
               (debugName.contains('mediaplay') && !debugName.contains('pause'));
 
           // 2. Physical Pause / Stop key on remote
           final bool isPauseKey = key == LogicalKeyboardKey.mediaPause ||
               key == LogicalKeyboardKey.mediaStop ||
-              code == 127 ||
-              code == 86 ||
               ((debugName.contains('mediapause') || debugName.contains('mediastop')) && !debugName.contains('play'));
 
           // 3. Play / Pause toggle key (Space, mediaPlayPause, or desktop Key K)
           final bool isPlayPauseToggle = key == LogicalKeyboardKey.mediaPlayPause ||
               key == LogicalKeyboardKey.space ||
-              code == 85 ||
               debugName.contains('playpause') ||
               debugName.contains('play_pause') ||
               (_isMacOrDesktop && key == LogicalKeyboardKey.keyK);
@@ -1245,9 +1597,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           final bool isFwdKey = key == LogicalKeyboardKey.mediaFastForward ||
               key == LogicalKeyboardKey.mediaSkipForward ||
               key == LogicalKeyboardKey.mediaStepForward ||
-              code == 90 ||
-              code == 272 ||
-              code == 274 ||
               debugName.contains('fastforward') ||
               debugName.contains('fast_forward') ||
               debugName.contains('skipforward') ||
@@ -1259,9 +1608,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           final bool isRwdKey = key == LogicalKeyboardKey.mediaRewind ||
               key == LogicalKeyboardKey.mediaSkipBackward ||
               key == LogicalKeyboardKey.mediaStepBackward ||
-              code == 89 ||
-              code == 273 ||
-              code == 275 ||
               debugName.contains('rewind') ||
               debugName.contains('skipbackward') ||
               debugName.contains('skip_backward') ||
@@ -1271,12 +1617,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
           // 6. Track navigation (Previous / Next Track)
           final bool isPrevTrack = key == LogicalKeyboardKey.mediaTrackPrevious ||
-              code == 88 ||
               debugName.contains('trackprevious') ||
               debugName.contains('track_previous') ||
               (_isMacOrDesktop && key == LogicalKeyboardKey.keyP);
           final bool isNextTrack = key == LogicalKeyboardKey.mediaTrackNext ||
-              code == 87 ||
               debugName.contains('tracknext') ||
               debugName.contains('track_next') ||
               (_isMacOrDesktop && key == LogicalKeyboardKey.keyN);
@@ -1387,11 +1731,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             }
 
             if (isPrevTrack && widget.onPrevious != null) {
-              widget.onPrevious!();
+              _triggerEpisodeCallback(widget.onPrevious);
               return KeyEventResult.handled;
             }
             if (isNextTrack && widget.onNext != null) {
-              widget.onNext!();
+              _triggerEpisodeCallback(widget.onNext);
               return KeyEventResult.handled;
             }
 
@@ -1409,7 +1753,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               }
               final anyControlButtonFocused = _getActiveControlNodes().any((n) => n.hasFocus) ||
                   _backButtonFocusNode.hasFocus ||
-                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+                  (_isTouchMobile && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
               if (!anyControlButtonFocused) {
                 if (_isHoldingSeek) {
                   _commitPendingSeek();
@@ -1429,7 +1773,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
-              if (_isIOS) {
+              if (_isTouchMobile) {
                 if (_lockFocusNode.hasFocus) {
                   _rotateFocusNode.requestFocus();
                   _startHideControlsTimer();
@@ -1445,7 +1789,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
               final bool anyButtonFocused = currentIdx != -1 ||
                   _backButtonFocusNode.hasFocus ||
-                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+                  (_isTouchMobile && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
 
               if (!_showControls || _seekBarFocusNode.hasFocus || !anyButtonFocused) {
                 if (widget.isLive) {
@@ -1477,7 +1821,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
-              if (_isIOS) {
+              if (_isTouchMobile) {
                 if (_backButtonFocusNode.hasFocus) {
                   _rotateFocusNode.requestFocus();
                   _startHideControlsTimer();
@@ -1493,7 +1837,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               final currentIdx = controlNodes.indexWhere((n) => n.hasFocus);
               final bool anyButtonFocused = currentIdx != -1 ||
                   _backButtonFocusNode.hasFocus ||
-                  (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
+                  (_isTouchMobile && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus));
 
               if (!_showControls || _seekBarFocusNode.hasFocus || !anyButtonFocused) {
                 if (widget.isLive) {
@@ -1537,6 +1881,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               }
             }
 
+            // Phím CH+ / CH- chuyên dụng trên remote Android TV để chuyển kênh IPTV / luồng trực tiếp tức thì
+            if (key == LogicalKeyboardKey.channelUp) {
+              if (widget.isLive && _effectiveChannels.length > 1) {
+                _switchChannelDelta(1);
+                return KeyEventResult.handled;
+              }
+            }
+            if (key == LogicalKeyboardKey.channelDown) {
+              if (widget.isLive && _effectiveChannels.length > 1) {
+                _switchChannelDelta(-1);
+                return KeyEventResult.handled;
+              }
+            }
+
             final bool isUp = key == LogicalKeyboardKey.arrowUp ||
                 key == LogicalKeyboardKey.channelUp ||
                 key == LogicalKeyboardKey.pageUp;
@@ -1558,7 +1916,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
-              if (_backButtonFocusNode.hasFocus || (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
+              if (_backButtonFocusNode.hasFocus || (_isTouchMobile && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
                 _startHideControlsTimer();
                 return KeyEventResult.handled;
               }
@@ -1582,7 +1940,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _startHideControlsTimer();
                 return KeyEventResult.ignored;
               }
-              if (_backButtonFocusNode.hasFocus || (_isIOS && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
+              if (_backButtonFocusNode.hasFocus || (_isTouchMobile && (_rotateFocusNode.hasFocus || _lockFocusNode.hasFocus))) {
                 if (widget.isLive) {
                   _playPauseFocusNode.requestFocus();
                 } else {
@@ -1604,6 +1962,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 _showControls = false;
               });
               _hideControlsTimer?.cancel();
+              _rootFocusNode.requestFocus();
               return KeyEventResult.handled;
             }
           } else if (event is KeyRepeatEvent) {
@@ -1708,126 +2067,171 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 }
                 _toggleControls();
               },
-              onHorizontalDragStart: (_isIOS && !_isScreenLocked) ? _onHorizontalDragStart : null,
-              onHorizontalDragUpdate: (_isIOS && !_isScreenLocked) ? _onHorizontalDragUpdate : null,
-              onHorizontalDragEnd: (_isIOS && !_isScreenLocked) ? _onHorizontalDragEnd : null,
-              onLongPressStart: (_isIOS && !_isScreenLocked) ? _onLongPressStart : null,
-              onLongPressMoveUpdate: (_isIOS && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
-              onLongPressEnd: (_isIOS && !_isScreenLocked) ? _onLongPressEnd : null,
-              onLongPressCancel: (_isIOS && !_isScreenLocked) ? _onLongPressCancel : null,
+              onHorizontalDragStart: (_isTouchMobile && !_isScreenLocked) ? _onHorizontalDragStart : null,
+              onHorizontalDragUpdate: (_isTouchMobile && !_isScreenLocked) ? _onHorizontalDragUpdate : null,
+              onHorizontalDragEnd: (_isTouchMobile && !_isScreenLocked) ? _onHorizontalDragEnd : null,
+              onVerticalDragStart: (_isTouchMobile && !_isScreenLocked) ? _onVerticalDragStart : null,
+              onVerticalDragUpdate: (_isTouchMobile && !_isScreenLocked) ? _onVerticalDragUpdate : null,
+              onVerticalDragEnd: (_isTouchMobile && !_isScreenLocked) ? _onVerticalDragEnd : null,
+              onLongPressStart: (_isTouchMobile && !_isScreenLocked) ? _onLongPressStart : null,
+              onLongPressMoveUpdate: (_isTouchMobile && !_isScreenLocked) ? _onLongPressMoveUpdate : null,
+              onLongPressEnd: (_isTouchMobile && !_isScreenLocked) ? _onLongPressEnd : null,
+              onLongPressCancel: (_isTouchMobile && !_isScreenLocked) ? _onLongPressCancel : null,
               behavior: HitTestBehavior.opaque,
               child: Stack(
             alignment: Alignment.center,
             children: [
-              // 1. VIDEO CANVAS
-              if (_isInitialized)
-                Center(
-                  child: AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio > 0 ? _controller.value.aspectRatio : 16 / 9,
-                    child: VideoPlayer(_controller),
-                  ),
+              // 1. VIDEO CANVAS (Supports Fit / Fill / 16:9 / 4:3 aspect modes)
+              if (_isInitialized && _controller != null)
+                Builder(
+                  builder: (_) {
+                    final nativeRatio = _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : 16 / 9;
+                    if (_aspectModeIndex == 1) {
+                      // Lấp đầy (Cover / Fill)
+                      return SizedBox.expand(
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: _controller!.value.size.width > 0 ? _controller!.value.size.width : 1280,
+                            height: _controller!.value.size.height > 0 ? _controller!.value.size.height : 720,
+                            child: VideoPlayer(_controller!),
+                          ),
+                        ),
+                      );
+                    }
+                    final double ratio = _aspectModeIndex == 2
+                        ? 16 / 9
+                        : (_aspectModeIndex == 3 ? 4 / 3 : nativeRatio);
+                    return Center(
+                      child: AspectRatio(
+                        aspectRatio: ratio,
+                        child: VideoPlayer(_controller!),
+                      ),
+                    );
+                  },
                 )
               else if (_hasError)
                 Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(24),
-                    margin: const EdgeInsets.symmetric(horizontal: 40),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
-                        const SizedBox(height: 12),
-                        const Text(
-                          'Lỗi phát video',
-                          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _errorMessage,
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
-                          textAlign: TextAlign.center,
-                        ),
-                        if (_effectiveChannels.length > 1) ...[
-                          const SizedBox(height: 16),
+                  child: SingleChildScrollView(
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      constraints: const BoxConstraints(maxWidth: 520),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141414),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.redAccent.withOpacity(0.5)),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                          const SizedBox(height: 12),
                           const Text(
-                            'Chọn luồng phát khác để xem:',
-                            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                            'Lỗi phát video',
+                            style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            alignment: WrapAlignment.center,
-                            children: _effectiveChannels.map((ch) {
-                              final bool isCurrent = ch.url == _currentStreamUrl;
-                              return TvFocusableCard(
-                                onTap: () => _switchChannel(ch),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isCurrent ? const Color(0xFFEF4444).withOpacity(0.3) : const Color(0xFF334155),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isCurrent ? Colors.redAccent : Colors.white24,
+                          const SizedBox(height: 6),
+                          Text(
+                            _errorMessage,
+                            style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_effectiveChannels.length > 1) ...[
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Chọn luồng phát khác để xem:',
+                              style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              alignment: WrapAlignment.center,
+                              children: _effectiveChannels.map((ch) {
+                                final bool isCurrent = ch.url == _currentStreamUrl;
+                                return TvFocusableCard(
+                                  onTap: () => _switchChannel(ch),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isCurrent ? const Color(0xFFEF4444).withOpacity(0.3) : const Color(0xFF262626),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: isCurrent ? Colors.redAccent : Colors.white24,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.play_circle_outline,
+                                          color: isCurrent ? Colors.redAccent : const Color(0xFF38BDF8),
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          ch.title,
+                                          style: TextStyle(
+                                            color: isCurrent ? Colors.white70 : Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: isCurrent ? FontWeight.normal : FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.play_circle_outline,
-                                        color: isCurrent ? Colors.redAccent : const Color(0xFF38BDF8),
-                                        size: 16,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        ch.title,
-                                        style: TextStyle(
-                                          color: isCurrent ? Colors.white70 : Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: isCurrent ? FontWeight.normal : FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 20),
+                          TvFocusableCard(
+                            focusNode: _errorRetryFocusNode,
+                            autoFocus: true,
+                            onTap: _initPlayer,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                              color: const Color(0xFF38BDF8),
+                              child: const Text('Thử lại', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                            ),
                           ),
                         ],
-                        const SizedBox(height: 20),
-                        TvFocusableCard(
-                          onTap: _initPlayer,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                            color: const Color(0xFF38BDF8),
-                            child: const Text('Thử lại', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 )
               else
-                const Center(
+                Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: Color(0xFF38BDF8)),
-                      SizedBox(height: 16),
-                      Text('Đang tải luồng phát...', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      const CircularProgressIndicator(color: Color(0xFF38BDF8)),
+                      const SizedBox(height: 16),
+                      Text(
+                        _isReconnecting
+                            ? 'Đang kết nối lại ($_reconnectAttempts/$_maxLiveReconnects)...'
+                            : 'Đang tải luồng phát...',
+                        style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
                     ],
                   ),
                 ),
 
-              // 2. DOUBLE-TAP SEEK ZONES (iOS only - Left 50% & Right 50% screen)
-              if (_isIOS) ...[
+              // 1b. SOFTWARE BRIGHTNESS DIMMING OVERLAY (Mobile Left-half vertical drag)
+              if (_isTouchMobile && _softwareBrightness < 0.99)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(
+                      color: Colors.black.withOpacity((1.0 - _softwareBrightness).clamp(0.0, 0.75)),
+                    ),
+                  ),
+                ),
+
+              // 2. DOUBLE-TAP SEEK ZONES (iOS & Android Phone - Left 50% & Right 50% screen)
+              if (_isTouchMobile) ...[
                 Positioned(
                   left: 0,
                   top: 0,
@@ -1838,10 +2242,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       if (_isScreenLocked) return;
                       _onDoubleTapSide(false);
                     },
-                    onLongPressStart: !_isScreenLocked ? _onLongPressStart : null,
-                    onLongPressMoveUpdate: !_isScreenLocked ? _onLongPressMoveUpdate : null,
-                    onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
-                    onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
                     behavior: HitTestBehavior.translucent,
                     child: Container(color: Colors.transparent),
                   ),
@@ -1856,10 +2256,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       if (_isScreenLocked) return;
                       _onDoubleTapSide(true);
                     },
-                    onLongPressStart: !_isScreenLocked ? _onLongPressStart : null,
-                    onLongPressMoveUpdate: !_isScreenLocked ? _onLongPressMoveUpdate : null,
-                    onLongPressEnd: !_isScreenLocked ? _onLongPressEnd : null,
-                    onLongPressCancel: !_isScreenLocked ? _onLongPressCancel : null,
                     behavior: HitTestBehavior.translucent,
                     child: Container(color: Colors.transparent),
                   ),
@@ -1867,7 +2263,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               ],
 
               // 3. DOUBLE-TAP RIPPLE INDICATORS (YouTube-style curved side overlay)
-              if (_isIOS && _showDoubleTapLeft)
+              if (_isTouchMobile && _showDoubleTapLeft)
                 Positioned(
                   left: 0,
                   top: 0,
@@ -1902,7 +2298,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     ),
                   ),
                 ),
-              if (_isIOS && _showDoubleTapRight)
+              if (_isTouchMobile && _showDoubleTapRight)
                 Positioned(
                   right: 0,
                   top: 0,
@@ -1939,7 +2335,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 ),
 
               // 3b. BUFFERING HUD INDICATOR (Khi video đang load bộ đệm giữa chừng)
-              if (_isInitialized && _controller.value.isBuffering)
+              if (_isInitialized && _controller != null && _controller!.value.isBuffering)
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -1974,10 +2370,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if (_controller.value.duration.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
+                        if (_controller!.value.duration.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
                           const SizedBox(height: 4),
                           Text(
-                            'Buffer: ${((_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
+                            'Buffer: ${((_videoBufferedPosition.inMilliseconds / _controller!.value.duration.inMilliseconds) * 100).clamp(0, 100).toInt()}%',
                             style: TextStyle(
                               color: const Color(0xFF38BDF8).withOpacity(0.85),
                               fontSize: 11,
@@ -2138,7 +2534,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                                                                   ? Icons.lock_open_rounded
                                                                                   : (_hudIcon == 'ROTATE'
                                                                                       ? Icons.screen_rotation_rounded
-                                                                                      : Icons.volume_up_rounded))))))))),
+                                                                                      : (_hudIcon == 'BRIGHTNESS'
+                                                                                          ? Icons.brightness_6_rounded
+                                                                                          : (_hudIcon == 'SPEED'
+                                                                                              ? Icons.speed_rounded
+                                                                                              : (_hudIcon == 'ASPECT'
+                                                                                                  ? Icons.aspect_ratio_rounded
+                                                                                                  : Icons.volume_up_rounded)))))))))))),
                                               color: const Color(0xFF38BDF8),
                                               size: 16,
                                             ),
@@ -2176,8 +2578,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       )
                                     : const SizedBox.shrink(),
                               ),
-                              // Rotate Screen & Lock Touch Screen Buttons (Chỉ hiển thị trên iOS)
-                              if (_isIOS) ...[
+                              // Rotate Screen & Lock Touch Screen Buttons (iOS & Android Phone)
+                              if (_isTouchMobile) ...[
                                 const SizedBox(width: 8),
                                 TvFocusableCard(
                                   focusNode: _rotateFocusNode,
@@ -2256,7 +2658,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                             trackHeight: 3.0,
                                           ),
                                           child: Slider(
-                                            focusNode: FocusNode(canRequestFocus: false),
+                                            focusNode: _volumeSliderFocusNode,
                                             value: _isMuted ? 0.0 : _volume,
                                             min: 0.0,
                                             max: 1.0,
@@ -2292,7 +2694,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   if (_isScreenLocked) return;
                                   _toggleControls();
                                 },
-                                onDoubleTap: _isIOS && !_isScreenLocked
+                                onDoubleTap: _isTouchMobile && !_isScreenLocked
                                     ? () => _onDoubleTapSide(false)
                                     : null,
                                 child: const SizedBox.expand(),
@@ -2305,7 +2707,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   if (_isScreenLocked) return;
                                   _toggleControls();
                                 },
-                                onDoubleTap: _isIOS && !_isScreenLocked
+                                onDoubleTap: _isTouchMobile && !_isScreenLocked
                                     ? () => _onDoubleTapSide(true)
                                     : null,
                                 child: const SizedBox.expand(),
@@ -2341,7 +2743,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               // Progress Slider for VOD (Thanh tiến trình)
-                              if (!widget.isLive && _isInitialized) ...[
+                              if (!widget.isLive && _isInitialized && _controller != null) ...[
                                 Focus(
                                   focusNode: _seekBarFocusNode,
                                   child: AnimatedBuilder(
@@ -2361,124 +2763,133 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         child: child,
                                       );
                                     },
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          _formatDuration(_isHoldingSeek ? _pendingSeekPosition : _controller.value.position),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: MouseRegion(
-                                            cursor: SystemMouseCursors.click,
-                                            child: Stack(
-                                              alignment: Alignment.center,
-                                              children: [
-                                                // 1. Buffered Track Bar
-                                                Padding(
-                                                  padding: EdgeInsets.symmetric(horizontal: _isIOS ? 8.5 : 6.5),
-                                                  child: ClipRRect(
-                                                    borderRadius: BorderRadius.circular(4),
-                                                    child: LinearProgressIndicator(
-                                                      value: _controller.value.duration.inMilliseconds > 0
-                                                          ? (_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds).clamp(0.0, 1.0)
-                                                          : 0.0,
-                                                      minHeight: _isIOS ? 5.0 : 4.0,
-                                                      backgroundColor: Colors.white24,
-                                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.4)),
-                                                    ),
-                                                  ),
-                                                ),
-                                                // 2. Active Slider
-                                                SliderTheme(
-                                                  data: SliderTheme.of(context).copyWith(
-                                                    activeTrackColor: const Color(0xFF38BDF8),
-                                                    inactiveTrackColor: Colors.transparent, // Let buffer bar show through
-                                                    thumbColor: const Color(0xFF38BDF8),
-                                                    overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
-                                                    thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isIOS ? 8.5 : 6.5),
-                                                    trackHeight: _isIOS ? 5.0 : 4.0,
-                                                  ),
-                                                  child: Slider(
-                                                    focusNode: FocusNode(canRequestFocus: false),
-                                                    value: (_isHoldingSeek ? _pendingSeekPosition : _controller.value.position).inSeconds.toDouble().clamp(
-                                                          0.0,
-                                                          _controller.value.duration.inSeconds.toDouble(),
+                                    child: Builder(
+                                      builder: (_) {
+                                        final dur = _controller!.value.duration;
+                                        final maxSec = dur.inSeconds > 0 ? dur.inSeconds.toDouble() : 1.0;
+                                        final curPos = _isHoldingSeek ? _pendingSeekPosition : _controller!.value.position;
+                                        return Row(
+                                          children: [
+                                            Text(
+                                              _formatDuration(curPos),
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.bold,
+                                                shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: MouseRegion(
+                                                cursor: SystemMouseCursors.click,
+                                                child: Stack(
+                                                  alignment: Alignment.center,
+                                                  children: [
+                                                    // 1. Buffered Track Bar
+                                                    Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: _isTouchMobile ? 8.5 : 6.5),
+                                                      child: ClipRRect(
+                                                        borderRadius: BorderRadius.circular(4),
+                                                        child: LinearProgressIndicator(
+                                                          value: dur.inMilliseconds > 0
+                                                              ? (_videoBufferedPosition.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+                                                              : 0.0,
+                                                          minHeight: _isTouchMobile ? 5.0 : 4.0,
+                                                          backgroundColor: Colors.white24,
+                                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withOpacity(0.4)),
                                                         ),
-                                                    max: _controller.value.duration.inSeconds.toDouble() > 0
-                                                      ? _controller.value.duration.inSeconds.toDouble()
-                                                      : 1.0,
-                                                    onChangeStart: (val) {
-                                                      _hideControlsTimer?.cancel();
-                                                      setState(() {
-                                                        _isHoldingSeek = true;
-                                                        _pendingSeekPosition = Duration(seconds: val.toInt());
-                                                      });
-                                                    },
-                                                    onChanged: (val) {
-                                                      setState(() {
-                                                        _pendingSeekPosition = Duration(seconds: val.toInt());
-                                                      });
-                                                    },
-                                                    onChangeEnd: (val) {
-                                                      final target = Duration(seconds: val.toInt());
-                                                      _controller.seekTo(target).then((_) {
-                                                        if (mounted) {
+                                                      ),
+                                                    ),
+                                                    // 2. Active Slider
+                                                    SliderTheme(
+                                                      data: SliderTheme.of(context).copyWith(
+                                                        activeTrackColor: const Color(0xFF38BDF8),
+                                                        inactiveTrackColor: Colors.transparent,
+                                                        thumbColor: const Color(0xFF38BDF8),
+                                                        overlayColor: const Color(0xFF38BDF8).withOpacity(0.2),
+                                                        thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isTouchMobile ? 8.5 : 6.5),
+                                                        trackHeight: _isTouchMobile ? 5.0 : 4.0,
+                                                      ),
+                                                      child: Slider(
+                                                        focusNode: _progressSliderFocusNode,
+                                                        value: curPos.inSeconds.toDouble().clamp(0.0, maxSec),
+                                                        max: maxSec,
+                                                        onChangeStart: (val) {
+                                                          _hideControlsTimer?.cancel();
                                                           setState(() {
-                                                            _isHoldingSeek = false;
+                                                            _isHoldingSeek = true;
+                                                            _pendingSeekPosition = Duration(seconds: val.toInt());
                                                           });
-                                                          _startHideControlsTimer();
-                                                        }
-                                                      });
-                                                    },
-                                                  ),
+                                                        },
+                                                        onChanged: (val) {
+                                                          setState(() {
+                                                            _pendingSeekPosition = Duration(seconds: val.toInt());
+                                                          });
+                                                        },
+                                                        onChangeEnd: (val) {
+                                                          final ctrl = _controller;
+                                                          if (ctrl == null) {
+                                                            setState(() => _isHoldingSeek = false);
+                                                            return;
+                                                          }
+                                                          final target = Duration(seconds: val.toInt());
+                                                          ctrl.seekTo(target).whenComplete(() {
+                                                            if (mounted) {
+                                                              setState(() {
+                                                                _isHoldingSeek = false;
+                                                              });
+                                                              _startHideControlsTimer();
+                                                            }
+                                                          });
+                                                        },
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
+                                              ),
                                             ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          _formatDuration(_controller.value.duration),
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500,
-                                            shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
-                                          ),
-                                        ),
-                                        if (!widget.isLive && _controller.value.duration.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            '• Đã nạp: ${_formatDuration(_videoBufferedPosition)} (${((_videoBufferedPosition.inMilliseconds / _controller.value.duration.inMilliseconds) * 100).round()}%)',
-                                            style: TextStyle(
-                                              color: const Color(0xFF38BDF8).withOpacity(0.85),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              shadows: const [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              _formatDuration(dur),
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                shadows: [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                              ),
                                             ),
-                                          ),
-                                        ],
-                                      ],
+                                            if (!widget.isLive && dur.inMilliseconds > 0 && _videoBufferedPosition.inMilliseconds > 0) ...[
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                '• Đã nạp: ${_formatDuration(_videoBufferedPosition)} (${((_videoBufferedPosition.inMilliseconds / dur.inMilliseconds) * 100).round()}%)',
+                                                style: TextStyle(
+                                                  color: const Color(0xFF38BDF8).withOpacity(0.85),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.bold,
+                                                  shadows: const [Shadow(color: Colors.black87, blurRadius: 4, offset: Offset(0, 1))],
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        );
+                                      },
                                     ),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
                               ],
 
-                              // Playback Controls Row (Nút điều khiển xuất hiện DƯỚI thanh tiến trình)
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (widget.onPrevious != null) ...[
-                                    TvFocusableCard(
-                                      focusNode: _prevFocusNode,
-                                      onTap: widget.onPrevious!,
+                              // Playback Controls Row (Cuộn ngang an toàn cho màn hình điện thoại dọc, căn giữa trên TV/iPad)
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    if (widget.onPrevious != null) ...[
+                                      TvFocusableCard(
+                                        focusNode: _prevFocusNode,
+                                        onTap: () => _triggerEpisodeCallback(widget.onPrevious),
                                       scale: 1.15,
                                       borderRadius: BorderRadius.circular(24),
                                       child: Container(
@@ -2521,14 +2932,14 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        _controller.value.isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                                        (_controller?.value.isPlaying ?? false) ? Icons.pause_circle_filled : Icons.play_circle_filled,
                                         color: const Color(0xFF38BDF8),
                                         size: 46,
                                       ),
                                     ),
                                   ),
                                   if (!widget.isLive) ...[
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     TvFocusableCard(
                                       focusNode: _forward10FocusNode,
                                       onTap: () => _seekRelative(10),
@@ -2543,12 +2954,86 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                         child: const Icon(Icons.forward_10_rounded, color: Colors.white, size: 26),
                                       ),
                                     ),
+                                    const SizedBox(width: 10),
+                                    TvFocusableCard(
+                                      focusNode: _skipIntroFocusNode,
+                                      onTap: () => _seekDirectOffset(85, customHudText: 'Bỏ qua Intro +85s'),
+                                      scale: 1.08,
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(color: Colors.white24, width: 0.8),
+                                        ),
+                                        child: const Text(
+                                          '+85s',
+                                          style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    TvFocusableCard(
+                                      focusNode: _speedButtonFocusNode,
+                                      onTap: _cyclePlaybackSpeed,
+                                      scale: 1.08,
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                        decoration: BoxDecoration(
+                                          color: _playbackSpeed != 1.0
+                                              ? const Color(0xFF0284C7)
+                                              : Colors.white.withOpacity(0.12),
+                                          borderRadius: BorderRadius.circular(18),
+                                          border: Border.all(
+                                            color: _playbackSpeed != 1.0 ? const Color(0xFF38BDF8) : Colors.white24,
+                                            width: 0.8,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          '${_playbackSpeed}x',
+                                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ),
                                   ],
+                                  const SizedBox(width: 10),
+                                  TvFocusableCard(
+                                    focusNode: _aspectButtonFocusNode,
+                                    onTap: _cycleAspectMode,
+                                    scale: 1.08,
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                      decoration: BoxDecoration(
+                                        color: _aspectModeIndex != 0
+                                            ? const Color(0xFF0284C7)
+                                            : Colors.white.withOpacity(0.12),
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(
+                                          color: _aspectModeIndex != 0 ? const Color(0xFF38BDF8) : Colors.white24,
+                                          width: 0.8,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.aspect_ratio_rounded, color: Colors.white, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _aspectModeLabels[_aspectModeIndex],
+                                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
                                   if (widget.onNext != null) ...[
-                                    const SizedBox(width: 14),
+                                    const SizedBox(width: 12),
                                     TvFocusableCard(
                                       focusNode: _nextFocusNode,
-                                      onTap: widget.onNext!,
+                                      onTap: () => _triggerEpisodeCallback(widget.onNext),
                                       scale: 1.08,
                                       borderRadius: BorderRadius.circular(18),
                                       child: Container(
@@ -2639,6 +3124,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                       onTap: () {
                                         setState(() {
                                           _showStreamSelector = !_showStreamSelector;
+                                          if (_showStreamSelector) {
+                                            _showEpisodeSelector = false;
+                                          }
                                         });
                                         if (_showStreamSelector) {
                                           _initChannelFocusNodes();
@@ -2684,6 +3172,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                                   ],
                                 ],
                               ),
+                              ),
+                              if (!_isTouchMobile && !_isMacOrDesktop) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  widget.isLive
+                                      ? '▲▼ Điều khiển  •  OK Phát/Dừng  •  CH± Đổi kênh  •  Back Ẩn/Thoát'
+                                      : '◀▶ Tua video  •  ▲▼ Điều khiển  •  OK Phát/Dừng  •  Back Ẩn/Thoát',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.48), fontSize: 10.5),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -2699,7 +3198,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               if (_showStreamSelector && _effectiveChannels.isNotEmpty)
                 Positioned(
                   bottom: 96,
-                  right: 28,
+                  right: screenSize.width < 460 ? 16 : 28,
                   child: MouseRegion(
                     onEnter: (_) {
                       _isHoveringControls = true;
@@ -2710,7 +3209,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       _startHideControlsTimer();
                     },
                     child: Container(
-                      width: 380,
+                      width: screenSize.width < 460 ? screenSize.width - 32 : 380,
                       constraints: const BoxConstraints(maxHeight: 280),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F172A).withOpacity(0.96),
@@ -2848,7 +3347,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
               if (_showEpisodeSelector && widget.episodes != null && widget.episodes!.isNotEmpty)
                 Positioned(
                   bottom: 96,
-                  right: 28,
+                  right: screenSize.width < 500 ? 16 : 28,
                   child: MouseRegion(
                     onEnter: (_) {
                       _isHoveringControls = true;
@@ -2859,7 +3358,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       _startHideControlsTimer();
                     },
                     child: Container(
-                      width: 440,
+                      width: screenSize.width < 500 ? screenSize.width - 32 : 440,
                       constraints: const BoxConstraints(maxHeight: 300),
                       decoration: BoxDecoration(
                         color: const Color(0xFF0F172A).withOpacity(0.96),
@@ -3029,6 +3528,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                         const SizedBox(width: 12),
                         TvFocusableCard(
+                          focusNode: _countdownPlayFocusNode,
                           onTap: _playNextEpisodeImmediately,
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
@@ -3049,6 +3549,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         ),
                         const SizedBox(width: 6),
                         TvFocusableCard(
+                          focusNode: _countdownCancelFocusNode,
                           onTap: _cancelNextCountdown,
                           borderRadius: BorderRadius.circular(6),
                           child: Container(
@@ -3065,8 +3566,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 5. FLOATING UNLOCK BUTTON (Hiển thị khi khóa màn hình cảm ứng - Chỉ trên iOS)
-              if (_isIOS && _isScreenLocked)
+              // 5. FLOATING UNLOCK BUTTON (iOS & Android Phone)
+              if (_isTouchMobile && _isScreenLocked)
                 Positioned(
                   top: 24,
                   left: 24,
@@ -3114,8 +3615,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ),
                 ),
 
-              // 6. TELEGRAM-STYLE FAST FORWARD HUD (2x -> 3x - Chỉ trên iOS)
-              if (_isIOS && _isHoldSpeeding)
+              // 6. TELEGRAM-STYLE FAST FORWARD HUD (2x -> 3x - iOS & Android Phone)
+              if (_isTouchMobile && _isHoldSpeeding)
                 Positioned(
                   top: 24,
                   child: SafeArea(

@@ -35,6 +35,12 @@ class TvFocusableCard extends StatefulWidget {
     this.verticalScrollAlignment,
   });
 
+  static void clearLastFocusedRow(NetflixScrollableRowState row) {
+    if (_TvFocusableCardState._lastFocusedRow == row) {
+      _TvFocusableCardState._lastFocusedRow = null;
+    }
+  }
+
   @override
   State<TvFocusableCard> createState() => _TvFocusableCardState();
 }
@@ -46,13 +52,15 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
   Timer? _holdTimer;
   bool _holdFired = false;
 
+  // Chỉ giữ sống widget đang được focus để danh sách ảo hóa (virtualization) giải phóng RAM trên Android TV
   @override
-  bool get wantKeepAlive => true;
+  bool get wantKeepAlive => _isFocused;
 
   @override
   void initState() {
     super.initState();
     _focusNode = widget.focusNode ?? FocusNode();
+    _isFocused = _focusNode.hasFocus;
     _focusNode.addListener(_handleFocusChange);
   }
 
@@ -65,13 +73,19 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
         _focusNode.dispose();
       }
       _focusNode = widget.focusNode ?? FocusNode();
+      _isFocused = _focusNode.hasFocus;
       _focusNode.addListener(_handleFocusChange);
+      updateKeepAlive();
     }
   }
 
   void _handleFocusChange() {
     if (mounted) {
       final hasFocus = _focusNode.hasFocus;
+      if (!hasFocus) {
+        _holdTimer?.cancel();
+        _holdFired = false;
+      }
       setState(() {
         _isFocused = hasFocus;
       });
@@ -214,9 +228,11 @@ class _TvFocusableCardState extends State<TvFocusableCard> with AutomaticKeepAli
           }
 
           // Xử lý giữ phím OK trên remote TV (600ms)
-          if (event is KeyDownEvent && !_holdFired) {
+          if (event is KeyDownEvent) {
+            _holdFired = false;
             _holdTimer?.cancel();
             _holdTimer = Timer(const Duration(milliseconds: 600), () {
+              if (!mounted || !_focusNode.hasFocus) return;
               _holdFired = true;
               widget.onLongPress!();
             });

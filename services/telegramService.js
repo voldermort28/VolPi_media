@@ -3,12 +3,13 @@ const path = require('path');
 const bigInt = require('big-integer');
 const { TelegramClient, Api } = require('telegram');
 const { StringSession } = require('telegram/sessions');
+const { LruTtlCache } = require('../lib/lruCache');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'telegram_config.json');
 const CACHE_FILE_PATH = path.join(__dirname, '..', 'telegram_cache.json');
 
-// Memory Cache with 12-hour TTL for channel video lists
-const channelCache = new Map();
+// Bounded LRU Memory Cache with 12-hour TTL for channel video lists
+const channelCache = new LruTtlCache({ maxEntries: 50 });
 const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
 function loadDiskCache() {
@@ -29,7 +30,9 @@ function saveDiskCache() {
     for (const [k, v] of channelCache.entries()) {
       obj[k] = v;
     }
-    fs.writeFileSync(CACHE_FILE_PATH, JSON.stringify(obj), 'utf-8');
+    const tmpPath = `${CACHE_FILE_PATH}.tmp.${process.pid}`;
+    fs.writeFileSync(tmpPath, JSON.stringify(obj), 'utf-8');
+    fs.renameSync(tmpPath, CACHE_FILE_PATH);
   } catch (_) {}
 }
 
@@ -38,14 +41,48 @@ loadDiskCache();
 // Pending login state for phone code verification
 let pendingPhoneAuth = null;
 
-// Global singleton Telegram Client instance
+// Global singleton Telegram Client instance + in-flight connect deduplication
 let telegramClientInstance = null;
+let pendingConnectPromise = null;
 
-// In-memory cache for channel entities to avoid repeated getEntity network roundtrips
-const entityCache = new Map();
+// Bounded in-memory caches
+const entityCache = new LruTtlCache({ maxEntries: 100 });
+const messageDocCache = new LruTtlCache({ maxEntries: 500 });
 
-// In-memory cache for message documents to avoid getMessages network roundtrips on every range chunk
-const messageDocCache = new Map();
+function normalizeChannelKey(raw) {
+  if (raw === null || raw === undefined) return '';
+  let s = String(raw).trim().toLowerCase();
+  if (s.startsWith('@')) s = s.slice(1);
+  if (s.startsWith('-100')) s = s.slice(4);
+  else if (s.startsWith('-')) s = s.slice(1);
+  return s;
+}
+
+function isAllowedChannelId(channelIdentifier) {
+  const extracted = extractChannelIdentifier(channelIdentifier) || String(channelIdentifier || '').trim();
+  const lower = extracted.toLowerCase();
+  if (!lower || lower === 'me' || lower === 'self') return false;
+
+  const targetNorm = normalizeChannelKey(extracted);
+  if (!targetNorm) return false;
+
+  const cfg = loadConfig();
+  const sources = (cfg.sources || []).filter((s) => s && s.enabled !== false);
+  for (const src of sources) {
+    const candidates = [
+      src.channelId,
+      src.id,
+      src.username,
+      extractChannelIdentifier(src.channelId || ''),
+    ];
+    for (const c of candidates) {
+      if (c && normalizeChannelKey(c) === targetNorm) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 function isDefaultOrInvalidApiId(apiId) {
   if (!apiId) return true;
@@ -233,23 +270,35 @@ async function getClient(forceNew = false) {
     return telegramClientInstance;
   }
 
-  if (telegramClientInstance) {
-    try {
-      await telegramClientInstance.disconnect();
-    } catch (_) {}
-    telegramClientInstance = null;
+  if (!forceNew && pendingConnectPromise) {
+    return pendingConnectPromise;
   }
 
-  const session = new StringSession(sessionString || '');
-  const client = new TelegramClient(session, parseInt(apiId, 10), apiHash, {
-    connectionRetries: 5,
-    useWSS: false,
-    autoReconnect: true,
-  });
+  pendingConnectPromise = (async () => {
+    try {
+      if (telegramClientInstance) {
+        try {
+          await telegramClientInstance.disconnect();
+        } catch (_) {}
+        telegramClientInstance = null;
+      }
 
-  await client.connect();
-  telegramClientInstance = client;
-  return client;
+      const session = new StringSession(sessionString || '');
+      const client = new TelegramClient(session, parseInt(apiId, 10), apiHash, {
+        connectionRetries: 5,
+        useWSS: false,
+        autoReconnect: true,
+      });
+
+      await client.connect();
+      telegramClientInstance = client;
+      return client;
+    } finally {
+      pendingConnectPromise = null;
+    }
+  })();
+
+  return pendingConnectPromise;
 }
 
 async function getAuthStatus() {
@@ -520,7 +569,7 @@ async function addSource({ name, url }) {
   let count = 0;
 
   try {
-    const scanResult = await getChannelVideos(channelIdentifier, { forceRefresh: true, limit: 2500 });
+    const scanResult = await getChannelVideos(channelIdentifier, { forceRefresh: true, limit: 2500, bypassAllowlist: true });
     count = scanResult.videos ? scanResult.videos.length : 0;
     if (!title && scanResult.channelTitle) {
       title = scanResult.channelTitle;
@@ -625,8 +674,13 @@ async function resolveChannelEntity(client, channelIdentifier) {
 /**
  * Fetch and filter video messages from a channel
  */
-async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 2500, page = null, pageSize = 50, search = '' } = {}) {
+async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit = 2500, page = null, pageSize = 50, search = '', bypassAllowlist = false } = {}) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
+  if (!bypassAllowlist && !isAllowedChannelId(channelId)) {
+    const err = new Error('Kênh Telegram không nằm trong danh sách nguồn được phép truy cập');
+    err.statusCode = 403;
+    throw err;
+  }
   const cacheKey = `tg_videos_${channelId}`;
 
   let fullResult = null;
@@ -646,8 +700,9 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 
       const channelTitle = entity.title || entity.username || channelId;
 
-      // We scan up to Math.max(limit, 2500) messages to catch all videos in the channel
-      const targetLimit = Math.max(parseInt(limit, 10) || 2500, 2500);
+      // Cap scan strictly between 1 and 2500 messages to prevent Telegram FLOOD_WAIT / ban
+      const parsedLimit = parseInt(limit, 10);
+      const targetLimit = Math.min(Math.max(isNaN(parsedLimit) ? 2500 : parsedLimit, 1), 2500);
 
       // Use waitTime 0.05 (50ms) between batches to prevent Telegram FLOOD_WAIT
       const messages = await client.getMessages(entity, {
@@ -837,7 +892,13 @@ async function getChannelVideos(channelIdentifier, { forceRefresh = false, limit
 
 async function streamMedia(channelIdentifier, messageId, req, res) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
+  if (!isAllowedChannelId(channelId)) {
+    return res.status(403).json({ error: 'Kênh Telegram không được phép truy cập' });
+  }
   const msgId = parseInt(messageId, 10);
+  if (isNaN(msgId) || msgId <= 0) {
+    return res.status(400).json({ error: 'Invalid message ID' });
+  }
   const cacheKey = `${channelId}_${msgId}`;
 
   try {
@@ -863,17 +924,31 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
     }
 
     const { totalSize, mimeType, media } = mediaInfo;
+    if (!totalSize || isNaN(totalSize) || totalSize <= 0) {
+      return res.status(502).json({ error: 'Invalid media size' });
+    }
 
     const rangeHeader = req.headers.range;
     let start = 0;
     let end = totalSize - 1;
 
-    // Parse Range header: bytes=start-end
+    // Parse Range header strictly: bytes=start-end
     if (rangeHeader) {
-      const parts = rangeHeader.replace(/bytes=/, '').split('-');
-      start = parseInt(parts[0], 10);
-      if (parts[1]) {
-        end = parseInt(parts[1], 10);
+      const match = String(rangeHeader).match(/^bytes=(\d*)-(\d*)$/);
+      if (!match) {
+        res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+        return res.end();
+      }
+      start = match[1] ? parseInt(match[1], 10) : 0;
+      end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+      if (!match[1] && match[2]) {
+        const suffix = parseInt(match[2], 10);
+        start = Math.max(0, totalSize - suffix);
+        end = totalSize - 1;
+      }
+      if (isNaN(start) || isNaN(end) || start < 0 || start >= totalSize || end < start) {
+        res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+        return res.end();
       }
     }
 
@@ -907,25 +982,32 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
     const chunksCount = Math.ceil(contentLength / CHUNK_SIZE);
 
     let bytesSent = 0;
-    // Stream chunks via GramJS iterDownload
+    // Stream chunks via GramJS iterDownload with proper backpressure handling
     for await (const chunk of client.iterDownload({
       file: media,
       offset: bigInt(start),
       limit: chunksCount,
       chunkSize: CHUNK_SIZE,
     })) {
-      if (isAborted) break;
+      if (isAborted || res.destroyed) break;
 
       const remaining = contentLength - bytesSent;
       if (remaining <= 0) break;
 
-      if (chunk.length > remaining) {
-        res.write(chunk.slice(0, remaining));
-        bytesSent += remaining;
-        break;
-      } else {
-        res.write(chunk);
-        bytesSent += chunk.length;
+      const toWrite = chunk.length > remaining ? chunk.slice(0, remaining) : chunk;
+      const canContinue = res.write(toWrite);
+      bytesSent += toWrite.length;
+
+      if (!canContinue && !isAborted && !res.destroyed) {
+        await new Promise((resolve) => {
+          const onDone = () => {
+            res.removeListener('drain', onDone);
+            res.removeListener('close', onDone);
+            resolve();
+          };
+          res.once('drain', onDone);
+          res.once('close', onDone);
+        });
       }
 
       if (bytesSent >= contentLength) break;
@@ -961,7 +1043,13 @@ async function streamMedia(channelIdentifier, messageId, req, res) {
  */
 async function streamThumbnail(channelIdentifier, messageId, res) {
   const channelId = extractChannelIdentifier(channelIdentifier) || channelIdentifier;
+  if (!isAllowedChannelId(channelId)) {
+    return res.status(403).send('Forbidden');
+  }
   const msgId = parseInt(messageId, 10);
+  if (isNaN(msgId) || msgId <= 0) {
+    return res.status(400).send('Invalid message ID');
+  }
 
   try {
     const client = await getClient();

@@ -8,6 +8,7 @@ import '../models/watch_history_model.dart';
 import '../services/favorites_service.dart';
 import '../services/sync_service.dart';
 import '../services/watch_history_service.dart';
+import '../widgets/loading_dialog_helper.dart';
 import '../widgets/resume_playback_dialog.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../player/video_player_screen.dart';
@@ -38,7 +39,52 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WatchHistoryService.instance.changeNotifier.addListener(_onHistoryChanged);
     _loadDetails();
+  }
+
+  @override
+  void dispose() {
+    WatchHistoryService.instance.changeNotifier.removeListener(_onHistoryChanged);
+    super.dispose();
+  }
+
+  void _onHistoryChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _playSingleMovie() async {
+    final anime = _detailedAnime ?? widget.anime;
+    final cleanId = anime.id.replaceAll(RegExp(r'^anime:'), '');
+    final streams = await LoadingDialogHelper.runWithLoading(
+      context,
+      () => widget.apiService.getAnimeEpisodeStreams(cleanId, 1, 1, type: anime.type),
+    );
+    if (!mounted || streams == null) return;
+    if (streams.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy link phát cho phim này.'), backgroundColor: Colors.amber),
+      );
+      return;
+    }
+    final selected = streams.first;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VideoPlayerScreen(
+          streamUrl: selected.url,
+          title: anime.name,
+          subtitle: selected.title,
+          headers: selected.headers,
+          availableChannels: streams,
+          isLive: false,
+          mediaId: 'anime:$cleanId:ep:1',
+          mediaCategory: 'anime',
+          mediaPoster: anime.poster,
+          episode: 1,
+          season: 1,
+        ),
+      ),
+    );
   }
 
   Future<void> _loadDetails() async {
@@ -89,21 +135,19 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
       }
     }
 
-    showDialog(
-      context: targetContext,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8))),
+    if (!targetContext.mounted) return;
+    final streams = await LoadingDialogHelper.runWithLoading(
+      targetContext,
+      () => widget.apiService.getAnimeEpisodeStreams(
+        widget.anime.id,
+        ep.season,
+        ep.episode,
+        type: widget.anime.type,
+      ),
+      indicatorColor: const Color(0xFF38BDF8),
     );
 
-    final streams = await widget.apiService.getAnimeEpisodeStreams(
-      widget.anime.id,
-      ep.season,
-      ep.episode,
-      type: widget.anime.type,
-    );
-
-    if (!mounted) return;
-    Navigator.of(targetContext).pop();
+    if (!mounted || !targetContext.mounted || streams == null) return;
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -156,8 +200,10 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
     );
 
     if (replaceContext != null) {
-      Navigator.of(replaceContext).pushReplacement(playerRoute);
-    } else {
+      if (replaceContext.mounted) {
+        Navigator.of(replaceContext).pushReplacement(playerRoute);
+      }
+    } else if (mounted) {
       Navigator.of(context).push(playerRoute);
     }
   }
@@ -177,7 +223,7 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
         Navigator.of(context).pop();
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF0F0F0F),
         body: SafeArea(
           child: Column(
             children: [
@@ -274,72 +320,155 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
               ),
             ),
 
-            // Content Area
+            // Content Area (Stacked header on portrait phones so episodes get full width; 2 columns on TV/landscape)
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Poster & Description Card (Left Column - compact on mobile)
-                  Container(
-                    width: isNarrow ? 120 : 260,
-                    padding: EdgeInsets.symmetric(horizontal: isNarrow ? 8 : 20),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(isNarrow ? 8 : 12),
-                            child: CachedNetworkImage(
-                              imageUrl: anime.poster,
-                              width: isNarrow ? 104 : 220,
-                              height: isNarrow ? 148 : 310,
-                              memCacheWidth: isNarrow ? 130 : 220,
-                              memCacheHeight: isNarrow ? 180 : 310,
-                              fit: BoxFit.cover,
-                              errorWidget: (_, __, ___) => Container(
-                                width: isNarrow ? 104 : 220,
-                                height: isNarrow ? 148 : 310,
-                                color: const Color(0xFF1E293B),
-                                child: Icon(Icons.movie_outlined, size: isNarrow ? 32 : 48, color: Colors.white30),
+              child: isNarrow
+                  ? Column(
+                      children: [
+                        // Compact Mobile Poster & Info Row
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: CachedNetworkImage(
+                                  imageUrl: anime.poster,
+                                  width: 82,
+                                  height: 118,
+                                  memCacheWidth: 160,
+                                  memCacheHeight: 230,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => Container(
+                                    width: 82,
+                                    height: 118,
+                                    color: const Color(0xFF1A1A1A),
+                                    child: const Icon(Icons.movie_outlined, size: 28, color: Colors.white30),
+                                  ),
+                                ),
                               ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (anime.genres.isNotEmpty)
+                                      Wrap(
+                                        spacing: 4,
+                                        runSpacing: 4,
+                                        children: anime.genres.take(4).map((g) {
+                                          return Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF1E293B),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(g, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                                          );
+                                        }).toList(),
+                                      ),
+                                    if (anime.description.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        anime.description,
+                                        style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11.5, height: 1.35),
+                                        maxLines: 4,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                            child: _buildEpisodesColumn(anime, episodes, isNarrow),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Poster & Description Card (Left Column on TV / Tablet / Desktop)
+                        Container(
+                          width: 260,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CachedNetworkImage(
+                                    imageUrl: anime.poster,
+                                    width: 220,
+                                    height: 310,
+                                    memCacheWidth: 220,
+                                    memCacheHeight: 310,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => Container(
+                                      width: 220,
+                                      height: 310,
+                                      color: const Color(0xFF1A1A1A),
+                                      child: const Icon(Icons.movie_outlined, size: 48, color: Colors.white30),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                if (anime.genres.isNotEmpty)
+                                  Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: anime.genres.map((g) {
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF1E293B),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(g, style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 10)),
+                                      );
+                                    }).toList(),
+                                  ),
+                                const SizedBox(height: 10),
+                                if (anime.description.isNotEmpty)
+                                  Text(
+                                    anime.description,
+                                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, height: 1.3),
+                                    maxLines: 6,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                              ],
                             ),
                           ),
-                          SizedBox(height: isNarrow ? 8 : 12),
-                          if (anime.genres.isNotEmpty)
-                            Wrap(
-                              spacing: isNarrow ? 4 : 6,
-                              runSpacing: isNarrow ? 4 : 6,
-                              children: anime.genres.map((g) {
-                                return Container(
-                                  padding: EdgeInsets.symmetric(horizontal: isNarrow ? 5 : 8, vertical: isNarrow ? 2 : 3),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF1E293B),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(g, style: TextStyle(color: const Color(0xFF38BDF8), fontSize: isNarrow ? 9 : 10)),
-                                );
-                              }).toList(),
-                            ),
-                          SizedBox(height: isNarrow ? 6 : 10),
-                          if (anime.description.isNotEmpty)
-                            Text(
-                              anime.description,
-                              style: TextStyle(color: const Color(0xFF94A3B8), fontSize: isNarrow ? 11 : 12, height: 1.3),
-                              maxLines: isNarrow ? 4 : 6,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
+                        ),
 
-                  // Episodes Grid (Right Column)
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.only(right: isNarrow ? 10 : 20, bottom: isNarrow ? 12 : 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                        // Episodes Grid (Right Column)
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.only(right: 20, bottom: 20),
+                            child: _buildEpisodesColumn(anime, episodes, isNarrow),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEpisodesColumn(AnimeModel anime, List<EpisodeModel> episodes, bool isNarrow) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
                           Wrap(
                             alignment: WrapAlignment.spaceBetween,
                             crossAxisAlignment: WrapCrossAlignment.center,
@@ -505,10 +634,39 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                             child: _isLoading
                                 ? const Center(child: CircularProgressIndicator(color: Color(0xFF38BDF8)))
                                 : episodes.isEmpty
-                                    ? const Center(
-                                        child: Text(
-                                          'Chưa có tập phim hoặc là phim lẻ (bấm để xem).',
-                                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                                    ? Center(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Text(
+                                              'Phim lẻ hoặc chưa phân danh sách tập',
+                                              style: TextStyle(color: Colors.white60, fontSize: 13),
+                                            ),
+                                            const SizedBox(height: 14),
+                                            TvFocusableCard(
+                                              autoFocus: true,
+                                              onTap: _playSingleMovie,
+                                              borderRadius: BorderRadius.circular(10),
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFE50914),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: const Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                                                    SizedBox(width: 6),
+                                                    Text(
+                                                      'Phát Phim Ngay',
+                                                      style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       )
                                     : GridView.builder(
@@ -566,16 +724,6 @@ class _AnimeDetailScreenState extends State<AnimeDetailScreen> {
                                       ),
                           ),
                         ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            ],
-          ),
-        ),
-      ),
-    );
+                      );
   }
 }

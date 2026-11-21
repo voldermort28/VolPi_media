@@ -1,10 +1,10 @@
 {
-  "version": "2.2.52",
-  "build": 118,
-  "tag_name": "v2.2.52",
-  "changelog": "• VolPi Media v2.2.52:\n- Sửa triệt để lỗi văng ứng dụng (crash) sau 1-2 giây khi mở trên Android TV do AudioServiceActivity / ForegroundService và quá tải RAM lúc khởi tạo đồng thời 6 tab.\n- Nạp tab thông minh (Lazy Tab Mounting) giúp mở app trên Android TV nhẹ, mượt và không ngốn bộ nhớ.\n- Bổ sung tab HeoAV và Phe69 vào Kho Phim riêng tư.",
+  "version": "2.2.53",
+  "build": 119,
+  "tag_name": "v2.2.53",
+  "changelog": "• VolPi Media v2.2.53 (Bản Đại Tu Toàn Diện - Bảo mật, Ổn định & UI/UX):\n- Bảo mật & Backend: Chống SSRF, khóa IP 2 tầng chống dò mật khẩu Admin (5 lần -> 15p, 10 lần -> 24h), chặn quét GDrive/Telegram ngoài danh sách, bảo vệ PIN 30s + đổi PIN ngay trong Kho Riêng Tư, chuyển Keystore & OTA token sang GitHub Secrets.\n- VideoPlayer thế hệ mới: Đảo chiều xoay ngang thuận tay hơn, hỗ trợ đầy đủ điện thoại Android (vuốt sáng/âm lượng, chạm đúp tua nhanh), chống tắt màn hình (Wakelock), tự kết nối lại khi rớt mạng Live, thêm nút Bỏ qua Intro (+85s), tốc độ phát (0.75x-2x), tỷ lệ khung hình, chuyển kênh CH+/CH- & điều khiển lỗi 100% bằng Remote TV.\n- Sửa triệt để các lỗi crash: Crash ScrollController trong Kho Riêng Tư, crash phân trang Telegram, crash bấm Back lúc loading, lỗi rò RAM/FocusNode trên Android TV, lỗi lịch sử xem Telegram/GDrive riêng tư.\n- Nâng cấp giao diện: Tìm kiếm toàn cục (Bóng đá + Anime + IPTV), thanh điều hướng 1 tay cho iOS & Android Phone, MiniPlayer nhạc nổi xuyên suốt mọi tab, khung ảnh 16:9 không cắt méo cho Kho Riêng Tư, ghim kênh IPTV yêu thích ngay trên app (nhấn giữ OK).",
   "apkUrl": "https://stremio.laboon.vn/download/VolPi-Media-AndroidTV.apk",
   "ipaUrl": "https://stremio.laboon.vn/download/VolPi-Media-iOS.ipa",
   "macosUrl": "https://stremio.laboon.vn/download/VolPi-Media-macOS.zip",
-  "published_at": "2026-11-22T00:30:00Z"
+  "published_at": "2026-11-22T02:35:00Z"
 }

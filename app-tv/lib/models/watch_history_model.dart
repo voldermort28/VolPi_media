@@ -30,12 +30,35 @@ class WatchHistoryItem {
   int get position => positionMs;
   int get duration => durationMs;
 
+  /// Nhận diện nhanh các ID thuộc nội dung riêng tư / GDrive / Telegram để không bao giờ rò rỉ ra Trang Chủ công khai
+  static bool isSecretOrPrivateItem(String id, String category) {
+    final lowerCat = category.toLowerCase();
+    if (lowerCat.contains('secret') || lowerCat.contains('private') || lowerCat == 'gdrive' || lowerCat == 'telegram') {
+      return true;
+    }
+    final lowerId = id.toLowerCase();
+    return lowerId.startsWith('vlxx:') ||
+        lowerId.startsWith('movie:vlxx') ||
+        lowerId.startsWith('viet69:') ||
+        lowerId.startsWith('movie:viet69') ||
+        lowerId.startsWith('xnhau:') ||
+        lowerId.startsWith('movie:xnhau') ||
+        lowerId.startsWith('qmh:') ||
+        lowerId.startsWith('movie:qmh') ||
+        lowerId.startsWith('heoav:') ||
+        lowerId.startsWith('movie:heoav') ||
+        lowerId.startsWith('phe69:') ||
+        lowerId.startsWith('movie:phe69') ||
+        lowerId.startsWith('telegram_') ||
+        lowerId.startsWith('gdrive_');
+  }
+
   /// Kiểm tra xem phim có đang ở trạng thái xem dở hay không
-  /// - Bỏ qua xem lướt: < 15 giây
+  /// - Bỏ qua xem lướt: < 15 giây hoặc chưa đo được thời lượng (durationMs <= 0)
   /// - Xem xong: >= 95% thời lượng hoặc còn dưới 30 giây cuối
   /// - Đang xem dở: 15s <= position < 95% và còn > 30s
   bool get isInProgress {
-    if (durationMs <= 0) return positionMs > 15000;
+    if (durationMs <= 0) return false;
     final double pct = positionMs / durationMs;
     final int remainMs = durationMs - positionMs;
     return positionMs >= 15000 && pct < 0.95 && remainMs > 30000;

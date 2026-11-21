@@ -68,9 +68,10 @@ const CATEGORY_MAP = {
   'xvideos': 'xvideos',
 };
 
-const videoInfoCache = new Map();
-const manifestUrlCache = new Map();
-const videoDetailsCache = new Map();
+const { LruTtlCache } = require("../lib/lruCache");
+const videoInfoCache = new LruTtlCache({ maxEntries: 300 });
+const manifestUrlCache = new LruTtlCache({ maxEntries: 200 });
+const videoDetailsCache = new LruTtlCache({ maxEntries: 300 });
 
 function parseVideoItem($, el) {
   const $el = $(el);

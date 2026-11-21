@@ -48,14 +48,22 @@ class ApiService {
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         if (data is List && data.isNotEmpty) {
-          final matches = data.map((item) => MatchModel.fromJson(item)).toList();
+          final matches = data
+              .whereType<Map>()
+              .map((item) => MatchModel.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
           MatchModel.sortByPriority(matches);
           return matches;
         }
       }
     } catch (_) {}
 
-    // 2. Fallback to Stremio catalog endpoint
+    // Gà Vàng & Về Bờ không có Stremio catalog; tuyệt đối không fallback nhầm sang Xôi Lạc!
+    if (src == 'gavang' || src == 'vebo') {
+      return [];
+    }
+
+    // 2. Fallback to Stremio catalog endpoint (chỉ dành cho xoilac & socolive)
     String catalogPath = 'xoilac/catalog/tv/xoilac-catalog.json';
     if (src == 'socolive') {
       catalogPath = 'socolive/catalog/tv/socolive-catalog.json';
@@ -68,9 +76,12 @@ class ApiService {
       final res = await _client.get(Uri.parse(catalogUrl)).timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
-        if (data['metas'] != null) {
-          final List list = data['metas'];
-          final matches = list.map((item) => MatchModel.fromJson(item)).toList();
+        if (data is Map && data['metas'] is List) {
+          final List list = data['metas'] as List;
+          final matches = list
+              .whereType<Map>()
+              .map((item) => MatchModel.fromJson(Map<String, dynamic>.from(item)))
+              .toList();
           MatchModel.sortByPriority(matches);
           return matches;
         }

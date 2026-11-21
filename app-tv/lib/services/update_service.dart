@@ -43,6 +43,7 @@ class UpdateService {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
+      final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       // 1. Try VPS version endpoint first (Fastest in VN, no rate limit)
       try {
@@ -53,7 +54,7 @@ class UpdateService {
         if (vpsRes.statusCode == 200) {
           final data = json.decode(utf8.decode(vpsRes.bodyBytes));
           if (data is Map<String, dynamic> && (data['version'] != null || data['tag_name'] != null)) {
-            return UpdateInfo.fromJson(data, currentVersion);
+            return UpdateInfo.fromJson(data, currentVersion, currentBuild: currentBuild);
           }
         }
       } catch (e) {
@@ -68,7 +69,7 @@ class UpdateService {
 
       if (ghRes.statusCode == 200) {
         final data = json.decode(utf8.decode(ghRes.bodyBytes));
-        return UpdateInfo.fromJson(data, currentVersion);
+        return UpdateInfo.fromJson(data, currentVersion, currentBuild: currentBuild);
       }
     } catch (e) {
       debugPrint('Update check error: $e');
@@ -76,12 +77,21 @@ class UpdateService {
     return null;
   }
 
+  static String? lastInstallError;
+
   /// Downloads APK and launches Android Native Package Installer
   static Future<bool> downloadAndInstallApk({
     required String downloadUrl,
     required Function(double progress, int receivedBytes, int totalBytes) onProgress,
   }) async {
     _isDownloadCancelled = false;
+    lastInstallError = null;
+    if (downloadUrl.trim().isEmpty) {
+      lastInstallError = 'Không tìm thấy đường dẫn tải APK.';
+      return false;
+    }
+
+    http.Client? client;
     try {
       final tempDir = await getTemporaryDirectory();
       final filePath = '${tempDir.path}/VolPi-Media-Update.apk';
@@ -91,15 +101,14 @@ class UpdateService {
         await file.delete();
       }
 
-      final client = http.Client();
+      client = http.Client();
       _activeDownloadClient = client;
-      final request = http.Request('GET', Uri.parse(downloadUrl));
-      final response = await client.send(request);
+      final request = http.Request('GET', Uri.parse(downloadUrl.trim()));
+      final response = await client.send(request).timeout(const Duration(seconds: 20));
 
       if (response.statusCode != 200) {
         debugPrint('Download APK HTTP status error: ${response.statusCode}');
-        client.close();
-        _activeDownloadClient = null;
+        lastInstallError = 'Lỗi máy chủ khi tải APK (HTTP ${response.statusCode}).';
         return false;
       }
 
@@ -108,7 +117,7 @@ class UpdateService {
       final sink = file.openWrite();
 
       try {
-        await for (final chunk in response.stream) {
+        await for (final chunk in response.stream.timeout(const Duration(seconds: 30))) {
           if (_isDownloadCancelled) {
             break;
           }
@@ -122,10 +131,6 @@ class UpdateService {
       } finally {
         await sink.flush();
         await sink.close();
-        client.close();
-        if (_activeDownloadClient == client) {
-          _activeDownloadClient = null;
-        }
       }
 
       if (_isDownloadCancelled) {
@@ -139,6 +144,7 @@ class UpdateService {
 
       if (totalBytes > 0 && receivedBytes < totalBytes) {
         debugPrint('Download APK incomplete: $receivedBytes of $totalBytes');
+        lastInstallError = 'Tải APK bị gián đoạn trước khi hoàn tất.';
         return false;
       }
 
@@ -148,24 +154,49 @@ class UpdateService {
         type: 'application/vnd.android.package-archive',
       );
 
-      return result.type == ResultType.done;
+      if (result.type == ResultType.permissionDenied) {
+        lastInstallError = 'Android chưa cấp quyền "Cài đặt ứng dụng không xác định" cho VolPi Media. Vào Cài đặt → Ứng dụng → VolPi Media để bật quyền này.';
+        return false;
+      }
+      if (result.type != ResultType.done) {
+        lastInstallError = result.message.isNotEmpty ? result.message : 'Không thể mở trình cài đặt APK.';
+        return false;
+      }
+
+      return true;
     } catch (e) {
       debugPrint('Download/Install APK error: $e');
+      lastInstallError = 'Kết nối bị gián đoạn khi tải APK: $e';
       return false;
+    } finally {
+      try {
+        client?.close();
+      } catch (_) {}
+      if (_activeDownloadClient == client) {
+        _activeDownloadClient = null;
+      }
     }
   }
 
-  /// Triggers 1-click in-place update for TrollStore on iOS
+  /// Triggers 1-click in-place update for TrollStore on iOS (official apple-magnifier:// scheme)
   static Future<bool> installIpaTrollStore(String ipaUrl) async {
+    if (ipaUrl.trim().isEmpty) return false;
     try {
-      // 1. Try trollstore:// URL scheme (Official TrollStore 2.0+ scheme)
-      final trollstoreUri = Uri.parse('trollstore://install?url=${Uri.encodeComponent(ipaUrl)}');
-      if (await canLaunchUrl(trollstoreUri)) {
-        return await launchUrl(trollstoreUri, mode: LaunchMode.externalApplication);
+      final encoded = Uri.encodeComponent(ipaUrl.trim());
+      // 1. Official TrollStore 2.0+ URL scheme (apple-magnifier://install?url=...)
+      final magnifierUri = Uri.parse('apple-magnifier://install?url=$encoded');
+      if (await canLaunchUrl(magnifierUri)) {
+        return await launchUrl(magnifierUri, mode: LaunchMode.externalApplication);
       }
 
-      // 2. Fallback: Open direct download link in Safari
-      final directUri = Uri.parse(ipaUrl);
+      // 2. Legacy trollstore:// fallback
+      final legacyUri = Uri.parse('trollstore://install?url=$encoded');
+      if (await canLaunchUrl(legacyUri)) {
+        return await launchUrl(legacyUri, mode: LaunchMode.externalApplication);
+      }
+
+      // 3. Fallback: Open direct download link in Safari
+      final directUri = Uri.parse(ipaUrl.trim());
       return await launchUrl(directUri, mode: LaunchMode.externalApplication);
     } catch (e) {
       debugPrint('Install IPA error: $e');

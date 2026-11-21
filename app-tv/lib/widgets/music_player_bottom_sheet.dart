@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/audio_player_handler.dart';
+import 'tv_focusable_card.dart';
 
 class MusicPlayerBottomSheet extends StatefulWidget {
   const MusicPlayerBottomSheet({super.key});
@@ -21,6 +23,7 @@ class MusicPlayerBottomSheet extends StatefulWidget {
 
 class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with SingleTickerProviderStateMixin {
   late AnimationController _vinylController;
+  StreamSubscription<PlaybackState>? _stateSub;
   bool _showQueue = false;
 
   @override
@@ -29,11 +32,24 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
     _vinylController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 18),
-    )..repeat();
+    );
+    final handler = VolPiAudioHandler.instance;
+    if (handler.playbackState.value.playing) {
+      _vinylController.repeat();
+    }
+    _stateSub = handler.playbackState.listen((state) {
+      if (!mounted) return;
+      if (state.playing && !_vinylController.isAnimating) {
+        _vinylController.repeat();
+      } else if (!state.playing && _vinylController.isAnimating) {
+        _vinylController.stop();
+      }
+    });
   }
 
   @override
   void dispose() {
+    _stateSub?.cancel();
     _vinylController.dispose();
     super.dispose();
   }
@@ -42,6 +58,15 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  String _extractAudioExt(String title) {
+    final m = RegExp(r'\.(flac|mp3|m4a|wav|aac|ogg|opus|wma|alac)$', caseSensitive: false).firstMatch(title.trim());
+    return m != null ? m.group(1)!.toUpperCase() : 'AUDIO';
+  }
+
+  String _cleanTitle(String title) {
+    return title.replaceFirst(RegExp(r'\.(flac|mp3|m4a|wav|aac|ogg|opus|wma|alac)$', caseSensitive: false), '').trim();
   }
 
   @override
@@ -56,33 +81,25 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
         final item = mediaSnapshot.data;
         if (item == null) return const SizedBox.shrink();
 
-        final title = item.title;
+        final rawTitle = item.title;
+        final title = _cleanTitle(rawTitle);
         final artist = item.artist ?? 'Nghệ sĩ';
         final album = item.album ?? 'Album';
         final artUri = item.artUri?.toString();
-
-        final ext = title.contains('.') ? title.split('.').last.toUpperCase() : 'AUDIO';
+        final ext = _extractAudioExt(rawTitle);
 
         return StreamBuilder<PlaybackState>(
           stream: handler.playbackState,
           builder: (context, stateSnapshot) {
             final state = stateSnapshot.data;
-            final playing = state?.playing ?? false;
-            final pos = state?.position ?? Duration.zero;
             final dur = item.duration ?? Duration.zero;
-
-            if (playing && !_vinylController.isAnimating) {
-              _vinylController.repeat();
-            } else if (!playing && _vinylController.isAnimating) {
-              _vinylController.stop();
-            }
 
             return Container(
               height: size.height * (isMobile ? 0.90 : 0.85),
               decoration: const BoxDecoration(
-                color: Color(0xFF0F172A),
+                color: Color(0xFF141414),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 1.5)),
+                border: Border(top: BorderSide(color: Color(0xFF262626), width: 1.5)),
               ),
               child: Column(
                 children: [
@@ -125,7 +142,14 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
                   Expanded(
                     child: _showQueue
                         ? _buildQueueList(handler)
-                        : _buildPlayerContent(title, artist, artUri, ext, pos, dur, state, handler, isMobile),
+                        : StreamBuilder<Duration>(
+                            stream: handler.player.positionStream,
+                            initialData: state?.position ?? Duration.zero,
+                            builder: (context, posSnap) {
+                              final livePos = posSnap.data ?? (state?.position ?? Duration.zero);
+                              return _buildPlayerContent(title, artist, artUri, ext, livePos, dur, state, handler, isMobile);
+                            },
+                          ),
                   ),
                 ],
               ),
@@ -296,18 +320,39 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
 
           const SizedBox(height: 10),
 
-          // Control Buttons
+          // Control Buttons (TV D-pad focusable + Shuffle & Repeat)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                iconSize: 36,
-                icon: const Icon(Icons.skip_previous_rounded, color: Colors.white),
-                onPressed: () => handler.skipToPrevious(),
+              ValueListenableBuilder<bool>(
+                valueListenable: handler.shuffleEnabledNotifier,
+                builder: (_, isShuffle, __) => TvFocusableCard(
+                  onTap: handler.toggleShuffle,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.shuffle_rounded,
+                      size: 22,
+                      color: isShuffle ? const Color(0xFF38BDF8) : Colors.white54,
+                    ),
+                  ),
+                ),
               ),
-              const SizedBox(width: 16),
-              GestureDetector(
+              const SizedBox(width: 10),
+              TvFocusableCard(
+                onTap: () => handler.skipToPrevious(),
+                borderRadius: BorderRadius.circular(24),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.skip_previous_rounded, color: Colors.white, size: 34),
+                ),
+              ),
+              const SizedBox(width: 14),
+              TvFocusableCard(
+                autoFocus: true,
                 onTap: () => playing ? handler.pause() : handler.play(),
+                borderRadius: BorderRadius.circular(36),
                 child: Container(
                   width: 64,
                   height: 64,
@@ -342,11 +387,30 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              IconButton(
-                iconSize: 36,
-                icon: const Icon(Icons.skip_next_rounded, color: Colors.white),
-                onPressed: () => handler.skipToNext(),
+              const SizedBox(width: 14),
+              TvFocusableCard(
+                onTap: () => handler.skipToNext(),
+                borderRadius: BorderRadius.circular(24),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(Icons.skip_next_rounded, color: Colors.white, size: 34),
+                ),
+              ),
+              const SizedBox(width: 10),
+              ValueListenableBuilder<bool>(
+                valueListenable: handler.repeatOneNotifier,
+                builder: (_, isRepeat, __) => TvFocusableCard(
+                  onTap: handler.toggleRepeatOne,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      isRepeat ? Icons.repeat_one_rounded : Icons.repeat_rounded,
+                      size: 22,
+                      color: isRepeat ? const Color(0xFF38BDF8) : Colors.white54,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -442,45 +506,61 @@ class _MusicPlayerBottomSheetState extends State<MusicPlayerBottomSheet> with Si
             final track = list[index];
             final isCurrent = index == handler.currentIndex;
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: isCurrent ? const Color(0xFF0284C7).withOpacity(0.2) : const Color(0xFF1E293B).withOpacity(0.5),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isCurrent ? const Color(0xFF38BDF8) : Colors.transparent,
-                  width: 1.2,
-                ),
-              ),
-              child: ListTile(
-                leading: Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: isCurrent ? const Color(0xFF38BDF8) : const Color(0xFF334155),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Center(
-                    child: isCurrent
-                        ? const Icon(Icons.equalizer_rounded, color: Colors.white, size: 18)
-                        : Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                ),
-                title: Text(
-                  track.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: isCurrent ? const Color(0xFF38BDF8) : Colors.white,
-                    fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-                    fontSize: 13,
-                  ),
-                ),
-                subtitle: Text(
-                  track.artist ?? 'Nghệ sĩ',
-                  style: const TextStyle(color: Colors.white54, fontSize: 11),
-                ),
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: TvFocusableCard(
                 onTap: () => handler.skipToQueueItem(index),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isCurrent ? const Color(0xFF0284C7).withOpacity(0.2) : const Color(0xFF1E293B).withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isCurrent ? const Color(0xFF38BDF8) : Colors.transparent,
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: isCurrent ? const Color(0xFF38BDF8) : const Color(0xFF334155),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Center(
+                          child: isCurrent
+                              ? const Icon(Icons.equalizer_rounded, color: Colors.white, size: 18)
+                              : Text('${index + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _cleanTitle(track.title),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isCurrent ? const Color(0xFF38BDF8) : Colors.white,
+                                fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 13,
+                              ),
+                            ),
+                            Text(
+                              track.artist ?? 'Nghệ sĩ',
+                              style: const TextStyle(color: Colors.white54, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             );
           },

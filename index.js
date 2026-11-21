@@ -1,10 +1,37 @@
+const fs = require("fs");
+const path = require("path");
+
+// Lightweight zero-dependency .env loader (loads VPS .env secrets before requiring services)
+(function loadEnvFile() {
+  const envPath = path.join(__dirname, ".env");
+  if (!fs.existsSync(envPath)) return;
+  try {
+    const lines = fs.readFileSync(envPath, "utf-8").split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx <= 0) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (key && process.env[key] === undefined) {
+        process.env[key] = val;
+      }
+    }
+  } catch (e) {
+    console.warn("[Env] Could not read .env:", e.message);
+  }
+})();
+
 const express = require("express");
 const axios = require("axios");
 const cheerio = require("cheerio");
-const path = require("path");
-const fs = require("fs");
 const crypto = require("crypto");
 const { getRouter } = require("stremio-addon-sdk");
+const { assertSafeUrl } = require("./lib/ssrfGuard");
 
 const config = require("./config");
 const unifiedAddon = require("./addon");
@@ -36,10 +63,10 @@ const telegramService = require("./services/telegramService");
 const app = express();
 const PORT = process.env.PORT || 7000;
 
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "2mb" }));
+app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -60,7 +87,7 @@ app.use((req, res, next) => {
 app.get(["/login", "/login.html"], (req, res) => {
   const token = authService.extractToken(req);
   if (token && authService.validateSession(token)) {
-    const redirect = req.query.redirect || "/";
+    const redirect = authService.sanitizeRedirect(req.query.redirect);
     return res.redirect(redirect);
   }
   return res.sendFile(path.join(__dirname, "public", "login.html"));
@@ -86,18 +113,31 @@ app.get(["/", "/index.html", "/admin", "/config"], authService.requireAuth, (req
   return res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Auth API Endpoints
+// Auth API Endpoints (with 2-tier progressive IP lockout: 5 fails -> 15m, 10 fails -> 24h)
 app.post("/api/login", (req, res) => {
   const { username, password, rememberMe } = req.body || {};
-  const result = authService.login(username, password, rememberMe !== false);
+  const clientIp = authService.getClientIp(req);
+  const result = authService.login(username, password, rememberMe !== false, clientIp);
   if (result.success) {
+    const isHttps = req.secure || req.headers["x-forwarded-proto"] === "https";
     res.cookie("volpi_session", result.token, {
       maxAge: (result.maxAgeSeconds || 86400) * 1000,
       httpOnly: true,
-      sameSite: "lax",
+      sameSite: "strict",
+      secure: isHttps,
       path: "/",
     });
-    return res.json(result);
+    return res.json({
+      success: true,
+      username: result.username,
+      expiresAt: result.expiresAt,
+    });
+  }
+  if (result.locked) {
+    if (result.retryAfterSeconds) {
+      res.setHeader("Retry-After", String(result.retryAfterSeconds));
+    }
+    return res.status(429).json(result);
   }
   return res.status(401).json(result);
 });
@@ -154,8 +194,22 @@ app.use(
   })
 );
 
-// OTA App Version & Update Endpoints
-const OTA_DEPLOY_TOKEN = process.env.OTA_DEPLOY_TOKEN || "volpi_ota_deploy_secret_9988";
+// OTA App Version & Update Endpoints (reads secret strictly from VPS .env / process.env)
+const OTA_DEPLOY_TOKEN = (process.env.OTA_DEPLOY_TOKEN || "").trim();
+const MAX_OTA_UPLOAD_BYTES = 250 * 1024 * 1024; // 250 MB cap
+
+function isValidOtaToken(req) {
+  if (!OTA_DEPLOY_TOKEN) return false;
+  const provided = String(req.headers["x-deploy-token"] || req.headers["x-upload-token"] || "").trim();
+  if (!provided) return false;
+  try {
+    const a = Buffer.from(provided, "utf8");
+    const b = Buffer.from(OTA_DEPLOY_TOKEN, "utf8");
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch (_) {
+    return false;
+  }
+}
 
 app.get("/api/version", (req, res) => {
   const versionFile = path.join(__dirname, "version.json");
@@ -186,8 +240,7 @@ app.get(["/download", "/download/"], (req, res) => {
 
 // Endpoint to update version info via JSON
 app.post("/api/update-version-info", (req, res) => {
-  const token = req.query.token || req.headers["x-upload-token"] || (req.body && req.body.token);
-  if (token !== OTA_DEPLOY_TOKEN) {
+  if (!isValidOtaToken(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
 
@@ -213,12 +266,11 @@ app.post("/api/update-version-info", (req, res) => {
 
 // Endpoint to stream-upload release binary (.apk or .ipa) with auto-cleanup of old versions
 app.post("/api/upload-release", (req, res) => {
-  const token = req.query.token || req.headers["x-upload-token"];
-  if (token !== OTA_DEPLOY_TOKEN) {
+  if (!isValidOtaToken(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
 
-  const filename = req.query.filename;
+  const filename = typeof req.query.filename === "string" ? req.query.filename : "";
   if (!filename || (!filename.endsWith(".apk") && !filename.endsWith(".ipa") && !filename.endsWith(".zip"))) {
     return res.status(400).json({ error: "Invalid filename. Must end with .apk, .ipa or .zip" });
   }
@@ -237,10 +289,37 @@ app.post("/api/upload-release", (req, res) => {
   const tmpPath = path.join(downloadDir, `${targetFilename}.tmp`);
   const finalFilePath = path.join(downloadDir, targetFilename);
 
+  let uploadedBytes = 0;
+  let aborted = false;
   const writeStream = fs.createWriteStream(tmpPath);
+
+  const cleanupTmp = () => {
+    try {
+      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+    } catch (_) {}
+  };
+
+  req.on("data", (chunk) => {
+    uploadedBytes += chunk.length;
+    if (uploadedBytes > MAX_OTA_UPLOAD_BYTES && !aborted) {
+      aborted = true;
+      req.unpipe(writeStream);
+      writeStream.destroy();
+      cleanupTmp();
+      if (!res.headersSent) res.status(413).json({ error: "Upload exceeds 250 MB limit" });
+    }
+  });
+
+  req.on("aborted", () => {
+    aborted = true;
+    writeStream.destroy();
+    cleanupTmp();
+  });
+
   req.pipe(writeStream);
 
   writeStream.on("finish", () => {
+    if (aborted) return;
     try {
       if (!fs.existsSync(tmpPath) || fs.statSync(tmpPath).size === 0) {
         if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
@@ -315,8 +394,7 @@ app.post("/api/upload-release", (req, res) => {
 
 // Endpoint to manually prune any extraneous files in download folder
 app.post("/api/cleanup-downloads", (req, res) => {
-  const token = req.query.token || req.headers["x-upload-token"] || (req.body && req.body.token);
-  if (token !== OTA_DEPLOY_TOKEN) {
+  if (!isValidOtaToken(req)) {
     return res.status(403).json({ error: "Unauthorized" });
   }
 
@@ -542,8 +620,8 @@ app.get("/api/vebo/streams/:id", async (req, res) => {
 // -------------------------------------------------------------
 // IPTV API ENDPOINTS
 // Stream Proxy to bypass CORS / Referer restrictions
-app.all("/api/iptv/stream-proxy", (req, res) => {
-  return iptvService.handleStreamProxy(req, res);
+app.all("/api/iptv/stream-proxy", (req, res, next) => {
+  Promise.resolve(iptvService.handleStreamProxy(req, res)).catch(next);
 });
 
 app.get("/api/iptv/channels", async (req, res) => {
@@ -598,7 +676,7 @@ app.post("/api/iptv/sources/toggle", authService.requireAuth, (req, res) => {
   }
 });
 
-app.get("/api/iptv/config", (req, res) => {
+app.get("/api/iptv/config", authService.requireAuth, (req, res) => {
   res.json(iptvService.loadConfig());
 });
 
@@ -649,7 +727,7 @@ app.post("/api/iptv/refresh", authService.requireAuth, async (req, res) => {
 // GOOGLE DRIVE API ENDPOINTS
 // =========================================================================
 
-app.get("/api/gdrive/auth/status", (req, res) => {
+app.get("/api/gdrive/auth/status", authService.requireAuth, (req, res) => {
   res.json(gdriveService.getOAuthStatus());
 });
 
@@ -741,23 +819,23 @@ app.get("/api/gdrive/folders/:folderId", async (req, res) => {
     const data = await gdriveService.getFolderContents(req.params.folderId, { forceRefresh });
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
-app.get(["/api/gdrive/stream/:fileId", "/api/gdrive/stream/:fileId/:filename"], (req, res) => {
-  gdriveService.streamVideo(req.params.fileId, req, res);
+app.get(["/api/gdrive/stream/:fileId", "/api/gdrive/stream/:fileId/:filename"], (req, res, next) => {
+  Promise.resolve(gdriveService.streamVideo(req.params.fileId, req, res)).catch(next);
 });
 
-app.get("/api/gdrive/subtitle/:fileId", (req, res) => {
-  gdriveService.streamSubtitle(req.params.fileId, res);
+app.get("/api/gdrive/subtitle/:fileId", (req, res, next) => {
+  Promise.resolve(gdriveService.streamSubtitle(req.params.fileId, res)).catch(next);
 });
 
 // =========================================================================
 // TELEGRAM CHANNELS & VIDEO STREAMING API
 // =========================================================================
 
-app.get("/api/telegram/auth/status", async (req, res) => {
+app.get("/api/telegram/auth/status", authService.requireAuth, async (req, res) => {
   try {
     const status = await telegramService.getAuthStatus();
     res.json(status);
@@ -864,10 +942,11 @@ app.post("/api/telegram/sources/toggle", authService.requireAuth, (req, res) => 
 app.get("/api/telegram/channels/:channelId/videos", async (req, res) => {
   try {
     const forceRefresh = req.query.forceRefresh === "true" || !!req.query._t;
-    const limit = req.query.limit ? Math.max(parseInt(req.query.limit, 10), 2500) : 2500;
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(Math.max(isNaN(rawLimit) ? 2500 : rawLimit, 1), 2500);
     const page = req.query.page;
     const pageSize = req.query.pageSize;
-    const search = req.query.search || req.query.q || "";
+    const search = typeof req.query.search === "string" ? req.query.search : (typeof req.query.q === "string" ? req.query.q : "");
     const data = await telegramService.getChannelVideos(req.params.channelId, {
       forceRefresh,
       limit,
@@ -877,19 +956,19 @@ app.get("/api/telegram/channels/:channelId/videos", async (req, res) => {
     });
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(err.statusCode || 500).json({ error: err.message });
   }
 });
 
-app.get("/api/telegram/stream/:channelId/:messageId", (req, res) => {
-  telegramService.streamMedia(req.params.channelId, req.params.messageId, req, res);
+app.get("/api/telegram/stream/:channelId/:messageId", (req, res, next) => {
+  Promise.resolve(telegramService.streamMedia(req.params.channelId, req.params.messageId, req, res)).catch(next);
 });
 
-app.get("/api/telegram/thumb/:channelId/:messageId", (req, res) => {
-  telegramService.streamThumbnail(req.params.channelId, req.params.messageId, res);
+app.get("/api/telegram/thumb/:channelId/:messageId", (req, res, next) => {
+  Promise.resolve(telegramService.streamThumbnail(req.params.channelId, req.params.messageId, res)).catch(next);
 });
 
-app.get("/api/config", (req, res) => {
+app.get("/api/config", authService.requireAuth, (req, res) => {
   res.json(config.getConfig());
 });
 
@@ -946,7 +1025,9 @@ function readSyncData(syncKey) {
 function writeSyncData(syncKey, data) {
   const filePath = getSyncFilePath(syncKey);
   data.lastSyncAt = new Date().toISOString();
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf8");
+  const tmpPath = `${filePath}.tmp.${process.pid}.${Date.now()}`;
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
+  fs.renameSync(tmpPath, filePath);
 }
 
 app.get("/api/user/sync", (req, res) => {
@@ -1021,9 +1102,16 @@ app.post("/api/user/sync", (req, res) => {
     favMap.delete(delId);
   }
 
+  const sortedHistory = Array.from(historyMap.values())
+    .sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))
+    .slice(0, 500);
+  const sortedFavorites = Array.from(favMap.values())
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 500);
+
   const merged = {
-    history: Array.from(historyMap.values()),
-    favorites: Array.from(favMap.values()),
+    history: sortedHistory,
+    favorites: sortedFavorites,
     deletedHistoryIds: Array.from(deletedHistorySet).slice(-500),
     deletedFavoriteIds: Array.from(deletedFavSet).slice(-500),
   };
@@ -1040,6 +1128,12 @@ app.post("/api/test-domain", authService.requireAuth, async (req, res) => {
     let cleanUrl = url.trim().replace(/\/+$/, "");
     if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
       cleanUrl = "https://" + cleanUrl;
+    }
+
+    try {
+      await assertSafeUrl(cleanUrl);
+    } catch (ssrfErr) {
+      return res.status(ssrfErr.statusCode || 403).json({ success: false, error: "URL không được phép kiểm tra (IP/host nội bộ)" });
     }
 
     let finalOrigin = null;
@@ -1344,6 +1438,13 @@ app.get("/thumb/vlxx/:id.jpg", async (req, res) => {
     res.setHeader("Content-Type", "image/jpeg");
     res.setHeader("Cache-Control", "public, max-age=604800");
     res.setHeader("X-Accel-Buffering", "no");
+    imgRes.data.on("error", () => {
+      if (!res.headersSent) res.status(404).end();
+      else res.end();
+    });
+    req.on("close", () => {
+      try { imgRes.data.destroy(); } catch (_) {}
+    });
     return imgRes.data.pipe(res);
   } catch (err) {
     return res.status(404).send("Image not found");
@@ -1802,14 +1903,20 @@ app.get(["/viet69/hls/:id/:server/master.m3u8", "/viet69/hls/:id/master.m3u8"], 
 app.get("/seg", async (req, res) => {
   try {
     const targetUrl = req.query.u;
-    if (!targetUrl) {
+    if (typeof targetUrl !== "string" || !targetUrl.trim()) {
       return res.status(400).send("Missing segment URL");
+    }
+
+    try {
+      await assertSafeUrl(targetUrl);
+    } catch (ssrfErr) {
+      return res.status(ssrfErr.statusCode || 403).send(ssrfErr.message || "Blocked segment URL");
     }
 
     const segHeaders = {
       "User-Agent": vlxxScraper.USER_AGENT,
     };
-    if (req.query.r) {
+    if (typeof req.query.r === "string" && req.query.r) {
       segHeaders["Referer"] = req.query.r;
     }
 
@@ -1817,6 +1924,8 @@ app.get("/seg", async (req, res) => {
       responseType: "arraybuffer",
       headers: segHeaders,
       timeout: 15000,
+      maxContentLength: 25 * 1024 * 1024, // 25 MB cap prevents OOM
+      maxBodyLength: 25 * 1024 * 1024,
     });
 
     const buf = Buffer.from(segRes.data);
@@ -2073,6 +2182,22 @@ app.get(["/phe69/hls/:id/:server/master.m3u8", "/phe69/hls/:id/master.m3u8"], as
     console.error("Error generating Phe69 HLS manifest:", err.message);
     return res.status(500).send("Error loading playlist");
   }
+});
+
+// Global Express error middleware (never leak stack traces or crash process)
+app.use((err, req, res, next) => {
+  console.error(`[Express Error] ${req.method} ${req.originalUrl}:`, err && err.message ? err.message : err);
+  if (res.headersSent) return next(err);
+  const status = err && err.statusCode ? err.statusCode : 500;
+  return res.status(status).json({ success: false, error: status >= 500 ? "Internal Server Error" : (err.message || "Bad Request") });
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[Process] Unhandled Rejection:", reason && reason.message ? reason.message : reason);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("[Process] Uncaught Exception:", err && err.stack ? err.stack : err);
 });
 
 app.listen(PORT, "0.0.0.0", () => {

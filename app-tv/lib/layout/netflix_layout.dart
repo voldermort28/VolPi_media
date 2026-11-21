@@ -1,21 +1,26 @@
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../api/api_service.dart';
 import '../models/update_model.dart';
 import '../screens/football_screen.dart';
 import '../screens/football_aggregate_screen.dart';
+import '../screens/global_search_screen.dart';
 import '../screens/iptv_screen.dart';
 import '../screens/music_screen.dart';
 import '../screens/netflix/netflix_anime_screen.dart';
 import '../screens/netflix/netflix_home_screen.dart';
 import '../screens/secret_movie_screen.dart';
 import '../player/video_player_screen.dart';
+import '../services/audio_player_handler.dart';
 import '../services/player_settings_service.dart';
 import '../services/sync_service.dart';
 import '../services/update_service.dart';
+import '../widgets/music_player_bottom_sheet.dart';
 import '../widgets/netflix/netflix_sidebar.dart';
 import '../widgets/passcode_dialog.dart';
+import '../widgets/tv_focusable_card.dart';
 import '../widgets/update_dialog.dart';
 import '../widgets/exit_confirm_dialog.dart';
 
@@ -110,6 +115,21 @@ class _NetflixLayoutState extends State<NetflixLayout> {
       barrierDismissible: true,
       builder: (ctx) => PasscodeDialog(onSuccess: _onProfileUnlocked),
     );
+  }
+
+  void _openGlobalSearch() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GlobalSearchScreen(apiService: widget.apiService),
+      ),
+    );
+  }
+
+  void _selectTab(int idx) {
+    setState(() {
+      _loadedTabs.add(idx);
+      _currentTabIndex = idx;
+    });
   }
 
   /// Chuyển focus từ sidebar sang vùng nội dung một cách ổn định:
@@ -315,8 +335,29 @@ class _NetflixLayoutState extends State<NetflixLayout> {
 
   @override
   Widget build(BuildContext context) {
-    // iPad and iPhone both run on iOS and use the clean Hamburger Drawer mode
-    final bool isDrawerMode = Platform.isIOS || MediaQuery.of(context).size.width < 750;
+    final double screenWidth = MediaQuery.of(context).size.width;
+    // Compact mobile (iPhone & Android Phone): Top header + 1-hand Bottom Navigation Bar + Drawer
+    final bool isPhoneMode = screenWidth < 700;
+    final bool isDrawerMode = Platform.isIOS || screenWidth < 750;
+
+    // Map 6 tabs <-> 5 bottom nav items (Home, Xôi Lạc/Bóng đá, Anime, IPTV, Nhạc)
+    int bottomNavIndex() {
+      switch (_currentTabIndex) {
+        case 0:
+          return 0;
+        case 1:
+        case 2:
+          return 1;
+        case 3:
+          return 2;
+        case 4:
+          return 3;
+        case 5:
+          return 4;
+        default:
+          return 0;
+      }
+    }
 
     return PopScope(
       canPop: false,
@@ -324,42 +365,63 @@ class _NetflixLayoutState extends State<NetflixLayout> {
         if (didPop) return;
         if (VideoPlayerScreen.isRecentExit()) return;
 
-        // If in drawer mode: close drawer if open
         if (isDrawerMode && (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
           Navigator.of(context).pop();
           return;
         }
 
-        // Nếu đang ở tab Nghe Nhạc / Video & Phim (Tab 5) và đang ở trong thư mục con -> lùi 1 cấp thư mục, giữ focus trong danh sách
         if (_currentTabIndex == 5 && (_musicKey.currentState?.handleBackNavigation() ?? false)) {
           return;
         }
 
-        // On TV: If content has focus, move focus to sidebar first
         final sidebarHasFocus = _sidebarFocusNodes.any((n) => n.hasFocus);
         if (!sidebarHasFocus && !isDrawerMode) {
           _sidebarFocusNodes[_currentTabIndex].requestFocus();
           return;
         }
 
-        // If on non-home tab: return to tab 0
         if (_currentTabIndex != 0) {
-          setState(() {
-            _currentTabIndex = 0;
-          });
+          _selectTab(0);
           if (!isDrawerMode) {
             _sidebarFocusNodes[0].requestFocus();
           }
           return;
         }
 
-        // Tab 0 & in sidebar: confirm before quit app
         ExitConfirmDialog.show(context);
       },
       child: Scaffold(
         key: _scaffoldKey,
         backgroundColor: const Color(0xFF0F0F0F),
         drawer: isDrawerMode ? _buildMobileDrawer() : null,
+        bottomNavigationBar: isPhoneMode
+            ? Container(
+                decoration: const BoxDecoration(
+                  color: Color(0xFF141414),
+                  border: Border(top: BorderSide(color: Color(0xFF262626), width: 1.0)),
+                ),
+                child: BottomNavigationBar(
+                  backgroundColor: const Color(0xFF141414),
+                  type: BottomNavigationBarType.fixed,
+                  currentIndex: bottomNavIndex(),
+                  selectedItemColor: const Color(0xFFE50914),
+                  unselectedItemColor: Colors.white54,
+                  selectedFontSize: 10.5,
+                  unselectedFontSize: 10,
+                  onTap: (navIdx) {
+                    const map = [0, 1, 3, 4, 5];
+                    _selectTab(map[navIdx]);
+                  },
+                  items: const [
+                    BottomNavigationBarItem(icon: Icon(Icons.home_rounded, size: 22), label: 'Trang chủ'),
+                    BottomNavigationBarItem(icon: Icon(Icons.sports_soccer_rounded, size: 22), label: 'Bóng đá'),
+                    BottomNavigationBarItem(icon: Icon(Icons.auto_awesome_rounded, size: 22), label: 'Anime'),
+                    BottomNavigationBarItem(icon: Icon(Icons.live_tv_rounded, size: 22), label: 'IPTV'),
+                    BottomNavigationBarItem(icon: Icon(Icons.music_note_rounded, size: 22), label: 'Nhạc'),
+                  ],
+                ),
+              )
+            : null,
         body: SafeArea(
           child: isDrawerMode
               ? Column(
@@ -368,6 +430,7 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                     Expanded(
                       child: _buildIndexedTabContent(),
                     ),
+                    if (_currentTabIndex != 5) _buildGlobalMiniPlayer(),
                   ],
                 )
               : Stack(
@@ -375,33 +438,36 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                     // 1. Main Content Area (Offset by 68px for the collapsed rail)
                     Positioned.fill(
                       left: 68,
-                      child: Focus(
-                        onKeyEvent: (node, event) {
-                          if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-                            final primary = FocusManager.instance.primaryFocus;
-                            // Để TextField (ô tìm kiếm) tự xử lý di chuyển con trỏ chữ
-                            if (primary?.context?.findAncestorWidgetOfExactType<EditableText>() != null) {
-                              return KeyEventResult.ignored;
-                            }
-                            // Check if primary focus has nowhere left to go inside content
-                            final moved = primary?.focusInDirection(TraversalDirection.left) ?? false;
-                            if (!moved) {
-                              // Reached left edge of content: jump directly to active sidebar item!
-                              if (primary != null) {
-                                _lastContentFocusPerTab[_currentTabIndex] = primary;
-                              }
-                              _sidebarFocusNodes[_currentTabIndex].requestFocus();
-                            }
-                            // Luôn chặn sự kiện tại đây: nếu trả về ignored sau khi đã di chuyển,
-                            // Shortcuts mặc định sẽ di chuyển thêm 1 lần nữa -> con trỏ nhảy 2 ô.
-                            return KeyEventResult.handled;
-                          }
-                          return KeyEventResult.ignored;
-                        },
-                        child: FocusScope(
-                          node: _contentFocusScopeNode,
-                          child: _buildIndexedTabContent(),
-                        ),
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: Focus(
+                              onKeyEvent: (node, event) {
+                                if ((event is KeyDownEvent || event is KeyRepeatEvent) &&
+                                    event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+                                  final primary = FocusManager.instance.primaryFocus;
+                                  if (primary?.context?.findAncestorWidgetOfExactType<EditableText>() != null) {
+                                    return KeyEventResult.ignored;
+                                  }
+                                  final moved = primary?.focusInDirection(TraversalDirection.left) ?? false;
+                                  if (!moved) {
+                                    if (primary != null) {
+                                      _lastContentFocusPerTab[_currentTabIndex] = primary;
+                                    }
+                                    _sidebarFocusNodes[_currentTabIndex].requestFocus();
+                                  }
+                                  return KeyEventResult.handled;
+                                }
+                                return KeyEventResult.ignored;
+                              },
+                              child: FocusScope(
+                                node: _contentFocusScopeNode,
+                                child: _buildIndexedTabContent(),
+                              ),
+                            ),
+                          ),
+                          if (_currentTabIndex != 5) _buildGlobalMiniPlayer(),
+                        ],
                       ),
                     ),
 
@@ -414,14 +480,11 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                         selectedIndex: _currentTabIndex,
                         focusNodes: _sidebarFocusNodes,
                         isRefreshing: _isRefreshingHeader,
+                        onSearchPressed: _openGlobalSearch,
                         onRefresh: _refreshActiveTab,
                         onCheckUpdate: () => _checkOtaUpdate(silent: false),
                         onMoveToContent: _moveFocusToContent,
-                        onTabSelected: (idx) {
-                          setState(() {
-                            _currentTabIndex = idx;
-                          });
-                        },
+                        onTabSelected: _selectTab,
                         onSwitchToOldUI: _switchToOldUI,
                         onProfilePressed: _handleProfileButton,
                       ),
@@ -430,6 +493,130 @@ class _NetflixLayoutState extends State<NetflixLayout> {
                 ),
         ),
       ),
+    );
+  }
+
+  /// Global MiniPlayer nổi xuyên suốt mọi tab khi đang nghe nhạc nền
+  Widget _buildGlobalMiniPlayer() {
+    final handler = VolPiAudioHandler.instance;
+    return StreamBuilder<MediaItem?>(
+      stream: handler.mediaItem,
+      builder: (context, mediaSnap) {
+        final item = mediaSnap.data;
+        if (item == null) return const SizedBox.shrink();
+
+        return StreamBuilder<PlaybackState>(
+          stream: handler.playbackState,
+          builder: (context, stateSnap) {
+            final state = stateSnap.data;
+            final playing = state?.playing ?? false;
+            final dur = item.duration ?? Duration.zero;
+
+            return Container(
+              height: 54,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: const BoxDecoration(
+                color: Color(0xFF141414),
+                border: Border(top: BorderSide(color: Color(0xFF38BDF8), width: 1.2)),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TvFocusableCard(
+                            onTap: () => MusicPlayerBottomSheet.show(context),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0284C7),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 18),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.title,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        item.artist ?? 'VolPi Music',
+                                        style: const TextStyle(color: Colors.white54, fontSize: 10),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        TvFocusableCard(
+                          onTap: () => playing ? handler.pause() : handler.play(),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Icon(
+                              playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                              color: const Color(0xFF38BDF8),
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        TvFocusableCard(
+                          onTap: () => handler.skipToNext(),
+                          borderRadius: BorderRadius.circular(18),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.skip_next_rounded, color: Colors.white70, size: 22),
+                          ),
+                        ),
+                        TvFocusableCard(
+                          onTap: () => handler.stopAndClear(),
+                          borderRadius: BorderRadius.circular(18),
+                          child: const Padding(
+                            padding: EdgeInsets.all(6),
+                            child: Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (dur.inMilliseconds > 0 && handler.hasActivePlayer)
+                    StreamBuilder<Duration>(
+                      stream: handler.player.positionStream,
+                      builder: (_, posSnap) {
+                        final pos = posSnap.data ?? Duration.zero;
+                        final pct = (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+                        return LinearProgressIndicator(
+                          value: pct,
+                          minHeight: 2,
+                          backgroundColor: Colors.white12,
+                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF38BDF8)),
+                        );
+                      },
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -490,12 +677,8 @@ class _NetflixLayoutState extends State<NetflixLayout> {
               ? NetflixAnimeScreen(
                   key: _animeKey,
                   apiService: widget.apiService,
-                  onNavigateTab: (tabIdx) {
-                    setState(() {
-                      _loadedTabs.add(tabIdx);
-                      _currentTabIndex = tabIdx;
-                    });
-                  },
+                  isActive: _currentTabIndex == 3,
+                  onNavigateTab: _selectTab,
                 )
               : const SizedBox.shrink(),
         ),
@@ -575,6 +758,15 @@ class _NetflixLayoutState extends State<NetflixLayout> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+
+          // 🔍 Global Search Button
+          IconButton(
+            icon: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            tooltip: 'Tìm kiếm toàn cục',
+            onPressed: _openGlobalSearch,
           ),
 
           // 🔄 Làm Mới Button

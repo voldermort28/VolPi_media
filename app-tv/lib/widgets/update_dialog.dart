@@ -46,6 +46,14 @@ class _UpdateDialogState extends State<UpdateDialog> {
   String _progressText = '';
   String? _errorMessage;
 
+  @override
+  void dispose() {
+    if (_isDownloading && !_isDismissed) {
+      UpdateService.cancelActiveDownload();
+    }
+    super.dispose();
+  }
+
   void _dismissDialog() {
     if (_isDismissed) return;
     _isDismissed = true;
@@ -87,17 +95,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
       if (_isDismissed || !mounted) return;
 
       if (success) {
-        // Đóng bảng thông báo cập nhật ngay khi trình cài đặt APK của Android mở lên,
-        // để nếu người dùng bấm Cancel trong trình cài đặt hệ thống thì bảng này cũng đã biến mất.
         _dismissDialog();
       } else {
         setState(() {
           _isDownloading = false;
-          _errorMessage = 'Không thể mở file cài đặt. Bạn có thể thử lại hoặc bấm Bỏ qua.';
+          _errorMessage = UpdateService.lastInstallError ??
+              'Không thể mở file cài đặt. Bạn có thể thử lại hoặc bấm Bỏ qua.';
         });
       }
     } else if (Platform.isIOS) {
-      // iOS with TrollStore 1-click in-place update
+      // iOS with TrollStore 1-click (apple-magnifier://) or Safari fallback
       final success = await UpdateService.installIpaTrollStore(widget.updateInfo.ipaUrl);
       if (mounted && !_isDismissed) {
         if (success) {
@@ -105,7 +112,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         } else {
           setState(() {
             _isDownloading = false;
-            _errorMessage = 'Không thể mở TrollStore. Đang chuyển sang trình duyệt...';
+            _errorMessage = 'Không thể mở TrollStore hoặc trình duyệt Safari. Vui lòng truy cập https://stremio.laboon.vn/download để tải thủ công.';
           });
         }
       }

@@ -12,11 +12,12 @@ function getHostUrl() {
 
 const USER_AGENT = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const cache = new Map();
+const { LruTtlCache } = require("../lib/lruCache");
+const cache = new LruTtlCache({ maxEntries: 120 });
 const TTL = 30 * 60 * 1000; // 30 mins
 
 // Card metadata registry for SVG generation
-const cardRegistry = new Map();
+const cardRegistry = new LruTtlCache({ maxEntries: 500 });
 
 function encodePathId(type, path) {
   const clean = path.startsWith('/') ? path.slice(1) : path;
@@ -781,7 +782,7 @@ async function getCatalog(catalogId, extra = {}, requestedType) {
 // METADATA RESOLUTION
 // -------------------------------------------------------------
 
-const seriesMetaCache = new Map();
+const seriesMetaCache = new LruTtlCache({ maxEntries: 250 });
 const META_TTL = 60 * 60 * 1000; // 1 hour
 
 async function getSeriesMeta(seriesId, requestedType = 'series') {

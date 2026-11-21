@@ -2,9 +2,11 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const axios = require('axios');
+const { LruTtlCache } = require('../lib/lruCache');
 
 const CONFIG_PATH = path.join(__dirname, '..', 'gdrive_config.json');
 const AUDIO_CACHE_DIR = path.join(__dirname, '..', 'cache', 'audio');
+const MAX_AUDIO_CACHE_BYTES = 500 * 1024 * 1024; // 500 MB disk cap
 if (!fs.existsSync(AUDIO_CACHE_DIR)) {
   try {
     fs.mkdirSync(AUDIO_CACHE_DIR, { recursive: true });
@@ -21,9 +23,107 @@ if (!fs.existsSync(INDEX_CACHE_DIR)) {
   } catch (_) {}
 }
 
-// Memory Cache with 10-minute TTL
-const folderCache = new Map();
+// Bounded LRU Memory Cache with 10-minute TTL
+const folderCache = new LruTtlCache({ maxEntries: 60 });
 const CACHE_TTL_MS = 10 * 60 * 1000;
+
+function isValidDriveId(id) {
+  return typeof id === 'string' && /^[a-zA-Z0-9_-]{10,80}$/.test(id);
+}
+
+function safeCachePath(baseDir, filename) {
+  const resolvedBase = path.resolve(baseDir);
+  const resolvedTarget = path.resolve(baseDir, filename);
+  if (!resolvedTarget.startsWith(resolvedBase + path.sep)) {
+    throw new Error('Invalid cache path');
+  }
+  return resolvedTarget;
+}
+
+function pruneAudioCacheDir() {
+  try {
+    const entries = fs.readdirSync(AUDIO_CACHE_DIR)
+      .filter((f) => f.endsWith('.mp3') && !f.endsWith('.tmp.mp3'))
+      .map((f) => {
+        const full = path.join(AUDIO_CACHE_DIR, f);
+        try {
+          const st = fs.statSync(full);
+          return { full, size: st.size, mtimeMs: st.mtimeMs };
+        } catch (_) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    let total = entries.reduce((sum, e) => sum + e.size, 0);
+    if (total <= MAX_AUDIO_CACHE_BYTES) return;
+
+    entries.sort((a, b) => a.mtimeMs - b.mtimeMs); // oldest first
+    for (const e of entries) {
+      if (total <= MAX_AUDIO_CACHE_BYTES * 0.8) break;
+      try {
+        fs.unlinkSync(e.full);
+        total -= e.size;
+      } catch (_) {}
+    }
+  } catch (_) {}
+}
+
+function getAllConfiguredSourceIndexes() {
+  const cfg = loadConfig();
+  const enabledSources = (cfg.sources || []).filter((s) => s && s.enabled !== false && s.folderId);
+  const indexes = [];
+  for (const src of enabledSources) {
+    const srcId = extractFolderId(src.folderId) || src.folderId;
+    if (!isValidDriveId(srcId)) continue;
+    const cacheKey = `folder_rec_${srcId}`;
+    let data = folderCache.get(cacheKey)?.data;
+    if (!data) {
+      data = loadDiskIndex(srcId);
+      if (data) {
+        folderCache.set(cacheKey, { time: data.timestamp || Date.now(), data });
+      }
+    }
+    indexes.push({ srcId, data });
+  }
+  return indexes;
+}
+
+function isAllowedFolderId(folderId) {
+  if (!isValidDriveId(folderId)) return false;
+  const indexes = getAllConfiguredSourceIndexes();
+  for (const { srcId, data } of indexes) {
+    if (srcId === folderId) return true;
+    if (data) {
+      if (data.subfolderMeta && Object.prototype.hasOwnProperty.call(data.subfolderMeta, folderId)) return true;
+      if (Array.isArray(data.allFolders) && data.allFolders.some((f) => f && f.id === folderId)) return true;
+      if (Array.isArray(data.folders) && data.folders.some((f) => f && f.id === folderId)) return true;
+    }
+  }
+  return false;
+}
+
+function isAllowedFileId(fileId) {
+  if (!isValidDriveId(fileId)) return false;
+  const indexes = getAllConfiguredSourceIndexes();
+  for (const { data } of indexes) {
+    if (!data) continue;
+    if (Array.isArray(data.allVideos) && data.allVideos.some((v) => v && v.id === fileId)) return true;
+    if (Array.isArray(data.allAudios) && data.allAudios.some((a) => a && a.id === fileId)) return true;
+    if (Array.isArray(data.videos) && data.videos.some((v) => v && v.id === fileId)) return true;
+    if (Array.isArray(data.audios) && data.audios.some((a) => a && a.id === fileId)) return true;
+    if (Array.isArray(data.subtitles) && data.subtitles.some((s) => s && s.id === fileId)) return true;
+    if (data.subfolderItems && typeof data.subfolderItems === 'object') {
+      for (const sub of Object.values(data.subfolderItems)) {
+        if (!sub) continue;
+        if (Array.isArray(sub.videos) && sub.videos.some((v) => v && (v.id === fileId || (Array.isArray(v.subtitles) && v.subtitles.some((s) => s && s.id === fileId))))) return true;
+        if (Array.isArray(sub.audios) && sub.audios.some((a) => a && a.id === fileId)) return true;
+      }
+    }
+    if (Array.isArray(data.allVideos) && data.allVideos.some((v) => Array.isArray(v?.subtitles) && v.subtitles.some((s) => s && s.id === fileId))) return true;
+  }
+  return false;
+}
 
 function loadConfig() {
   try {
@@ -345,7 +445,7 @@ async function addSource({ name, url, isPrivate = true }) {
   // Pre-test folder contents to verify
   let count = 0;
   try {
-    const contents = await getFolderContents(folderId, { forceRefresh: true });
+    const contents = await getFolderContents(folderId, { forceRefresh: true, bypassAllowlist: true });
     count = (contents.totalVideos || 0) + (contents.totalAudios || 0);
     if (count === 0) {
       count = (contents.videos ? contents.videos.length : 0) +
@@ -563,8 +663,9 @@ async function fetchFolderItems(folderId, accessToken) {
 // =========================================================================
 
 function loadDiskIndex(cleanId) {
+  if (!isValidDriveId(cleanId)) return null;
   try {
-    const filePath = path.join(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
+    const filePath = safeCachePath(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       return JSON.parse(raw);
@@ -576,9 +677,12 @@ function loadDiskIndex(cleanId) {
 }
 
 function saveDiskIndex(cleanId, data) {
+  if (!isValidDriveId(cleanId)) return;
   try {
-    const filePath = path.join(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8');
+    const filePath = safeCachePath(INDEX_CACHE_DIR, `folder_${cleanId}.json`);
+    const tmpPath = `${filePath}.tmp.${process.pid}`;
+    fs.writeFileSync(tmpPath, JSON.stringify(data), 'utf-8');
+    fs.renameSync(tmpPath, filePath);
   } catch (e) {
     console.warn(`[GDriveService] Error saving disk index for ${cleanId}:`, e.message);
   }
@@ -854,8 +958,18 @@ async function scanFolderIncremental(cleanId, previousIndex = null, accessToken 
 /**
  * Get folder contents (Optimistic Stale-While-Revalidate + Incremental Indexing)
  */
-async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3 } = {}) {
+async function getFolderContents(folderId, { forceRefresh = false, maxDepth = 3, bypassAllowlist = false } = {}) {
   const cleanId = extractFolderId(folderId) || folderId;
+  if (!isValidDriveId(cleanId)) {
+    const err = new Error('ID thư mục Google Drive không hợp lệ');
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!bypassAllowlist && !isAllowedFolderId(cleanId)) {
+    const err = new Error('Thư mục không nằm trong danh sách nguồn được phép truy cập');
+    err.statusCode = 403;
+    throw err;
+  }
   const cacheKey = `folder_rec_${cleanId}`;
 
   // 1. Check in-memory cache (< 3 minutes is completely fresh)
@@ -944,9 +1058,24 @@ function serveLocalFileRange(filePath, contentType, req, res) {
   const range = req.headers.range;
 
   if (range) {
-    const parts = range.replace(/bytes=/, '').split('-');
-    const start = parseInt(parts[0], 10);
-    const end = parts[1] ? parseInt(parts[1], 10) : totalSize - 1;
+    const match = String(range).match(/^bytes=(\d*)-(\d*)$/);
+    if (!match) {
+      res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+      return res.end();
+    }
+    let start = match[1] ? parseInt(match[1], 10) : 0;
+    let end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+    if (!match[1] && match[2]) {
+      // Suffix byte range: bytes=-500
+      const suffix = parseInt(match[2], 10);
+      start = Math.max(0, totalSize - suffix);
+      end = totalSize - 1;
+    }
+    if (isNaN(start) || isNaN(end) || start < 0 || start >= totalSize || end < start) {
+      res.writeHead(416, { 'Content-Range': `bytes */${totalSize}` });
+      return res.end();
+    }
+    end = Math.min(end, totalSize - 1);
     const chunksize = end - start + 1;
 
     res.writeHead(206, {
@@ -957,6 +1086,11 @@ function serveLocalFileRange(filePath, contentType, req, res) {
       'Cache-Control': 'no-cache',
     });
     const fileStream = fs.createReadStream(filePath, { start, end });
+    fileStream.on('error', () => {
+      if (!res.headersSent) res.status(500).end();
+      else res.end();
+    });
+    req.on('close', () => fileStream.destroy());
     fileStream.pipe(res);
   } else {
     res.writeHead(200, {
@@ -965,11 +1099,24 @@ function serveLocalFileRange(filePath, contentType, req, res) {
       'Accept-Ranges': 'bytes',
       'Cache-Control': 'no-cache',
     });
-    fs.createReadStream(filePath).pipe(res);
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.on('error', () => {
+      if (!res.headersSent) res.status(500).end();
+      else res.end();
+    });
+    req.on('close', () => fileStream.destroy());
+    fileStream.pipe(res);
   }
 }
 
 async function streamVideo(fileId, req, res) {
+  if (!isValidDriveId(fileId)) {
+    return res.status(400).json({ error: 'Invalid file ID' });
+  }
+  if (!isAllowedFileId(fileId)) {
+    return res.status(403).json({ error: 'File không thuộc danh sách nguồn được phép truy cập' });
+  }
+
   let filename = req.params?.filename || req.query?.name || '';
   if (!filename) {
     for (const entry of folderCache.values()) {
@@ -991,7 +1138,7 @@ async function streamVideo(fileId, req, res) {
   }
 
   const isFlac = filename.toLowerCase().endsWith('.flac');
-  const cachedMp3Path = path.join(AUDIO_CACHE_DIR, `${fileId}.mp3`);
+  const cachedMp3Path = safeCachePath(AUDIO_CACHE_DIR, `${fileId}.mp3`);
 
   // 1. If cached MP3 exists, serve directly with Range support (lossless 320k, instant playback)
   if (isFlac && fs.existsSync(cachedMp3Path) && fs.statSync(cachedMp3Path).size > 1000) {
@@ -1023,7 +1170,7 @@ async function streamVideo(fileId, req, res) {
             validateStatus: (status) => status >= 200 && status < 400,
           });
 
-          const tmpPath = path.join(AUDIO_CACHE_DIR, `${fileId}.tmp.mp3`);
+          const tmpPath = safeCachePath(AUDIO_CACHE_DIR, `${fileId}.tmp.mp3`);
           const fileStream = fs.createWriteStream(tmpPath);
           const ff = spawn('ffmpeg', [
             '-y',
@@ -1033,22 +1180,54 @@ async function streamVideo(fileId, req, res) {
             '-b:a', '320k',
             '-f', 'mp3',
             'pipe:1',
-          ]);
+          ], { stdio: ['pipe', 'pipe', 'ignore'] });
+
+          const killTimer = setTimeout(() => {
+            try { ff.kill('SIGKILL'); } catch (_) {}
+          }, 5 * 60 * 1000);
 
           driveRes.data.pipe(ff.stdin);
           ff.stdout.pipe(fileStream);
 
           return new Promise((resolve, reject) => {
+            const cleanupTmp = () => {
+              clearTimeout(killTimer);
+              try {
+                if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
+              } catch (_) {}
+            };
+            let settled = false;
+            const fail = (err) => {
+              if (settled) return;
+              settled = true;
+              try { driveRes.data.destroy(); } catch (_) {}
+              try { fileStream.destroy(); } catch (_) {}
+              try { ff.kill('SIGKILL'); } catch (_) {}
+              cleanupTmp();
+              reject(err);
+            };
+            fileStream.on('error', fail);
+            ff.stdin.on('error', () => {});
+            ff.on('error', fail);
+            driveRes.data.on('error', fail);
             ff.on('close', (code) => {
+              clearTimeout(killTimer);
+              if (settled) return;
+              settled = true;
               if (code === 0 && fs.existsSync(tmpPath) && fs.statSync(tmpPath).size > 1000) {
-                fs.renameSync(tmpPath, cachedMp3Path);
-                resolve(true);
+                try {
+                  fs.renameSync(tmpPath, cachedMp3Path);
+                  pruneAudioCacheDir();
+                  resolve(true);
+                } catch (renameErr) {
+                  cleanupTmp();
+                  reject(renameErr);
+                }
               } else {
+                cleanupTmp();
                 reject(new Error(`FFmpeg exited with code ${code}`));
               }
             });
-            ff.on('error', (err) => reject(err));
-            driveRes.data.on('error', (err) => reject(err));
           });
         })();
 
@@ -1169,6 +1348,12 @@ async function streamVideo(fileId, req, res) {
  * Serve subtitle file
  */
 async function streamSubtitle(fileId, res) {
+  if (!isValidDriveId(fileId)) {
+    return res.status(400).send('Invalid file ID');
+  }
+  if (!isAllowedFileId(fileId)) {
+    return res.status(403).send('Forbidden');
+  }
   const accessToken = await getValidAccessToken();
   let targetUrl = '';
   const requestHeaders = {};

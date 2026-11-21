@@ -7,6 +7,7 @@ const GENRE_TO_CAT = {
   'Xem nhiều': 'xem-nhieu',
   'Thích nhiều': 'thich-nhieu',
   'Điểm cao': 'diem-cao',
+  'Decen - LTX': 'decen-ltx',
   'Decen/LTX': 'decen-ltx',
   'Không che': 'uncensored',
   'Vietsub': 'vietsub',

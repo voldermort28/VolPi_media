@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../api/api_service.dart';
 import '../models/match_model.dart';
+import '../widgets/loading_dialog_helper.dart';
 import '../widgets/tv_focusable_card.dart';
 import '../widgets/netflix/netflix_scrollable_row.dart';
 import '../player/video_player_screen.dart';
@@ -153,20 +154,12 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
   }
 
   void _onMatchSelected(MatchModel match) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF38BDF8)),
-      ),
+    final streams = await LoadingDialogHelper.runWithLoading(
+      context,
+      () => widget.apiService.getMatchStreams(match.id, source: match.source),
+      indicatorColor: const Color(0xFF38BDF8),
     );
-
-    final streams = await widget.apiService.getMatchStreams(
-      match.id,
-      source: match.source,
-    );
-    if (!mounted) return;
-    Navigator.of(context).pop(); // dismiss loading dialog
+    if (!mounted || streams == null) return;
 
     if (streams.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -612,6 +605,8 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                                 imageUrl: match.homeLogo,
                                 width: isMobile ? 16 : 18,
                                 height: isMobile ? 16 : 18,
+                                memCacheWidth: 48,
+                                memCacheHeight: 48,
                                 fit: BoxFit.contain,
                                 errorWidget: (_, __, ___) => const Icon(Icons.shield_outlined, size: 14, color: Colors.white30),
                               )
@@ -642,6 +637,8 @@ class FootballAggregateScreenState extends State<FootballAggregateScreen> {
                                 imageUrl: match.awayLogo,
                                 width: isMobile ? 16 : 18,
                                 height: isMobile ? 16 : 18,
+                                memCacheWidth: 48,
+                                memCacheHeight: 48,
                                 fit: BoxFit.contain,
                                 errorWidget: (_, __, ___) => const Icon(Icons.shield_outlined, size: 14, color: Colors.white30),
                               )

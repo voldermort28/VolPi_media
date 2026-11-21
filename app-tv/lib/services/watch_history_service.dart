@@ -12,18 +12,36 @@ class WatchHistoryService {
 
   final Map<String, WatchHistoryItem> _cache = {};
   Timer? _writeDebounce;
+  Future<void> _writeQueue = Future.value();
   static const int _maxItems = 200;
   bool _isInitialized = false;
 
-  /// ValueNotifier để UI (như hàng Tiếp tục xem hoặc badge đồng hồ) tự động cập nhật khi có thay đổi
+  /// ValueNotifier cập nhật UI ngay lập tức
   final ValueNotifier<int> changeNotifier = ValueNotifier<int>(0);
 
-  /// Danh sách các ID đã bị người dùng xóa, cần thông báo đồng bộ lên server
+  /// ValueNotifier riêng để kích hoạt đồng bộ lên server (không bắn bão HTTP mỗi 5s khi đang xem phim)
+  final ValueNotifier<int> syncTriggerNotifier = ValueNotifier<int>(0);
+
+  /// Danh sách các ID đã bị người dùng xóa, được lưu xuống đĩa để không bị mất khi tắt app
   final Set<String> _pendingDeletions = {};
   List<String> get pendingDeletions => _pendingDeletions.toList();
-  void clearPendingDeletions() => _pendingDeletions.clear();
 
-  /// Khởi tạo và nạp toàn bộ lịch sử từ file JSON vào RAM
+  void clearPendingDeletions() {
+    if (_pendingDeletions.isNotEmpty) {
+      _pendingDeletions.clear();
+      _scheduleDiskWrite();
+    }
+  }
+
+  void removePendingDeletions(Iterable<String> ids) {
+    bool changed = false;
+    for (final id in ids) {
+      if (_pendingDeletions.remove(id)) changed = true;
+    }
+    if (changed) _scheduleDiskWrite();
+  }
+
+  /// Khởi tạo và nạp toàn bộ lịch sử + danh sách xóa chờ đồng bộ từ file JSON vào RAM
   Future<void> init() async {
     if (_isInitialized) return;
     try {
@@ -33,12 +51,21 @@ class WatchHistoryService {
         final content = await file.readAsString();
         if (content.trim().isNotEmpty) {
           final data = jsonDecode(content);
-          if (data is Map && data['items'] is List) {
-            for (final raw in data['items']) {
-              if (raw is Map<String, dynamic>) {
-                final item = WatchHistoryItem.fromJson(raw);
-                if (item.id.isNotEmpty) {
-                  _cache[item.id] = item;
+          if (data is Map) {
+            if (data['pendingDeletions'] is List) {
+              for (final id in data['pendingDeletions']) {
+                if (id != null && id.toString().isNotEmpty) {
+                  _pendingDeletions.add(id.toString());
+                }
+              }
+            }
+            if (data['items'] is List) {
+              for (final raw in data['items']) {
+                if (raw is Map<String, dynamic>) {
+                  final item = WatchHistoryItem.fromJson(raw);
+                  if (item.id.isNotEmpty && !_pendingDeletions.contains(item.id)) {
+                    _cache[item.id] = item;
+                  }
                 }
               }
             }
@@ -49,14 +76,12 @@ class WatchHistoryService {
       debugPrint('WatchHistoryService.init error: $e');
     } finally {
       _isInitialized = true;
-      _notify();
+      _notifyUi();
     }
   }
 
-  /// Truy vấn O(1) tiến trình xem từ RAM — hoàn toàn đồng bộ, không bao giờ gây giật lag UI
   WatchHistoryItem? getProgress(String id) => _cache[id];
 
-  /// Lấy tiến trình xem gần nhất của một phim/anime theo mediaId
   WatchHistoryItem? getLatestProgressForMedia(String mediaId) {
     final matches = _cache.values.where((item) =>
       item.mediaId == mediaId ||
@@ -69,90 +94,115 @@ class WatchHistoryService {
     return matches.first;
   }
 
-  /// Lấy danh sách các phim/tập đang xem dở, sắp xếp mới xem nhất lên đầu
   List<WatchHistoryItem> getContinueWatching({String? excludeCategory, String? category}) {
     return _cache.values
         .where((item) {
           if (!item.isInProgress) return false;
           if (category != null && item.category != category) return false;
-          if (excludeCategory != null && item.category == excludeCategory) return false;
+          if (excludeCategory != null) {
+            if (item.category == excludeCategory) return false;
+            if (excludeCategory == 'secret' && WatchHistoryItem.isSecretOrPrivateItem(item.id, item.category)) {
+              return false;
+            }
+          }
           return true;
         })
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
-  /// Lấy toàn bộ lịch sử xem theo category (không giới hạn isInProgress), sắp xếp mới xem nhất lên đầu
   List<WatchHistoryItem> getHistory({String? category, String? excludeCategory}) {
     return _cache.values
         .where((item) {
           if (category != null && item.category != category) return false;
-          if (excludeCategory != null && item.category == excludeCategory) return false;
+          if (excludeCategory != null) {
+            if (item.category == excludeCategory) return false;
+            if (excludeCategory == 'secret' && WatchHistoryItem.isSecretOrPrivateItem(item.id, item.category)) {
+              return false;
+            }
+          }
           return true;
         })
         .toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
-  /// Lưu tiến trình xem — cập nhật RAM tức thì, gom ghi đĩa mỗi 4 giây
-  void saveProgress(WatchHistoryItem item) {
+  /// Lưu tiến trình xem — cập nhật RAM tức thì, gom ghi đĩa mỗi 4 giây.
+  /// Đặt `triggerSync: false` cho các tick định kỳ 5s trong lúc đang xem để tránh bão HTTP POST.
+  void saveProgress(WatchHistoryItem item, {bool triggerSync = true}) {
     _cache[item.id] = item;
     _pendingDeletions.remove(item.id);
     _enforceLimit();
-    _notify();
+    _notifyUi();
+    if (triggerSync && !WatchHistoryItem.isSecretOrPrivateItem(item.id, item.category)) {
+      _notifySync();
+    }
     _scheduleDiskWrite();
   }
 
-  /// Xóa 1 mục khỏi lịch sử xem
   void clearProgress(String id) {
-    if (_cache.containsKey(id)) {
-      _cache.remove(id);
-      _pendingDeletions.add(id);
-      _notify();
+    final removed = _cache.remove(id);
+    if (removed != null) {
+      if (!WatchHistoryItem.isSecretOrPrivateItem(id, removed.category)) {
+        _pendingDeletions.add(id);
+        _notifySync();
+      }
+      _notifyUi();
       _scheduleDiskWrite();
     }
   }
 
-  /// Xóa mục cục bộ khi đồng bộ nhận được lệnh xóa từ thiết bị khác (không ghi nhận vào pendingDeletions)
   void removeLocalOnly(String id) {
     if (_cache.containsKey(id)) {
       _cache.remove(id);
-      _notify();
+      _notifyUi();
       _scheduleDiskWrite();
     }
   }
 
-  /// Kiểm tra xem có mục lịch sử nào bắt đầu bằng tiền tố id không
   bool hasProgressForPrefix(String prefix) {
     return _cache.keys.any((k) => k == prefix || k.startsWith('$prefix:'));
   }
 
-  /// Xóa tất cả các mục lịch sử có id bắt đầu bằng tiền tố
   void clearProgressForPrefix(String prefix) {
     final keysToRemove = _cache.keys.where((k) => k == prefix || k.startsWith('$prefix:')).toList();
+    bool shouldSync = false;
     for (final k in keysToRemove) {
-      _cache.remove(k);
-      _pendingDeletions.add(k);
+      final removed = _cache.remove(k);
+      if (removed != null && !WatchHistoryItem.isSecretOrPrivateItem(k, removed.category)) {
+        _pendingDeletions.add(k);
+        shouldSync = true;
+      }
     }
     if (keysToRemove.isNotEmpty) {
-      _notify();
+      _notifyUi();
+      if (shouldSync) _notifySync();
       _scheduleDiskWrite();
     }
   }
 
-  /// Xóa toàn bộ lịch sử
   void clearAll({String? category}) {
+    bool shouldSync = false;
     if (category == null) {
-      _pendingDeletions.addAll(_cache.keys);
+      for (final entry in _cache.entries) {
+        if (!WatchHistoryItem.isSecretOrPrivateItem(entry.key, entry.value.category)) {
+          _pendingDeletions.add(entry.key);
+          shouldSync = true;
+        }
+      }
       _cache.clear();
     } else {
-      final toRemove = _cache.values.where((i) => i.category == category).map((i) => i.id).toList();
-      for (final id in toRemove) {
-        _cache.remove(id);
-        _pendingDeletions.add(id);
+      final toRemove = _cache.values.where((i) => i.category == category).toList();
+      for (final item in toRemove) {
+        _cache.remove(item.id);
+        if (!WatchHistoryItem.isSecretOrPrivateItem(item.id, item.category)) {
+          _pendingDeletions.add(item.id);
+          shouldSync = true;
+        }
       }
     }
-    _notify();
+    _notifyUi();
+    if (shouldSync) _notifySync();
     _scheduleDiskWrite();
   }
 
@@ -165,52 +215,71 @@ class WatchHistoryService {
     }
   }
 
-  void _notify() {
+  void _notifyUi() {
     changeNotifier.value++;
+  }
+
+  void _notifySync() {
+    syncTriggerNotifier.value++;
   }
 
   void _scheduleDiskWrite() {
     _writeDebounce?.cancel();
     _writeDebounce = Timer(const Duration(seconds: 4), () {
-      _writeToDisk();
+      _enqueueDiskWrite();
     });
+  }
+
+  Future<void> _enqueueDiskWrite() {
+    _writeQueue = _writeQueue.then((_) => _writeToDisk()).catchError((_) {});
+    return _writeQueue;
   }
 
   Future<void> _writeToDisk() async {
     try {
       final dir = await getApplicationDocumentsDirectory();
       final file = File('${dir.path}/volpi_watch_history.json');
+      final tmpFile = File('${dir.path}/volpi_watch_history.json.tmp');
       final data = {
         'items': _cache.values.map((i) => i.toJson()).toList(),
-        'savedAt': DateTime.now().toIso8601String(),
+        'pendingDeletions': _pendingDeletions.toList(),
+        'savedAt': DateTime.now().toUtc().toIso8601String(),
       };
-      await file.writeAsString(jsonEncode(data), flush: true);
+      await tmpFile.writeAsString(jsonEncode(data), flush: true);
+      await tmpFile.rename(file.path);
     } catch (e) {
       debugPrint('WatchHistoryService._writeToDisk error: $e');
     }
   }
 
-  /// Ghi đĩa tức thì khi app thoát hoặc đóng VideoPlayerScreen
-  Future<void> flush() async {
+  Future<void> flush({bool triggerSync = false}) async {
     _writeDebounce?.cancel();
-    await _writeToDisk();
+    await _enqueueDiskWrite();
+    if (triggerSync) _notifySync();
   }
 
-  /// Xuất dữ liệu cho SyncService
-  List<Map<String, dynamic>> exportForSync({String? excludeCategory}) {
+  List<Map<String, dynamic>> exportForSync({String? excludeCategory = 'secret'}) {
     return _cache.values
-        .where((i) => excludeCategory == null || i.category != excludeCategory)
+        .where((i) {
+          if (excludeCategory == null) return true;
+          if (i.category == excludeCategory) return false;
+          if (excludeCategory == 'secret' && WatchHistoryItem.isSecretOrPrivateItem(i.id, i.category)) {
+            return false;
+          }
+          return true;
+        })
         .map((i) => i.toJson())
         .toList();
   }
 
-  /// Nạp dữ liệu đồng bộ từ server, hợp nhất theo updatedAt
+  /// Nạp dữ liệu đồng bộ từ server, hợp nhất theo updatedAt và tuyệt đối bỏ qua các mục đang chờ xóa cục bộ
   void importFromSync(List<Map<String, dynamic>> items) {
     bool hasChange = false;
     for (final raw in items) {
       try {
         final incoming = WatchHistoryItem.fromJson(raw);
         if (incoming.id.isEmpty) continue;
+        if (_pendingDeletions.contains(incoming.id)) continue;
         final existing = _cache[incoming.id];
         if (existing == null || incoming.updatedAt.compareTo(existing.updatedAt) > 0) {
           _cache[incoming.id] = incoming;
@@ -220,7 +289,7 @@ class WatchHistoryService {
     }
     if (hasChange) {
       _enforceLimit();
-      _notify();
+      _notifyUi();
       _scheduleDiskWrite();
     }
   }

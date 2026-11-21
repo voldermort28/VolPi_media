@@ -27,11 +27,15 @@ Thumbs.db
 *.log
 
 # IPTV & Runtime State files
+.env
 iptv_config.json
 auth_config.json
+auth_lockouts.json
 gdrive_config.json
 telegram_config.json
 telegram_cache.json
+app-tv/android/volpi_release.keystore
+app-tv/android/key.properties
 uploads/
 cache/
 user_data/
