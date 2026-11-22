@@ -5,7 +5,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 import '../models/anime_model.dart';
 import '../models/match_model.dart';
 import '../models/watch_history_model.dart';
@@ -323,10 +322,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> with WidgetsBindi
     return false;
   }
 
+  static const MethodChannel _wakelockChannel = MethodChannel('com.volpi/wakelock');
+
   void _setWakelock(bool enable) {
     try {
-      final fut = enable ? WakelockPlus.enable() : WakelockPlus.disable();
-      unawaited(fut.catchError((_) {}));
+      unawaited(
+        _wakelockChannel.invokeMethod<void>(enable ? 'enable' : 'disable').catchError((_) {}),
+      );
     } catch (_) {}
   }
 

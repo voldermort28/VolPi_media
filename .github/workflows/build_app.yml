@@ -79,9 +79,30 @@ jobs:
           cat << 'EOF' > android/app/src/main/kotlin/com/volpi/volpi_media/MainActivity.kt
           package com.volpi.volpi_media
 
+          import android.view.WindowManager
           import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
 
-          class MainActivity: FlutterActivity()
+          class MainActivity: FlutterActivity() {
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.volpi/wakelock")
+                      .setMethodCallHandler { call, result ->
+                          when (call.method) {
+                              "enable" -> {
+                                  runOnUiThread { window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                                  result.success(null)
+                              }
+                              "disable" -> {
+                                  runOnUiThread { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+                                  result.success(null)
+                              }
+                              else -> result.notImplemented()
+                          }
+                      }
+              }
+          }
           EOF
           mkdir -p android/app/src/main/res
           cp -r /tmp/android_res_backup/* android/app/src/main/res/ 2>/dev/null || true
